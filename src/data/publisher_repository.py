@@ -503,19 +503,21 @@ class PublisherRepository(BaseRepository):
 
     def remove_song_publisher(
         self, source_id: int, publisher_id: int, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Remove a publisher link from a song. Keeps Publisher record.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[PublisherRepository] -> remove_song_publisher(source_id={source_id}, publisher_id={publisher_id})"
         )
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             "DELETE FROM RecordingPublishers WHERE SourceID = ? AND PublisherID = ?",
             (source_id, publisher_id),
         )
         logger.debug("[PublisherRepository] <- remove_song_publisher() done")
+        return cursor.rowcount
 
     def add_album_publisher(
         self,
@@ -555,26 +557,28 @@ class PublisherRepository(BaseRepository):
 
     def remove_album_publisher(
         self, album_id: int, publisher_id: int, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Remove a publisher link from an album. Keeps Publisher record.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[PublisherRepository] -> remove_album_publisher(album_id={album_id}, publisher_id={publisher_id})"
         )
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             "DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?",
             (album_id, publisher_id),
         )
         logger.debug("[PublisherRepository] <- remove_album_publisher() done")
+        return cursor.rowcount
 
     def update_publisher(
         self, publisher_id: int, name: str, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Update a Publisher's name globally. Affects all songs linked to this publisher.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[PublisherRepository] -> update_publisher(publisher_id={publisher_id}, name='{name}')"
@@ -588,13 +592,13 @@ class PublisherRepository(BaseRepository):
             logger.warning(
                 f"[PublisherRepository] update_publisher(id={publisher_id}) NOT_FOUND"
             )
-            raise LookupError(f"Publisher {publisher_id} not found")
         logger.debug("[PublisherRepository] <- update_publisher() done")
+        return cursor.rowcount
 
     def set_parent(
         self, publisher_id: int, parent_id: Optional[int], conn: sqlite3.Connection
-    ) -> None:
-        """Set or clear the ParentPublisherID for a publisher. Does NOT commit."""
+    ) -> int:
+        """Set or clear the ParentPublisherID for a publisher. Returns rowcount. Does NOT commit."""
         logger.debug(
             f"[PublisherRepository] -> set_parent(publisher_id={publisher_id}, parent_id={parent_id})"
         )
@@ -604,8 +608,11 @@ class PublisherRepository(BaseRepository):
             (parent_id, publisher_id),
         )
         if cursor.rowcount == 0:
-            raise LookupError(f"Publisher {publisher_id} not found")
+            logger.warning(
+                f"[PublisherRepository] set_parent(id={publisher_id}) NOT_FOUND"
+            )
         logger.debug("[PublisherRepository] <- set_parent() done")
+        return cursor.rowcount
 
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""

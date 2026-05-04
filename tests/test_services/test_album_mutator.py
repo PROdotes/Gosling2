@@ -80,7 +80,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 3, "name": "Nevermind", "id": 100,
              "track_number": 5, "disc_number": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 3)
         assert any(r["AlbumID"] == 100 and r["TrackNumber"] == 5 for r in links)
@@ -90,7 +90,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 3, "name": "Brand New Album",
              "track_number": 1, "disc_number": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 3)
         assert any(r["AlbumTitle"] == "Brand New Album" for r in links)
@@ -101,7 +101,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 3, "name": "Nevermind", "id": 100,
              "track_number": 1, "disc_number": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 3)
         match = next(r for r in links if r["AlbumID"] == 100)
@@ -113,7 +113,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
              "track_number": 3, "disc_number": 1, "make_primary": True}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 1)
         assert next(r for r in links if r["AlbumID"] == 200)["IsPrimary"] == 1
@@ -125,7 +125,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
              "track_number": 3, "disc_number": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 1)
         assert next(r for r in links if r["AlbumID"] == 100)["IsPrimary"] == 1
@@ -137,7 +137,7 @@ class TestAlbumMutatorAdd:
             {"type": "album", "song_id": 1, "name": "Nevermind", "id": 100,
              "track_number": 1, "disc_number": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         after = _get_song_albums(conn, 1)
         assert len(after) == len(before)
@@ -148,7 +148,7 @@ class TestAlbumMutatorAdd:
              "track_number": 1, "disc_number": 1}
         )
         with pytest.raises(ValueError):
-            mutator.apply_within("bad_action", item, conn, None)
+            mutator.apply_within("bad_action", item, conn)
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ class TestAlbumMutatorRemove:
         item = RemoveAlbumItem.model_validate(
             {"type": "album", "song_id": 1, "id": 100}
         )
-        mutator.apply_within("remove", item, conn, None)
+        mutator.apply_within("remove", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 1)
         assert not any(r["AlbumID"] == 100 for r in links)
@@ -169,7 +169,7 @@ class TestAlbumMutatorRemove:
         item = RemoveAlbumItem.model_validate(
             {"type": "album", "song_id": 1, "id": 100}
         )
-        mutator.apply_within("remove", item, conn, None)
+        mutator.apply_within("remove", item, conn)
         conn.commit()
         assert _get_album_row(conn, 100) is not None
 
@@ -178,7 +178,7 @@ class TestAlbumMutatorRemove:
             {"type": "album", "song_id": 3, "id": 100}
         )
         with pytest.raises(LookupError):
-            mutator.apply_within("remove", item, conn, None)
+            mutator.apply_within("remove", item, conn)
 
     def test_remove_primary_auto_promotes_next(self, mutator, conn):
         # First add a second album to song 1 so there's something to promote to
@@ -186,13 +186,13 @@ class TestAlbumMutatorRemove:
             {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
              "track_number": 3, "disc_number": 1}
         )
-        mutator.apply_within("add", add, conn, None)
+        mutator.apply_within("add", add, conn)
         conn.commit()
 
         remove = RemoveAlbumItem.model_validate(
             {"type": "album", "song_id": 1, "id": 100}
         )
-        mutator.apply_within("remove", remove, conn, None)
+        mutator.apply_within("remove", remove, conn)
         conn.commit()
 
         links = _get_song_albums(conn, 1)
@@ -203,7 +203,7 @@ class TestAlbumMutatorRemove:
         item = RemoveAlbumItem.model_validate(
             {"type": "album", "song_id": 1, "id": 100}
         )
-        mutator.apply_within("remove", item, conn, None)
+        mutator.apply_within("remove", item, conn)
         conn.commit()
         assert _get_song_albums(conn, 1) == []
 
@@ -217,7 +217,7 @@ class TestAlbumMutatorUpdateEntity:
         item = UpdateAlbumEntityItem.model_validate(
             {"type": "album", "id": 100, "title": "Nevermind (Remaster)"}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         row = _get_album_row(conn, 100)
         assert row["AlbumTitle"] == "Nevermind (Remaster)"
@@ -226,7 +226,7 @@ class TestAlbumMutatorUpdateEntity:
         item = UpdateAlbumEntityItem.model_validate(
             {"type": "album", "id": 100, "release_year": 1992}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         row = _get_album_row(conn, 100)
         assert row["ReleaseYear"] == 1992
@@ -234,7 +234,7 @@ class TestAlbumMutatorUpdateEntity:
     def test_update_no_fields_is_noop(self, mutator, conn):
         before = _get_album_row(conn, 100)
         item = UpdateAlbumEntityItem.model_validate({"type": "album", "id": 100})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         after = _get_album_row(conn, 100)
         assert dict(before) == dict(after)
@@ -244,7 +244,7 @@ class TestAlbumMutatorUpdateEntity:
             {"type": "album", "id": 99999, "title": "Ghost"}
         )
         with pytest.raises(LookupError):
-            mutator.apply_within("update", item, conn, None)
+            mutator.apply_within("update", item, conn)
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ class TestAlbumMutatorUpdateSongAlbum:
         item = UpdateSongAlbumItem.model_validate(
             {"type": "song_album", "song_id": 1, "album_id": 100, "track_number": 7}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 1)
         match = next(r for r in links if r["AlbumID"] == 100)
@@ -268,13 +268,13 @@ class TestAlbumMutatorUpdateSongAlbum:
             {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
              "track_number": 3, "disc_number": 1}
         )
-        mutator.apply_within("add", add, conn, None)
+        mutator.apply_within("add", add, conn)
         conn.commit()
 
         item = UpdateSongAlbumItem.model_validate(
             {"type": "song_album", "song_id": 1, "album_id": 200, "is_primary": True}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         links = _get_song_albums(conn, 1)
         assert next(r for r in links if r["AlbumID"] == 200)["IsPrimary"] == 1
@@ -285,4 +285,4 @@ class TestAlbumMutatorUpdateSongAlbum:
             {"type": "song_album", "song_id": 3, "album_id": 100, "track_number": 1}
         )
         with pytest.raises(LookupError):
-            mutator.apply_within("update", item, conn, None)
+            mutator.apply_within("update", item, conn)

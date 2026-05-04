@@ -1,5 +1,5 @@
 import sqlite3
-from uuid import UUID
+from typing import Union
 
 from src.data.publisher_repository import PublisherRepository
 from src.engine.routers.mutation_models import (
@@ -13,7 +13,12 @@ class PublisherMutator:
     def __init__(self, db_path: str):
         self._repo = PublisherRepository(db_path)
 
-    def apply_within(self, action: str, item, conn: sqlite3.Connection, batch_id: UUID) -> None:
+    def apply_within(
+        self,
+        action: str,
+        item: Union[AddPublisherItem, RemovePublisherItem, UpdatePublisherEntityItem],
+        conn: sqlite3.Connection,
+    ) -> None:
         if action == "add":
             self._add(item, conn)
         elif action == "remove":
@@ -31,12 +36,21 @@ class PublisherMutator:
 
     def _remove(self, item: RemovePublisherItem, conn: sqlite3.Connection) -> None:
         if item.song_id is not None:
-            self._repo.remove_song_publisher(item.song_id, item.id, conn)
+            removed = self._repo.remove_song_publisher(item.song_id, item.id, conn)
         else:
-            self._repo.remove_album_publisher(item.album_id, item.id, conn)
+            removed = self._repo.remove_album_publisher(item.album_id, item.id, conn)
+        if removed == 0:
+            raise LookupError(f"Publisher {item.id} not linked")
 
     def _update(self, item: UpdatePublisherEntityItem, conn: sqlite3.Connection) -> None:
-        if item.name is not None:
-            self._repo.update_publisher(item.id, item.name, conn)
-        if item.parent_id is not None or (item.model_fields_set and "parent_id" in item.model_fields_set):
-            self._repo.set_parent(item.id, item.parent_id, conn)
+        fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
+        if not fields:
+            return
+        if "name" in fields:
+            updated = self._repo.update_publisher(item.id, item.name, conn)
+            if updated == 0:
+                raise LookupError(f"Publisher {item.id} not found")
+        if "parent_id" in fields:
+            updated = self._repo.set_parent(item.id, item.parent_id, conn)
+            if updated == 0:
+                raise LookupError(f"Publisher {item.id} not found")

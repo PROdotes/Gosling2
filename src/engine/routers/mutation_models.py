@@ -33,7 +33,7 @@ class AddCreditItem(BaseModel):
 
     @field_validator("name", "role")
     @classmethod
-    def non_empty(cls, v: str) -> str:
+    def not_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must not be blank")
         return v
@@ -55,7 +55,7 @@ class AddTagItem(BaseModel):
 
     @field_validator("name", "category")
     @classmethod
-    def non_empty(cls, v: Optional[str]) -> Optional[str]:
+    def not_empty(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and not v.strip():
             raise ValueError("must not be blank")
         return v
@@ -76,7 +76,7 @@ class AddPublisherItem(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def non_empty(cls, v: str) -> str:
+    def not_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must not be blank")
         return v
@@ -105,7 +105,7 @@ class AddAlbumItem(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def non_empty(cls, v: str) -> str:
+    def not_empty(cls, v: str) -> str:
         if v is not None and not v.strip():
             raise ValueError("must not be blank")
         return v
@@ -177,7 +177,7 @@ class UpdateSongTagItem(BaseModel):
     type: Literal["song_tag"]
     song_id: int
     tag_id: int
-    is_primary: bool
+    is_primary: Optional[bool] = None
 
 
 class UpdateSongAlbumItem(BaseModel):
@@ -303,11 +303,23 @@ class DeleteSongItem(BaseModel):
     id: Optional[int] = None
     unlinked: bool = False
 
+    @model_validator(mode="after")
+    def id_or_unlinked(self) -> "DeleteSongItem":
+        if self.id is None and not self.unlinked:
+            raise ValueError("either id or unlinked=True is required")
+        return self
+
 
 class DeleteTagItem(BaseModel):
     type: Literal["tag"]
     id: Optional[int] = None
     unlinked: bool = False
+
+    @model_validator(mode="after")
+    def id_or_unlinked(self) -> "DeleteTagItem":
+        if self.id is None and not self.unlinked:
+            raise ValueError("either id or unlinked=True is required")
+        return self
 
 
 class DeletePublisherItem(BaseModel):
@@ -315,17 +327,35 @@ class DeletePublisherItem(BaseModel):
     id: Optional[int] = None
     unlinked: bool = False
 
+    @model_validator(mode="after")
+    def id_or_unlinked(self) -> "DeletePublisherItem":
+        if self.id is None and not self.unlinked:
+            raise ValueError("either id or unlinked=True is required")
+        return self
+
 
 class DeleteAlbumItem(BaseModel):
     type: Literal["album"]
     id: Optional[int] = None
     unlinked: bool = False
 
+    @model_validator(mode="after")
+    def id_or_unlinked(self) -> "DeleteAlbumItem":
+        if self.id is None and not self.unlinked:
+            raise ValueError("either id or unlinked=True is required")
+        return self
+
 
 class DeleteIdentityItem(BaseModel):
     type: Literal["identity"]
     id: Optional[int] = None
     unlinked: bool = False
+
+    @model_validator(mode="after")
+    def id_or_unlinked(self) -> "DeleteIdentityItem":
+        if self.id is None and not self.unlinked:
+            raise ValueError("either id or unlinked=True is required")
+        return self
 
 
 DeleteItem = Annotated[

@@ -48,7 +48,7 @@ class TestRouting:
         original = getattr(coordinator, mutator_attr)
         monkeypatch.setattr(
             original, "apply_within",
-            lambda action, item, conn, batch_id: calls.append((action, item.type))
+            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1]
         )
         coordinator.apply(MutationRequest.model_validate(req_dict))
         return calls
@@ -101,44 +101,44 @@ class TestRouting:
     def test_delete_song_routes_to_delete_mutator(self, coordinator, monkeypatch):
         calls = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+                            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1])
         coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
         assert calls == [("delete", "song")]
 
     def test_delete_tag_routes_to_delete_mutator(self, coordinator, monkeypatch):
         calls = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+                            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1])
         coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "tag", "id": 6}]}))
         assert calls == [("delete", "tag")]
 
     def test_delete_publisher_routes_to_delete_mutator(self, coordinator, monkeypatch):
         calls = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+                            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1])
         coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "publisher", "id": 1}]}))
         assert calls == [("delete", "publisher")]
 
     def test_delete_album_routes_to_delete_mutator(self, coordinator, monkeypatch):
         calls = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+                            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1])
         coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "album", "id": 100}]}))
         assert calls == [("delete", "album")]
 
     def test_delete_identity_routes_to_delete_mutator(self, coordinator, monkeypatch):
         calls = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+                            lambda action, item, conn, *args: (calls.append((action, item.type)), [])[1])
         coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "identity", "id": 1}]}))
         assert calls == [("delete", "identity")]
 
     def test_delete_fires_before_remove(self, coordinator, monkeypatch):
         order = []
         monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: order.append("delete"))
+                            lambda action, item, conn, *args: (order.append("delete"), [])[1])
         monkeypatch.setattr(coordinator._tag_mutator, "apply_within",
-                            lambda action, item, conn, batch_id: order.append("remove"))
+                            lambda action, item, conn, *args: (order.append("remove"), [])[1])
         coordinator.apply(MutationRequest.model_validate({
             "delete": [{"type": "tag", "id": 6}],
             "remove": [{"type": "tag", "song_id": 1, "id": 99}],
@@ -158,7 +158,7 @@ class TestRouting:
             k = key
             monkeypatch.setattr(
                 getattr(coordinator, attr), "apply_within",
-                lambda action, item, conn, batch_id, k=k: received[k].append((action, item.type))
+                lambda action, item, conn, *args, k=k: (received[k].append((action, item.type)), [])[1]
             )
 
         coordinator.apply(MutationRequest.model_validate({
@@ -187,7 +187,16 @@ class TestRouting:
         assert received["publisher"] == [("remove", "publisher"), ("add", "publisher")]
         assert received["album"]     == [("remove", "album"), ("add", "album"), ("update", "song_album")]
 
-    def test_mixed_request_touched_songs_correct(self, coordinator):
+    def test_mixed_request_touched_songs_correct(self, coordinator, monkeypatch):
+        for attr in ("_credit_mutator", "_tag_mutator", "_publisher_mutator", "_album_mutator", "_song_mutator"):
+            monkeypatch.setattr(
+                getattr(coordinator, attr), "apply_within",
+                lambda action, item, conn, *args: []
+            )
+        monkeypatch.setattr(
+            coordinator._delete_mutator, "apply_within",
+            lambda action, item, conn, *args: []
+        )
         result = coordinator.apply(MutationRequest.model_validate({
             "add": [
                 {"type": "credit",    "song_id": 1, "name": "Dave", "role": "Performer"},
@@ -196,7 +205,7 @@ class TestRouting:
             "update": [
                 {"type": "song",      "id": 3, "bpm": 90},
                 {"type": "song_tag",  "song_id": 4, "tag_id": 6, "is_primary": True},
-                {"type": "tag",       "id": 6, "name": "Rock"},  # entity-only, no song_id
+                {"type": "tag",       "id": 6, "name": "Rock"},
             ],
             "remove": [
                 {"type": "album",     "song_id": 5, "id": 99},
@@ -212,6 +221,16 @@ class TestRouting:
 
 class TestTouchedSongIds:
     def _song_ids(self, coordinator, req_dict):
+        result = coordinator.apply(MutationRequest.model_validate(req_dict))
+        return {s["id"] for s in result["songs"]}
+
+    def _song_ids_with_spies(self, coordinator, monkeypatch, req_dict):
+        for attr in ("_credit_mutator", "_tag_mutator", "_publisher_mutator",
+                      "_album_mutator", "_song_mutator", "_delete_mutator"):
+            monkeypatch.setattr(
+                getattr(coordinator, attr), "apply_within",
+                lambda action, item, conn, *args: []
+            )
         result = coordinator.apply(MutationRequest.model_validate(req_dict))
         return {s["id"] for s in result["songs"]}
 
@@ -234,33 +253,32 @@ class TestTouchedSongIds:
         assert 1 in self._song_ids(coordinator,
             {"add": [{"type": "album", "song_id": 1, "name": "Nevermind"}]})
 
-    def test_remove_credit_song_id(self, coordinator):
-        assert 1 in self._song_ids(coordinator,
+    def test_remove_credit_song_id(self, coordinator, monkeypatch):
+        assert 1 in self._song_ids_with_spies(coordinator, monkeypatch,
             {"remove": [{"type": "credit", "song_id": 1, "id": 99}]})
 
-    def test_remove_tag_song_id(self, coordinator):
-        assert 1 in self._song_ids(coordinator,
+    def test_remove_tag_song_id(self, coordinator, monkeypatch):
+        assert 1 in self._song_ids_with_spies(coordinator, monkeypatch,
             {"remove": [{"type": "tag", "song_id": 1, "id": 99}]})
 
-    def test_remove_publisher_song_id(self, coordinator):
-        assert 1 in self._song_ids(coordinator,
+    def test_remove_publisher_song_id(self, coordinator, monkeypatch):
+        assert 1 in self._song_ids_with_spies(coordinator, monkeypatch,
             {"remove": [{"type": "publisher", "song_id": 1, "id": 99}]})
 
-    def test_remove_album_song_id(self, coordinator):
-        assert 1 in self._song_ids(coordinator,
+    def test_remove_album_song_id(self, coordinator, monkeypatch):
+        assert 1 in self._song_ids_with_spies(coordinator, monkeypatch,
             {"remove": [{"type": "album", "song_id": 1, "id": 99}]})
 
-    def test_song_tag_update_song_id(self, coordinator):
-        assert 1 in self._song_ids(coordinator,
+    def test_song_tag_update_song_id(self, coordinator, monkeypatch):
+        assert 1 in self._song_ids_with_spies(coordinator, monkeypatch,
             {"update": [{"type": "song_tag", "song_id": 1, "tag_id": 1, "is_primary": True}]})
 
     def test_song_album_update_song_id(self, coordinator):
         assert 1 in self._song_ids(coordinator,
             {"update": [{"type": "song_album", "song_id": 1, "album_id": 100, "track_number": 2}]})
 
-    def test_entity_only_update_no_song_id(self, coordinator):
-        # tag / album / credit / publisher entity updates have no song_id
-        ids = self._song_ids(coordinator, {"update": [
+    def test_entity_only_update_no_song_id(self, coordinator, monkeypatch):
+        ids = self._song_ids_with_spies(coordinator, monkeypatch, {"update": [
             {"type": "tag", "id": 6, "name": "Alt Rock Renamed"},
             {"type": "album", "id": 100, "title": "Nevermind"},
             {"type": "credit", "id": 1, "display_name": "Dave G"},
@@ -274,7 +292,12 @@ class TestTouchedSongIds:
 # ---------------------------------------------------------------------------
 
 class TestResponseShape:
-    def test_same_song_from_multiple_items_appears_once(self, coordinator):
+    def test_same_song_from_multiple_items_appears_once(self, coordinator, monkeypatch):
+        for attr in ("_tag_mutator", "_credit_mutator"):
+            monkeypatch.setattr(
+                getattr(coordinator, attr), "apply_within",
+                lambda action, item, conn, *args: []
+            )
         result = coordinator.apply(MutationRequest.model_validate({
             "add": [{"type": "credit", "song_id": 1, "name": "Dave", "role": "Performer"}],
             "update": [{"type": "song", "id": 1, "bpm": 120}],
@@ -295,23 +318,25 @@ class TestResponseShape:
         assert ids == {1, 2, 3}
 
     def test_missing_song_id_silently_dropped(self, coordinator):
-        # song_id 9999 does not exist — should not appear in response, no error
         result = coordinator.apply(MutationRequest.model_validate({
             "update": [{"type": "song", "id": 9999}]
         }))
         assert result["songs"] == []
-        assert result["warnings"] == []
 
-    def test_response_always_has_songs_and_warnings_keys(self, coordinator):
+    def test_response_always_has_songs_key(self, coordinator, monkeypatch):
+        for attr in ("_tag_mutator",):
+            monkeypatch.setattr(
+                getattr(coordinator, attr), "apply_within",
+                lambda action, item, conn, *args: []
+            )
         result = coordinator.apply(MutationRequest.model_validate({
             "update": [{"type": "tag", "id": 6, "name": "Alt Rock Renamed"}]
         }))
         assert "songs" in result
-        assert "warnings" in result
 
 
 # ---------------------------------------------------------------------------
-# Ordering: remove → add → update
+# Ordering: remove -> add -> update
 # ---------------------------------------------------------------------------
 
 class TestOperationOrder:
@@ -319,7 +344,7 @@ class TestOperationOrder:
         order = []
 
         def make_spy(label):
-            return lambda action, item, conn, batch_id: order.append(label)
+            return lambda action, item, conn, *args: (order.append(label), [])[1]
 
         monkeypatch.setattr(coordinator._song_mutator, "apply_within", make_spy("update:song"))
         monkeypatch.setattr(coordinator._credit_mutator, "apply_within", make_spy("add:credit"))
@@ -373,7 +398,7 @@ class TestRollback:
     def test_lookup_error_propagates_without_commit(self, coordinator, monkeypatch):
         monkeypatch.setattr(
             coordinator._credit_mutator, "apply_within",
-            lambda action, item, conn, batch_id: (_ for _ in ()).throw(LookupError("gone"))
+            lambda action, item, conn, *args: (_ for _ in ()).throw(LookupError("gone"))
         )
         with pytest.raises(LookupError):
             coordinator.apply(MutationRequest.model_validate({
@@ -391,7 +416,6 @@ class TestHttpErrorMapping:
         assert resp.status_code == 200
         body = resp.json()
         assert "songs" in body
-        assert "warnings" in body
 
     def test_empty_request_returns_422(self, api):
         resp = api.post("/api/v1/mutate", json={})

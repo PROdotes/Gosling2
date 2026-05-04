@@ -217,10 +217,10 @@ class SongCreditRepository(BaseRepository):
         finally:
             conn.close()
 
-    def remove_credit(self, credit_id: int, conn: sqlite3.Connection) -> None:
+    def remove_credit(self, credit_id: int, conn: sqlite3.Connection) -> int:
         """
         Remove a single SongCredits link by its CreditID. Keeps ArtistName record.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(f"[SongCreditRepository] -> remove_credit(credit_id={credit_id})")
         cursor = conn.cursor()
@@ -232,10 +232,10 @@ class SongCreditRepository(BaseRepository):
 
     def update_credit_name(
         self, name_id: int, new_name: str, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Update an ArtistName's DisplayName globally. Affects all songs linked to this name.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[SongCreditRepository] -> update_credit_name(name_id={name_id}, new_name='{new_name}')"

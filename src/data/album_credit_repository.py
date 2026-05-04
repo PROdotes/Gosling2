@@ -89,9 +89,9 @@ class AlbumCreditRepository(BaseRepository):
 
     def remove_credit(
         self, album_id: int, name_id: int, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
-        Remove a credit from an album. Deletes link only. Does NOT commit.
+        Remove a credit from an album. Deletes link only. Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[AlbumCreditRepository] -> remove_credit(album_id={album_id}, name_id={name_id})"

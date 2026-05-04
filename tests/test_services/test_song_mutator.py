@@ -64,21 +64,21 @@ def conn(populated_db):
 class TestSongMutatorUpdate:
     def test_update_bpm(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 140})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
         assert row["TempoBPM"] == 140
 
     def test_update_media_name(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "media_name": "New Title"})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
         assert row["MediaName"] == "New Title"
 
     def test_update_notes(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "notes": "some note"})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
         assert row["SourceNotes"] == "some note"
@@ -86,11 +86,11 @@ class TestSongMutatorUpdate:
     def test_clear_notes_with_null(self, mutator, conn):
         # First set a note
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "notes": "temporary"})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         # Then clear it
         item2 = UpdateSongItem.model_validate({"type": "song", "id": 1, "notes": None})
-        mutator.apply_within("update", item2, conn, None)
+        mutator.apply_within("update", item2, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
         assert row["SourceNotes"] is None
@@ -100,7 +100,7 @@ class TestSongMutatorUpdate:
         original_name = before["MediaName"]
         # Only update bpm — media_name must be untouched
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 99})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         after = _fetch_song_row(conn, 1)
         assert after["MediaName"] == original_name
@@ -109,7 +109,7 @@ class TestSongMutatorUpdate:
     def test_no_fields_set_is_noop(self, mutator, conn):
         before = _fetch_song_row(conn, 1)
         item = UpdateSongItem.model_validate({"type": "song", "id": 1})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         after = _fetch_song_row(conn, 1)
         assert dict(before) == dict(after)
@@ -117,9 +117,9 @@ class TestSongMutatorUpdate:
     def test_unknown_song_raises_lookup_error(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 99999, "bpm": 100})
         with pytest.raises(LookupError):
-            mutator.apply_within("update", item, conn, None)
+            mutator.apply_within("update", item, conn)
 
     def test_unsupported_action_raises_value_error(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 100})
         with pytest.raises(ValueError):
-            mutator.apply_within("add", item, conn, None)
+            mutator.apply_within("add", item, conn)

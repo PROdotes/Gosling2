@@ -253,26 +253,28 @@ class TagRepository(BaseRepository):
         logger.debug(f"[TagRepository] <- add_tag() tag_id={tag_id}")
         return self._row_to_tag(row)
 
-    def remove_tag(self, source_id: int, tag_id: int, conn: sqlite3.Connection) -> None:
+    def remove_tag(self, source_id: int, tag_id: int, conn: sqlite3.Connection) -> int:
         """
         Remove a tag link from a song. Keeps Tag record.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[TagRepository] -> remove_tag(source_id={source_id}, tag_id={tag_id})"
         )
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             "DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?",
             (source_id, tag_id),
         )
         logger.debug("[TagRepository] <- remove_tag() done")
+        return cursor.rowcount
 
     def update_tag(
         self, tag_id: int, name: str, category: str, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Update a Tag's name and category globally. Affects all songs linked to this tag.
-        Does NOT commit.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[TagRepository] -> update_tag(tag_id={tag_id}, name='{name}', category='{category}')"
@@ -285,22 +287,22 @@ class TagRepository(BaseRepository):
         )
         if cursor.rowcount == 0:
             logger.warning(f"[TagRepository] update_tag(id={tag_id}) NOT_FOUND")
-            raise LookupError(f"Tag {tag_id} not found")
         logger.debug("[TagRepository] <- update_tag() done")
+        return cursor.rowcount
 
     def set_primary_tag(
         self, source_id: int, tag_id: int, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Set a specific tag as primary for its category (Genre).
         Resets all other genre tags for this song to non-primary.
+        Returns rowcount of the primary set. Does NOT commit.
         """
         logger.debug(
             f"[TagRepository] -> set_primary_tag(source_id={source_id}, tag_id={tag_id})"
         )
         cursor = conn.cursor()
 
-        # 1. Reset all genres for this song
         cursor.execute(
             """
             UPDATE MediaSourceTags 
@@ -312,7 +314,6 @@ class TagRepository(BaseRepository):
             (source_id,),
         )
 
-        # 2. Set target as primary
         cursor.execute(
             "UPDATE MediaSourceTags SET IsPrimary = 1 WHERE SourceID = ? AND TagID = ?",
             (source_id, tag_id),
@@ -321,13 +322,11 @@ class TagRepository(BaseRepository):
             logger.warning(
                 f"[TagRepository] set_primary_tag(song={source_id}, tag={tag_id}) LINK_NOT_FOUND"
             )
-            raise LookupError(
-                f"Link between song {source_id} and tag {tag_id} not found"
-            )
 
         logger.debug(
             f"[TagRepository] <- set_primary_tag(source_id={source_id}, tag_id={tag_id}) OK"
         )
+        return cursor.rowcount
 
     def get_categories(self, conn: Optional[sqlite3.Connection] = None) -> List[str]:
         """Fetch all distinct non-null tag categories, sorted."""

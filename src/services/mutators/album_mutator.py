@@ -1,5 +1,5 @@
 import sqlite3
-from uuid import UUID
+from typing import Union
 
 from src.data.album_repository import AlbumRepository
 from src.data.song_album_repository import SongAlbumRepository
@@ -16,7 +16,12 @@ class AlbumMutator:
         self._album_repo = AlbumRepository(db_path)
         self._song_album_repo = SongAlbumRepository(db_path)
 
-    def apply_within(self, action: str, item, conn: sqlite3.Connection, batch_id: UUID) -> None:
+    def apply_within(
+        self,
+        action: str,
+        item: Union[AddAlbumItem, RemoveAlbumItem, UpdateAlbumEntityItem, UpdateSongAlbumItem],
+        conn: sqlite3.Connection,
+    ) -> None:
         if action == "add":
             self._add(item, conn)
         elif action == "remove":
@@ -49,11 +54,13 @@ class AlbumMutator:
         if was_primary:
             self._song_album_repo.promote_next(item.song_id, conn)
 
-    def _update(self, item, conn: sqlite3.Connection) -> None:
+    def _update(self, item: Union[UpdateAlbumEntityItem, UpdateSongAlbumItem], conn: sqlite3.Connection) -> None:
         if isinstance(item, UpdateAlbumEntityItem):
             self._update_album_entity(item, conn)
         elif isinstance(item, UpdateSongAlbumItem):
             self._update_song_album(item, conn)
+        else:
+            raise ValueError(f"AlbumMutator: unexpected update type '{getattr(item, 'type', '?')}'")
 
     def _update_album_entity(self, item: UpdateAlbumEntityItem, conn: sqlite3.Connection) -> None:
         fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
@@ -64,15 +71,20 @@ class AlbumMutator:
             raise LookupError(f"Album {item.id} not found")
 
     def _update_song_album(self, item: UpdateSongAlbumItem, conn: sqlite3.Connection) -> None:
-        track = item.track_number if item.track_number is not None else ...
-        disc = item.disc_number if item.disc_number is not None else ...
-        if track is not ... or disc is not ...:
+        fields = item.model_dump(exclude={"type", "song_id", "album_id", "is_primary"}, exclude_unset=True)
+        if fields:
+            track = item.track_number if "track_number" in item.model_fields_set else ...
+            disc = item.disc_number if "disc_number" in item.model_fields_set else ...
             updated = self._song_album_repo.update_track_info(item.song_id, item.album_id, track, disc, conn)
             if updated == 0:
                 raise LookupError(f"Album {item.album_id} not linked to song {item.song_id}")
 
         if item.is_primary is not None:
             if item.is_primary:
-                self._song_album_repo.set_primary(item.song_id, item.album_id, conn)
+                updated = self._song_album_repo.set_primary(item.song_id, item.album_id, conn)
+                if updated == 0:
+                    raise LookupError(f"Album {item.album_id} not linked to song {item.song_id}")
             else:
-                self._song_album_repo.clear_primary(item.song_id, item.album_id, conn)
+                updated = self._song_album_repo.clear_primary(item.song_id, item.album_id, conn)
+                if updated == 0:
+                    raise LookupError(f"Album {item.album_id} not linked to song {item.song_id}")

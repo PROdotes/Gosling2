@@ -95,7 +95,7 @@ class TestCreditMutatorAdd:
         item = AddCreditItem.model_validate(
             {"type": "credit", "song_id": 7, "name": "Brand New Artist", "role": "Performer"}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         credits = _get_credits(conn, 7)
         assert any(c["DisplayName"] == "Brand New Artist" and c["RoleName"] == "Performer" for c in credits)
@@ -104,7 +104,7 @@ class TestCreditMutatorAdd:
         item = AddCreditItem.model_validate(
             {"type": "credit", "song_id": 7, "name": "Dave Grohl", "role": "Composer", "id": 1}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         credits = _get_credits(conn, 7)
         match = next((c for c in credits if c["DisplayName"] == "Dave Grohl" and c["RoleName"] == "Composer"), None)
@@ -117,7 +117,7 @@ class TestCreditMutatorAdd:
         item = AddCreditItem.model_validate(
             {"type": "credit", "song_id": 6, "name": "Dave Grohl", "role": "Performer"}
         )
-        mutator.apply_within("add", item, conn, None)
+        mutator.apply_within("add", item, conn)
         conn.commit()
         after = _get_credits(conn, 6)
         assert len(after) == len(before)
@@ -127,7 +127,7 @@ class TestCreditMutatorAdd:
             {"type": "credit", "song_id": 7, "name": "X", "role": "Performer"}
         )
         with pytest.raises(ValueError):
-            mutator.apply_within("bad_action", item, conn, None)
+            mutator.apply_within("bad_action", item, conn)
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ class TestCreditMutatorRemove:
         item = RemoveCreditItem.model_validate(
             {"type": "credit", "song_id": 6, "id": credit_id}
         )
-        mutator.apply_within("remove", item, conn, None)
+        mutator.apply_within("remove", item, conn)
         conn.commit()
         credits = _get_credits(conn, 6)
         assert not any(c["CreditID"] == credit_id for c in credits)
@@ -150,7 +150,7 @@ class TestCreditMutatorRemove:
         item = RemoveCreditItem.model_validate(
             {"type": "credit", "song_id": 6, "id": credit_id}
         )
-        mutator.apply_within("remove", item, conn, None)
+        mutator.apply_within("remove", item, conn)
         conn.commit()
         credits = _get_credits(conn, 6)
         assert any(c["RoleName"] == "Composer" for c in credits)
@@ -160,7 +160,7 @@ class TestCreditMutatorRemove:
             {"type": "credit", "song_id": 6, "id": 99999}
         )
         with pytest.raises(LookupError):
-            mutator.apply_within("remove", item, conn, None)
+            mutator.apply_within("remove", item, conn)
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ class TestCreditMutatorUpdate:
         item = UpdateCreditEntityItem.model_validate(
             {"type": "credit", "id": 10, "display_name": "Dave G."}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         assert _get_display_name(conn, 10) == "Dave G."
 
@@ -182,7 +182,7 @@ class TestCreditMutatorUpdate:
         item = UpdateCreditEntityItem.model_validate(
             {"type": "credit", "id": 10, "display_name": "DG"}
         )
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         for song_id in (6, 8):
             credits = _get_credits(conn, song_id)
@@ -191,7 +191,7 @@ class TestCreditMutatorUpdate:
     def test_update_null_display_name_is_noop(self, mutator, conn):
         original = _get_display_name(conn, 10)
         item = UpdateCreditEntityItem.model_validate({"type": "credit", "id": 10})
-        mutator.apply_within("update", item, conn, None)
+        mutator.apply_within("update", item, conn)
         conn.commit()
         assert _get_display_name(conn, 10) == original
 
@@ -200,4 +200,4 @@ class TestCreditMutatorUpdate:
             {"type": "credit", "id": 99999, "display_name": "Ghost"}
         )
         with pytest.raises(LookupError):
-            mutator.apply_within("update", item, conn, None)
+            mutator.apply_within("update", item, conn)

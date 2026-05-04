@@ -178,10 +178,10 @@ class AlbumRepository(BaseRepository):
 
     def update_album(
         self, album_id: int, fields: dict, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
-        Update editable Album fields. Partial updates — only send changed fields.
-        Does NOT commit.
+        Update editable Album fields. Partial updates -- only send changed fields.
+        Returns rowcount. Does NOT commit.
         """
         logger.debug(
             f"[AlbumRepository] -> update_album(album_id={album_id}, fields={list(fields.keys())})"

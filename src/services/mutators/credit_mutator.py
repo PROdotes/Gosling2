@@ -1,5 +1,5 @@
 import sqlite3
-from uuid import UUID
+from typing import Union
 
 from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.song_credit_repository import SongCreditRepository
@@ -15,7 +15,12 @@ class CreditMutator:
         self._song_repo = SongCreditRepository(db_path)
         self._album_repo = AlbumCreditRepository(db_path)
 
-    def apply_within(self, action: str, item, conn: sqlite3.Connection, batch_id: UUID) -> None:
+    def apply_within(
+        self,
+        action: str,
+        item: Union[AddCreditItem, RemoveCreditItem, UpdateCreditEntityItem],
+        conn: sqlite3.Connection,
+    ) -> None:
         if action == "add":
             self._add(item, conn)
         elif action == "remove":

@@ -68,17 +68,17 @@ def conn(populated_db):
 
 class TestDeleteSong:
     def test_soft_deletes_song(self, mutator, conn):
-        mutator.apply_within("delete", DeleteSongItem(type="song", id=1), conn, None)
+        mutator.apply_within("delete", DeleteSongItem(type="song", id=1), conn)
         conn.commit()
         assert _is_deleted(conn, "MediaSources", "SourceID", 1)
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeleteSongItem(type="song", id=9999), conn, None)
+            mutator.apply_within("delete", DeleteSongItem(type="song", id=9999), conn)
 
     def test_wrong_action_raises_value_error(self, mutator, conn):
         with pytest.raises(ValueError):
-            mutator.apply_within("remove", DeleteSongItem(type="song", id=1), conn, None)
+            mutator.apply_within("remove", DeleteSongItem(type="song", id=1), conn)
 
 
 # ---------------------------------------------------------------------------
@@ -89,18 +89,18 @@ class TestDeleteTag:
     def test_soft_deletes_unlinked_tag(self, mutator, conn):
         # Insert an unlinked tag to delete
         conn.execute("INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (99, 'Orphan', 'Genre')")
-        mutator.apply_within("delete", DeleteTagItem(type="tag", id=99), conn, None)
+        mutator.apply_within("delete", DeleteTagItem(type="tag", id=99), conn)
         conn.commit()
         assert _is_deleted(conn, "Tags", "TagID", 99)
 
     def test_linked_tag_raises_value_error(self, mutator, conn):
         # Tag 1 (Grunge) is linked to song 1
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeleteTagItem(type="tag", id=1), conn, None)
+            mutator.apply_within("delete", DeleteTagItem(type="tag", id=1), conn)
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeleteTagItem(type="tag", id=9999), conn, None)
+            mutator.apply_within("delete", DeleteTagItem(type="tag", id=9999), conn)
 
 
 # ---------------------------------------------------------------------------
@@ -110,18 +110,18 @@ class TestDeleteTag:
 class TestDeletePublisher:
     def test_soft_deletes_unlinked_publisher(self, mutator, conn):
         # Publisher 2 (Island Records) has no song or album links
-        mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=2), conn, None)
+        mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=2), conn)
         conn.commit()
         assert _is_deleted(conn, "Publishers", "PublisherID", 2)
 
     def test_linked_publisher_raises_value_error(self, mutator, conn):
         # Publisher 10 (DGC Records) linked to song 1
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=10), conn, None)
+            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=10), conn)
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=9999), conn, None)
+            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=9999), conn)
 
 
 # ---------------------------------------------------------------------------
@@ -131,18 +131,18 @@ class TestDeletePublisher:
 class TestDeleteAlbum:
     def test_soft_deletes_unlinked_album(self, mutator, conn):
         conn.execute("INSERT INTO Albums (AlbumID, AlbumTitle) VALUES (999, 'Orphan Album')")
-        mutator.apply_within("delete", DeleteAlbumItem(type="album", id=999), conn, None)
+        mutator.apply_within("delete", DeleteAlbumItem(type="album", id=999), conn)
         conn.commit()
         assert _is_deleted(conn, "Albums", "AlbumID", 999)
 
     def test_linked_album_raises_value_error(self, mutator, conn):
         # Album 100 linked to song 1
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeleteAlbumItem(type="album", id=100), conn, None)
+            mutator.apply_within("delete", DeleteAlbumItem(type="album", id=100), conn)
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeleteAlbumItem(type="album", id=9999), conn, None)
+            mutator.apply_within("delete", DeleteAlbumItem(type="album", id=9999), conn)
 
 
 # ---------------------------------------------------------------------------
@@ -153,15 +153,15 @@ class TestDeleteIdentity:
     def test_soft_deletes_unlinked_identity(self, mutator, conn):
         # Insert a fresh identity with no credits
         conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
-        mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=999), conn, None)
+        mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=999), conn)
         conn.commit()
         assert _is_deleted(conn, "Identities", "IdentityID", 999)
 
     def test_linked_identity_raises_value_error(self, mutator, conn):
         # Identity 1 (Dave Grohl) credited on multiple songs
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=1), conn, None)
+            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=1), conn)
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=9999), conn, None)
+            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=9999), conn)
