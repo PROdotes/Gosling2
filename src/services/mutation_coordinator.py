@@ -1,15 +1,19 @@
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from src.data.base_repository import BaseRepository
-from src.engine.config import AUTO_SAVE_ID3, LIBRARY_ROOT, RENAME_RULES_PATH
+from src.data.staging_repository import StagingRepository
+from src.engine.config import LIBRARY_ROOT, RENAME_RULES_PATH, STAGING_DIR
 from src.engine.routers.mutation_models import (
+    DeleteOriginalFileItem,
+    DeleteSongItem,
     MutationRequest,
     UpdateSongItem,
 )
 from src.services.filing_service import FilingService
-from src.services.library_service import LibraryService
 from src.services.logger import logger
+from src.services.library_service import LibraryService
 from src.services.metadata_writer import MetadataWriter
 
 from src.services.mutators.album_mutator import AlbumMutator
@@ -37,15 +41,32 @@ class MutationCoordinator:
         self._publisher_mutator = PublisherMutator(db_path)
         self._album_mutator = AlbumMutator(db_path)
         self._delete_mutator = DeleteMutator(db_path)
+        self._staging_repo = StagingRepository(db_path)
         self._id3_writer = MetadataWriter()
         self._filing = FilingService(RENAME_RULES_PATH)
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
         conn = self._conn_factory.get_connection()
+        copied_files: list[tuple[str, str]] = []  # (old_path, new_path)
         try:
             touched_song_ids: set[int] = set()
 
+            deleted_songs = []
+            delete_file_ids: set[int] = set()
             for item in (body.delete or []):
+                if isinstance(item, DeleteOriginalFileItem):
+                    origin = self._staging_repo.get_origin(item.song_id)
+                    if origin and Path(origin).exists():
+                        Path(origin).unlink()
+                        logger.info(f"[MutationCoordinator] Deleted original source: {origin}")
+                    self._staging_repo.clear_origin(item.song_id)
+                    continue
+                if isinstance(item, DeleteSongItem):
+                    song = self._library.get_song(item.id, conn)
+                    if song:
+                        deleted_songs.append(song)
+                    if item.delete_file and item.id:
+                        delete_file_ids.add(item.id)
                 self._delete_mutator.apply_within("delete", item, conn)
 
             for item in (body.remove or []):
@@ -60,8 +81,6 @@ class MutationCoordinator:
                 self._route(item, "update", conn)
                 self._collect_touched(item, touched_song_ids)
 
-            conn.commit()
-
             songs = []
             warnings = []
             for song_id in sorted(touched_song_ids):
@@ -69,22 +88,40 @@ class MutationCoordinator:
                 if not post:
                     continue
                 songs.append(post)
-                if AUTO_SAVE_ID3:
-                    try:
-                        self._id3_writer.write_metadata(post)
-                    except Exception as e:
-                        logger.error(f"ID3 write failed for song {song_id}: {e}")
-                        warnings.append({"song_id": song_id, "kind": "id3_write", "error": str(e)})
-                try:
-                    self._filing.move_if_needed(post, LIBRARY_ROOT)
-                except Exception as e:
-                    logger.error(f"File move failed for song {song_id}: {e}")
-                    warnings.append({"song_id": song_id, "kind": "file_move", "error": str(e)})
+                warnings += self._filing.write_id3_if_needed(post, self._id3_writer)
+                copy_warnings, new_path = self._filing.copy_if_needed(post, LIBRARY_ROOT)
+                warnings += copy_warnings
+                if new_path:
+                    copied_files.append((post.source_path, new_path))
+                    self._song_mutator.apply_within(
+                        "update",
+                        UpdateSongItem(type="song", id=song_id, source_path=new_path),
+                        conn,
+                    )
+
+            conn.commit()
+
+            for song in deleted_songs:
+                if song.id in delete_file_ids:
+                    self._filing.delete_physical_file(song)
+                else:
+                    self._filing.delete_staging_file(song, Path(STAGING_DIR))
+
+            for old_path, _ in copied_files:
+                old = Path(old_path)
+                if old.exists():
+                    old.unlink()
+                    logger.debug(f"[MutationCoordinator] Deleted original after move: {old}")
 
             return {"songs": [s.model_dump() for s in songs], "warnings": warnings}
 
         except Exception:
             conn.rollback()
+            for _, new_path in copied_files:
+                new = Path(new_path)
+                if new.exists():
+                    new.unlink()
+                    logger.debug(f"[MutationCoordinator] Deleted copy after rollback: {new}")
             raise
         finally:
             conn.close()

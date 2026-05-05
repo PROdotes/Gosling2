@@ -195,30 +195,44 @@ class FilingService:
         shutil.copy2(str(source_path), str(target_absolute))
         return target_absolute
 
-    def move_if_needed(self, song: Song, library_root: Path) -> None:
-        """Move song to library if AUTO_MOVE_ON_APPROVE is enabled and song is approved (status 0)."""
+    def write_id3_if_needed(self, song: Song, writer) -> list[dict]:
+        from src.engine.config import AUTO_SAVE_ID3
+        if not AUTO_SAVE_ID3:
+            return []
+        try:
+            writer.write_metadata(song)
+            return []
+        except Exception as e:
+            logger.error(f"[FilingService] ID3 write failed for song {song.id}: {e}")
+            return [{"song_id": song.id, "kind": "id3_write", "error": str(e)}]
+
+    def delete_staging_file(self, song: Song, staging_dir: Path) -> None:
+        """Deletes the physical file if it lives inside the staging directory."""
+        source = Path(song.source_path)
+        if not source.is_relative_to(staging_dir):
+            return
+        if source.exists():
+            source.unlink()
+            logger.info(f"[FilingService] Deleted staging file: {source}")
+
+    def delete_physical_file(self, song: Song) -> None:
+        """Deletes the physical file unconditionally, regardless of location."""
+        source = Path(song.source_path)
+        if source.exists():
+            source.unlink()
+            logger.info(f"[FilingService] Deleted physical file: {source}")
+
+    def copy_if_needed(self, song: Song, library_root: Path) -> tuple[list[dict], str | None]:
+        """Copy song to library if AUTO_MOVE_ON_APPROVE is enabled and song is reviewed.
+        Returns (warnings, new_path). Does NOT delete the source — caller handles that after DB commit."""
         from src.engine.config import AUTO_MOVE_ON_APPROVE, ProcessingStatus
         if not AUTO_MOVE_ON_APPROVE:
-            return
+            return [], None
         if song.processing_status != ProcessingStatus.REVIEWED:
-            return
-        self.move_to_library(song, library_root)
-
-    def move_to_library(self, song: Song, library_root: Path) -> Path:
-        """Organizes a file into the library and removes the old source."""
-        source_path = Path(song.source_path)
-        target_path = self.copy_to_library(song, library_root)
-
-        # Safe comparison: samefile() handles different path formats pointing to same inode
-        is_same = False
+            return [], None
         try:
-            if source_path.exists() and target_path.exists():
-                is_same = source_path.samefile(target_path)
+            new_path = self.copy_to_library(song, library_root)
+            return [], str(new_path)
         except Exception as e:
-            logger.warning(f"[FilingService] samefile() check failed for {source_path} vs {target_path}: {e}")
-
-        if source_path.exists() and not is_same:
-            source_path.unlink()
-            logger.debug(f"[FilingService] Unlinked old source: {source_path}")
-
-        return target_path
+            logger.error(f"[FilingService] File copy failed for song {song.id}: {e}")
+            return [{"song_id": song.id, "kind": "file_move", "error": str(e)}], None

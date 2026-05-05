@@ -93,11 +93,13 @@ async def _stream_ingestion(service, work_items):
                 if res.get("song"):
                     res["song"] = SongView.from_domain(res["song"])
 
-            service._ingestion_service._update_task(task_id, res["status"])
+            completed = service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
             report = IngestionReportView(**res) if not isinstance(res, IngestionReportView) else res
             yield f"{json.dumps(jsonable_encoder({**status, 'filename': Path(staged_path).name, 'last_result': report}))}\n"
             await asyncio.sleep(0)
+            if completed:
+                service._ingestion_service.reset_session_status()
 
     except Exception as e:
         logger.error(f"[IngestRouter] Stream error: {e}")

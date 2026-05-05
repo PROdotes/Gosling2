@@ -8,13 +8,14 @@ import {
     getAcceptedFormats,
     getAlbumDetail,
     getArtistSongs,
-    getCatalogSong,
     getArtistTree,
+    getCatalogSong,
     getIngestStatus,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
     getTagDetail,
+    getTagSongs,
     isAbortError,
     resetIngestStatus,
     searchAlbums,
@@ -22,14 +23,9 @@ import {
     searchPublishers,
     searchSongs,
     searchTags,
-    getTagSongs,
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
-import {
-    basename,
-    isModalOpen,
-    renderEmptyState,
-} from "./components/utils.js";
+import { basename, isModalOpen, renderEmptyState } from "./components/utils.js";
 import { FilterSidebarHandler } from "./handlers/filter_sidebar.js";
 import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
@@ -44,7 +40,13 @@ import {
     renderArtistDetailLoading,
     renderArtists,
 } from "./renderers/artists.js";
-import { handleIngestDrop, insertPendingCard, trackIngestResult, resolvePendingCard, INGEST_RESULTS_LIST_ID } from "./renderers/ingestion.js";
+import {
+    handleIngestDrop,
+    INGEST_RESULTS_LIST_ID,
+    insertPendingCard,
+    resolvePendingCard,
+    trackIngestResult,
+} from "./renderers/ingestion.js";
 import {
     renderPublisherDetailComplete,
     renderPublisherDetailLoading,
@@ -268,7 +270,10 @@ const ctx = {
         }
     },
     performSearch: (query) => {
-        if (state.currentMode === "songs" && filterSidebar?.hasActiveFilters()) {
+        if (
+            state.currentMode === "songs" &&
+            filterSidebar?.hasActiveFilters()
+        ) {
             filterSidebar.reapply();
         } else {
             performSearch(query);
@@ -355,10 +360,11 @@ let lastFilteredItems = null;
 function applySearchToFilteredItems(items, query) {
     if (!query) return items;
     const q = query.toLowerCase();
-    return items.filter((s) =>
-        (s.display_title || s.media_name || "").toLowerCase().includes(q) ||
-        (s.display_artist || "").toLowerCase().includes(q) ||
-        (s.primary_genre || "").toLowerCase().includes(q)
+    return items.filter(
+        (s) =>
+            (s.display_title || s.media_name || "").toLowerCase().includes(q) ||
+            (s.display_artist || "").toLowerCase().includes(q) ||
+            (s.primary_genre || "").toLowerCase().includes(q),
     );
 }
 
@@ -368,7 +374,10 @@ const filterSidebar = new FilterSidebarHandler({
         try {
             const items = await resultPromise;
             lastFilteredItems = items;
-            const visible = applySearchToFilteredItems(items, state.currentQuery);
+            const visible = applySearchToFilteredItems(
+                items,
+                state.currentQuery,
+            );
             setActiveCache("songs", visible);
             renderSongs(ctx, visible);
         } catch (err) {
@@ -524,14 +533,6 @@ async function switchMode(mode) {
     state.currentQuery = "";
     state.selectedIndex = -1;
 
-    if (mode === "ingest" && state.pendingCount === 0) {
-        try {
-            await resetIngestStatus();
-            updateIngestBadges({ success: 0, action: 0, pending: 0 });
-        } catch (e) {
-            console.error("Failed to reset ingest status:", e);
-        }
-    }
     elements.searchInput.value = "";
     filterSidebar.setSearchText("");
     syncModeUi();
@@ -768,7 +769,9 @@ async function openSelectedResult(index) {
         };
         state.chipHandles = wireChipInputs(
             result,
-            () => { ctx.refreshActiveSongV2(result.id); },
+            () => {
+                ctx.refreshActiveSongV2(result.id);
+            },
             state.onSplit,
             state.validationRules,
             state.onSplitPublisher,
@@ -783,11 +786,15 @@ async function openSelectedResult(index) {
                 state.scalarHandles = wireScalarInputs(
                     state.activeSong,
                     state.validationRules,
-                    () => { ctx.refreshActiveSongV2(state.activeSong.id); },
+                    () => {
+                        ctx.refreshActiveSongV2(state.activeSong.id);
+                    },
                 );
                 state.chipHandles = wireChipInputs(
                     state.activeSong,
-                    () => { ctx.refreshActiveSongV2(state.activeSong.id); },
+                    () => {
+                        ctx.refreshActiveSongV2(state.activeSong.id);
+                    },
                     state.onSplit,
                     state.validationRules,
                     state.onSplitPublisher,
@@ -901,20 +908,46 @@ async function setupHeaderDropZone() {
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
-                insertPendingCard(INGEST_RESULTS_LIST_ID, update.filename, update.is_wav);
+                insertPendingCard(
+                    INGEST_RESULTS_LIST_ID,
+                    update.filename,
+                    update.is_wav,
+                );
                 updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
-                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
+                updateIngestBadges({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                    currentFile: null,
+                });
                 const res = update.last_result;
                 if (res) {
-                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
-                    resolvePendingCard(INGEST_RESULTS_LIST_ID, res, fileName, update.filename);
+                    const fileName =
+                        basename(res.song?.source_path) ||
+                        basename(res.staged_path) ||
+                        "Unknown";
+                    resolvePendingCard(
+                        INGEST_RESULTS_LIST_ID,
+                        res,
+                        fileName,
+                        update.filename,
+                    );
                     trackIngestResult(res, fileName, { getState: () => state });
                     const title = res.display_title || "Unknown File";
                     const severity = res.status_severity || "error";
-                    const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
-                    showToast(`${res.status_label}: ${title}`, severity, duration);
+                    const duration =
+                        severity === "error"
+                            ? 5000
+                            : severity === "success"
+                              ? 2000
+                              : 3000;
+                    showToast(
+                        `${res.status_label}: ${title}`,
+                        severity,
+                        duration,
+                    );
                 }
             },
             onError(err) {
@@ -955,20 +988,46 @@ async function setupSongsWorkspaceDropZone() {
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
-                insertPendingCard(INGEST_RESULTS_LIST_ID, update.filename, update.is_wav);
+                insertPendingCard(
+                    INGEST_RESULTS_LIST_ID,
+                    update.filename,
+                    update.is_wav,
+                );
                 updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
-                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
+                updateIngestBadges({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                    currentFile: null,
+                });
                 const res = update.last_result;
                 if (res) {
-                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
-                    resolvePendingCard(INGEST_RESULTS_LIST_ID, res, fileName, update.filename);
+                    const fileName =
+                        basename(res.song?.source_path) ||
+                        basename(res.staged_path) ||
+                        "Unknown";
+                    resolvePendingCard(
+                        INGEST_RESULTS_LIST_ID,
+                        res,
+                        fileName,
+                        update.filename,
+                    );
                     trackIngestResult(res, fileName, { getState: () => state });
                     const title = res.display_title || "Unknown File";
                     const severity = res.status_severity || "error";
-                    const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
-                    showToast(`${res.status_label}: ${title}`, severity, duration);
+                    const duration =
+                        severity === "error"
+                            ? 5000
+                            : severity === "success"
+                              ? 2000
+                              : 3000;
+                    showToast(
+                        `${res.status_label}: ${title}`,
+                        severity,
+                        duration,
+                    );
                 }
             },
             onError(err) {
@@ -1041,8 +1100,15 @@ elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
     filterSidebar.setSearchText(state.currentQuery);
-    if (state.currentMode === "songs" && filterSidebar.hasActiveFilters() && lastFilteredItems !== null) {
-        const visible = applySearchToFilteredItems(lastFilteredItems, state.currentQuery);
+    if (
+        state.currentMode === "songs" &&
+        filterSidebar.hasActiveFilters() &&
+        lastFilteredItems !== null
+    ) {
+        const visible = applySearchToFilteredItems(
+            lastFilteredItems,
+            state.currentQuery,
+        );
         setActiveCache("songs", visible);
         renderSongs(ctx, visible);
         return;

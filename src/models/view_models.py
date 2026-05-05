@@ -528,6 +528,11 @@ class AlbumView(BaseModel):
     def song_count(self) -> int:
         return len(self.songs)
 
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        return self.song_count == 0
+
 
 class TagView(BaseModel):
     """View-model for tag detail."""

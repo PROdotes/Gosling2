@@ -132,6 +132,8 @@ class UpdateSongItem(BaseModel):
     year: Optional[int] = None
     isrc: Optional[str] = None
     is_active: Optional[bool] = None
+    processing_status: Optional[int] = None
+    source_path: Optional[str] = None
     notes: Optional[str] = None
 
     @field_validator("media_name")
@@ -304,6 +306,7 @@ class DeleteSongItem(BaseModel):
     type: Literal["song"]
     id: Optional[int] = None
     unlinked: bool = False
+    delete_file: bool = False
 
     @model_validator(mode="after")
     def id_or_unlinked(self) -> "DeleteSongItem":
@@ -360,8 +363,13 @@ class DeleteIdentityItem(BaseModel):
         return self
 
 
+class DeleteOriginalFileItem(BaseModel):
+    type: Literal["original_file"]
+    song_id: int
+
+
 DeleteItem = Annotated[
-    Union[DeleteSongItem, DeleteTagItem, DeletePublisherItem, DeleteAlbumItem, DeleteIdentityItem],
+    Union[DeleteSongItem, DeleteTagItem, DeletePublisherItem, DeleteAlbumItem, DeleteIdentityItem, DeleteOriginalFileItem],
     Field(discriminator="type"),
 ]
 

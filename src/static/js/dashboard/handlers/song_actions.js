@@ -4,35 +4,38 @@
  */
 
 import {
-    getSongSyncStatus,
-    syncAlbumFromSong,
-    deleteSong,
-    rejectSong,
-    patchSongScalars,
-    mutate,
-    moveSongToLibrary,
     cleanupOriginalFile,
-    syncSongId3,
-    setPrimarySongTag,
-    removeSongTag,
-    removeSongCredit,
-    removeSongAlbum,
+    deleteSong,
     formatText,
-    getSongWebSearch,
-    resolveConflict,
     getIngestStatus,
-    removeSongPublisher,
-    removeAlbumPublisher,
-    removeAlbumCredit,
-    updateAlbum,
+    getSongSyncStatus,
+    getSongWebSearch,
+    moveSongToLibrary,
+    mutate,
+    patchSongScalars,
     quickCreateAlbum,
+    rejectSong,
+    removeAlbumCredit,
+    removeAlbumPublisher,
+    removeSongAlbum,
+    removeSongCredit,
+    removeSongPublisher,
+    removeSongTag,
+    resolveConflict,
+    setPrimarySongTag,
+    syncAlbumFromSong,
+    syncSongId3,
+    updateAlbum,
 } from "../api.js";
-import { showToast } from "../components/toast.js";
-import { isModalOpen } from "../components/utils.js";
 import { closeEditModal } from "../components/edit_modal.js";
 import { closeLinkModal } from "../components/link_modal.js";
+import { showToast } from "../components/toast.js";
+import { isModalOpen } from "../components/utils.js";
 import { PROCESSING_STATUS } from "../constants.js";
-import { resolvePendingCard, INGEST_RESULTS_LIST_ID } from "../renderers/ingestion.js";
+import {
+    INGEST_RESULTS_LIST_ID,
+    resolvePendingCard,
+} from "../renderers/ingestion.js";
 
 export async function updateSyncLed(songId) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
@@ -45,7 +48,9 @@ export async function updateSyncLed(songId) {
     if (mismatchEl) mismatchEl.textContent = "";
     try {
         const result = await getSongSyncStatus(songId);
-        led.style.background = result.in_sync ? "var(--success)" : "var(--danger)";
+        led.style.background = result.in_sync
+            ? "var(--success)"
+            : "var(--danger)";
         led.title = result.in_sync
             ? "In sync"
             : `Out of sync:\n${result.mismatches.join("\n")}`;
@@ -61,9 +66,8 @@ export async function updateSyncLed(songId) {
     }
 }
 
-import { activateInlineEdit } from "../components/inline_editor.js";
-
 import { showConfirm } from "../components/confirm_modal.js";
+import { activateInlineEdit } from "../components/inline_editor.js";
 
 export class SongActionsHandler {
     constructor(ctx, _window = typeof window !== "undefined" ? window : null) {
@@ -186,10 +190,17 @@ export class SongActionsHandler {
         actionTarget.disabled = true;
         actionTarget.textContent = "Deleting...";
 
-        const processingStatus = parseInt(actionTarget.dataset.processingStatus ?? "-1", 10);
-        const deleteFile = processingStatus === 0
-            ? await showConfirm("Also delete the file from disk?", { title: "Delete File", okLabel: "Delete File" })
-            : false;
+        const processingStatus = parseInt(
+            actionTarget.dataset.processingStatus ?? "-1",
+            10,
+        );
+        const deleteFile =
+            processingStatus === 0
+                ? await showConfirm("Also delete the file from disk?", {
+                      title: "Delete File",
+                      okLabel: "Delete File",
+                  })
+                : false;
 
         try {
             await deleteSong(id, deleteFile);
@@ -263,7 +274,10 @@ export class SongActionsHandler {
             actionTarget.classList.remove("confirming");
             actionTarget.textContent = "Reject Song";
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Rejection failed: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Rejection failed: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -288,7 +302,9 @@ export class SongActionsHandler {
 
         try {
             await mutate({
-                update: [{ type: "song", id: Number(id), is_active: isChecked }],
+                update: [
+                    { type: "song", id: Number(id), is_active: isChecked },
+                ],
             });
 
             // Sync current items in any list results
@@ -332,6 +348,13 @@ export class SongActionsHandler {
         );
     }
 
+    async handleMarkReviewed(actionTarget) {
+        return this._handleReviewStatus(
+            actionTarget,
+            PROCESSING_STATUS.REVIEWED,
+        );
+    }
+
     async handleUnreviewSong(actionTarget) {
         return this._handleReviewStatus(
             actionTarget,
@@ -342,7 +365,18 @@ export class SongActionsHandler {
     async _handleReviewStatus(actionTarget, newStatus) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            await patchSongScalars(id, { processing_status: newStatus });
+            const result = await patchSongScalars(id, {
+                processing_status: newStatus,
+            });
+            if (result?.warnings?.length) {
+                const msg = result.warnings
+                    .map((w) => w.error || w.kind)
+                    .join("; ");
+                showToast(
+                    `Status updated but file operation failed: ${msg}`,
+                    "warning",
+                );
+            }
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(id);
             }
@@ -364,7 +398,7 @@ export class SongActionsHandler {
 
         try {
             await moveSongToLibrary(id);
-            
+
             // Check for original file cleanup reminder
             const state = this.ctx.getState();
             const song = state.activeSong;
@@ -384,16 +418,19 @@ export class SongActionsHandler {
                         {
                             title: "Cleanup Original File",
                             okLabel: "Yes, Delete Original",
-                            cancelLabel: "Not Now"
-                        }
+                            cancelLabel: "Not Now",
+                        },
                     );
                     if (cleanNow) {
                         try {
-                            await cleanupOriginalFile(null, id);
+                            await cleanupOriginalFile(id);
                             showToast("Original file deleted.", "success");
                             await this.ctx.refreshActiveSongV2(id);
                         } catch (cleanErr) {
-                            showToast(`Cleanup failed: ${cleanErr.message}`, "error");
+                            showToast(
+                                `Cleanup failed: ${cleanErr.message}`,
+                                "error",
+                            );
                         }
                     }
                 }
@@ -557,7 +594,9 @@ export class SongActionsHandler {
         if (entityType === "song") {
             input = document.getElementById("ef-title");
         } else if (entityType === "album") {
-            input = document.querySelector(`[data-album-scalar="${field}"][data-album-id="${entityId}"]`);
+            input = document.querySelector(
+                `[data-album-scalar="${field}"][data-album-id="${entityId}"]`,
+            );
         }
         if (!input || !input.value.trim()) return;
         try {
@@ -566,7 +605,10 @@ export class SongActionsHandler {
             input.dispatchEvent(new Event("blur"));
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Formatting failed: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Formatting failed: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -574,7 +616,7 @@ export class SongActionsHandler {
     async handleWebSearch(actionTarget) {
         const { engine } = actionTarget.dataset;
         const songId =
-            actionTarget.dataset.songId || 
+            actionTarget.dataset.songId ||
             actionTarget.dataset.id ||
             actionTarget
                 .closest(".web-search-split")
@@ -644,21 +686,31 @@ export class SongActionsHandler {
                 { method: "POST" },
             );
             const data = await res.json();
-            if (!res.ok || data.status === "ERROR") throw new Error(data.message || "Conversion failed");
+            if (!res.ok || data.status === "ERROR")
+                throw new Error(data.message || "Conversion failed");
 
             const card = actionTarget.closest(".result-card");
             const path = data.song?.source_path || stagedPath;
             if (card) {
                 const filename = stagedPath.split(/[\\/]/).pop();
                 card.dataset.pendingFile = filename;
-                resolvePendingCard(INGEST_RESULTS_LIST_ID, data, path, filename);
+                resolvePendingCard(
+                    INGEST_RESULTS_LIST_ID,
+                    data,
+                    path,
+                    filename,
+                );
             }
             if (this.ctx.updateCachedIngestResult) {
                 this.ctx.updateCachedIngestResult(stagedPath, { ...data });
             }
             if (this.ctx.updateIngestBadges) {
                 const status = await getIngestStatus();
-                this.ctx.updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+                this.ctx.updateIngestBadges({
+                    success: status.success,
+                    action: status.action,
+                    pending: status.pending,
+                });
             }
             showToast("Conversion complete!", "success");
         } catch (err) {
@@ -749,7 +801,7 @@ export class SongActionsHandler {
         actionTarget.style.pointerEvents = "none";
         const songId = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            await cleanupOriginalFile(path, songId);
+            await cleanupOriginalFile(songId);
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
@@ -995,7 +1047,10 @@ export class SongActionsHandler {
         try {
             await quickCreateAlbum(songId, song.media_name);
             await this.ctx.refreshActiveDetail();
-            showToast(`Album "${song.media_name}" created & synced.`, "success");
+            showToast(
+                `Album "${song.media_name}" created & synced.`,
+                "success",
+            );
 
             actionTarget.disabled = false;
             actionTarget.classList.remove("loading");
@@ -1005,7 +1060,10 @@ export class SongActionsHandler {
             actionTarget.classList.remove("loading");
             actionTarget.innerHTML = originalHtml;
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Quick Create failed: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Quick Create failed: ${err.message}`,
+                    "error",
+                );
             }
         }
     }

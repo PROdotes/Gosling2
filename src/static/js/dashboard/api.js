@@ -513,8 +513,8 @@ export function applyFilenameParsing(items, pattern) {
     });
 }
 
-export function cleanupOriginalFile(filePath = null, songId = null) {
-    return mutate({ remove: [{ type: "original_file", file_path: filePath, song_id: songId }] });
+export function cleanupOriginalFile(songId) {
+    return mutate({ delete: [{ type: "original_file", song_id: songId }] });
 }
 
 export function getPendingConvert() {

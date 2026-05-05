@@ -747,21 +747,19 @@ class SongRepository(MediaSourceRepository):
                         [v for pair in parsed for v in (pair[1], pair[0])],
                     )
 
-        # 4. Statuses
+        # 4. Statuses — each selected status is its own subquery so ALL mode ANDs them
         if statuses:
             status_map = {
                 "done": f"m.ProcessingStatus = {ProcessingStatus.REVIEWED}",
                 "not_done": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED}",
-                "missing_data": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND ({BLOCKER_SQL})",
+                "missing_data": f"({BLOCKER_SQL})",
                 "ready_to_finalize": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND {NO_BLOCKER_SQL}",
             }
-            parts = [
-                f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE m.IsDeleted = 0 AND {status_map[s]}"
-                for s in statuses
-                if s in status_map
-            ]
-            if parts:
-                subqueries.append(" UNION ".join(parts))
+            for s in statuses:
+                if s in status_map:
+                    subqueries.append(
+                        f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE m.IsDeleted = 0 AND {status_map[s]}"
+                    )
 
         if not subqueries:
             id_filter = "1=1"

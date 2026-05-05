@@ -15,8 +15,10 @@ populated_db data map (relevant):
   Tags:  song 9 has tag_id=6 (Genre, primary)
   Albums: song 1 -> album 100, song 2 -> album 200
 """
+import os
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 from src.engine.routers.mutation_models import MutationRequest
 from src.services.mutation_coordinator import MutationCoordinator
@@ -448,3 +450,311 @@ class TestHttpErrorMapping:
         )
         resp = api.post("/api/v1/mutate", json={"update": [{"type": "song", "id": 1}]})
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Staging file cleanup on song delete
+# ---------------------------------------------------------------------------
+
+class TestStagingFileCleanup:
+    def test_staged_song_delete_removes_file(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        staged_file = staging / "test_song.mp3"
+        staged_file.write_bytes(b"fake audio")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute(f"UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(staged_file),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+
+        assert not staged_file.exists()
+
+    def test_staged_song_delete_missing_file_does_not_error(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        missing_file = staging / "already_gone.mp3"
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(missing_file),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+
+    def test_library_song_delete_does_not_remove_file(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        library_file = tmp_path / "library" / "song.mp3"
+        library_file.parent.mkdir()
+        library_file.write_bytes(b"fake audio")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(library_file),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+
+        assert library_file.exists()
+
+    def test_no_source_path_does_not_error(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = '' WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+
+    def test_unrelated_directory_file_not_deleted(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        other_dir = tmp_path / "other"
+        other_dir.mkdir()
+        other_file = other_dir / "song.mp3"
+        other_file.write_bytes(b"fake audio")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(other_file),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+
+        assert other_file.exists()
+
+    def test_batch_delete_only_removes_staged_files(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        staged_file = staging / "staged.mp3"
+        staged_file.write_bytes(b"fake audio")
+
+        library_file = tmp_path / "library" / "library.mp3"
+        library_file.parent.mkdir()
+        library_file.write_bytes(b"fake audio")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(staged_file),))
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 2", (str(library_file),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({
+            "delete": [{"type": "song", "id": 1}, {"type": "song", "id": 2}]
+        }))
+
+        assert not staged_file.exists()
+        assert library_file.exists()
+
+    def test_multiple_staged_files_all_deleted(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        staged_1 = staging / "staged_1.mp3"
+        staged_2 = staging / "staged_2.mp3"
+        staged_1.write_bytes(b"fake audio")
+        staged_2.write_bytes(b"fake audio")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(staged_1),))
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 2", (str(staged_2),))
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({
+            "delete": [{"type": "song", "id": 1}, {"type": "song", "id": 2}]
+        }))
+
+        assert not staged_1.exists()
+        assert not staged_2.exists()
+
+
+# ---------------------------------------------------------------------------
+# File move on approve: copy before commit, source_path updated, original deleted
+# ---------------------------------------------------------------------------
+
+class TestFileMoveOnApprove:
+    """
+    Song 1 (SLTS): status=0 (REVIEWED), performer=Nirvana, year=1991, genre=Grunge.
+    These tests monkeypatch AUTO_MOVE_ON_APPROVE=True and LIBRARY_ROOT to a tmp dir.
+    """
+
+    def _setup(self, populated_db, monkeypatch, tmp_path):
+        import sqlite3
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+        from src.services.filing_service import FilingService
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        library = tmp_path / "library"
+        library.mkdir(exist_ok=True)
+
+        source_file = staging / "song1.mp3"
+        source_file.write_bytes(b"audio data")
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(source_file),))
+        conn.commit()
+        conn.close()
+
+        rules_file = tmp_path / "rules.json"
+        rules_file.write_text('{"routing_rules": [], "default_rule": "{year}/{artist} - {title}"}')
+
+        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
+        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator._filing = FilingService(rules_path=rules_file)
+        return coordinator, source_file, library
+
+    def test_reviewed_song_file_is_copied_to_library(self, populated_db, monkeypatch, tmp_path):
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+        copied = list(library.rglob("*.mp3"))
+        assert len(copied) == 1
+        assert copied[0].read_bytes() == b"audio data"
+
+    def test_reviewed_song_original_deleted_after_commit(self, populated_db, monkeypatch, tmp_path):
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+        assert not source_file.exists()
+
+    def test_reviewed_song_source_path_updated_in_db(self, populated_db, monkeypatch, tmp_path):
+        import sqlite3
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute("SELECT SourcePath FROM MediaSources WHERE SourceID = 1").fetchone()
+        conn.close()
+        new_path = Path(row[0])
+        assert new_path.is_relative_to(library)
+        assert new_path.exists()
+
+    def test_copy_failure_does_not_delete_original(self, populated_db, monkeypatch, tmp_path):
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+        monkeypatch.setattr(coordinator._filing, "copy_to_library", lambda *a, **kw: (_ for _ in ()).throw(OSError("disk full")))
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+        assert source_file.exists()
+
+    def test_rollback_deletes_copy(self, populated_db, monkeypatch, tmp_path):
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+
+        original_apply_within = coordinator._song_mutator.apply_within
+        call_count = [0]
+
+        def fail_on_second(action, item, conn):
+            call_count[0] += 1
+            if call_count[0] > 1:
+                raise RuntimeError("db write failed")
+            return original_apply_within(action, item, conn)
+
+        monkeypatch.setattr(coordinator._song_mutator, "apply_within", fail_on_second)
+
+        with pytest.raises(RuntimeError):
+            coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+
+        copied = list(library.rglob("*.mp3"))
+        assert copied == [], "Copy should have been cleaned up on rollback"
+        assert source_file.exists(), "Original must survive a failed transaction"
+
+    def test_file_exists_at_destination_returns_warning_and_leaves_original(self, populated_db, monkeypatch, tmp_path):
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+
+        # Pre-create a different file at the destination path
+        dest_dir = library / "1991"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        conflict_file = dest_dir / "Nirvana - Smells Like Teen Spirit.mp3"
+        conflict_file.write_bytes(b"different content")
+
+        result = coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+
+        assert source_file.exists(), "Original must not be deleted when destination conflict exists"
+        assert conflict_file.read_bytes() == b"different content", "Existing destination file must not be overwritten"
+        assert any(w.get("kind") == "file_move" for w in result["warnings"]), "Warning must be returned for file conflict"
+
+    def test_non_reviewed_song_not_moved(self, populated_db, monkeypatch, tmp_path):
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        library = tmp_path / "library"
+        library.mkdir(exist_ok=True)
+
+        source_file = staging / "song7.mp3"
+        source_file.write_bytes(b"audio data")
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 7", (str(source_file),))
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
+        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 7}]}))
+
+        assert source_file.exists()
+        assert list(library.rglob("*.mp3")) == []

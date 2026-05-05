@@ -92,10 +92,10 @@ class IngestionService:
             "results": [],
         }
 
-    def _update_task(self, task_id: str, status_delta: str):
-        """Update the internal counters."""
+    def _update_task(self, task_id: str, status_delta: str) -> bool:
+        """Update the internal counters. Returns True if the task just completed."""
         if task_id not in IngestionService._active_tasks:
-            return
+            return False
 
         task = IngestionService._active_tasks[task_id]
         if status_delta == "INGESTED":
@@ -117,6 +117,8 @@ class IngestionService:
         if task["processed"] >= task["total"]:
             logger.info(f"[IngestionService] Task {task_id} completed: {task}")
             del IngestionService._active_tasks[task_id]
+            return True
+        return False
 
     @classmethod
     def reset_session_status(cls):
