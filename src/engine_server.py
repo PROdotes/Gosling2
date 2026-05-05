@@ -16,7 +16,8 @@ from src.engine.routers.audio import router as audio_router
 from src.engine.routers.spotify import router as spotify_router
 from src.engine.routers.tools import router as tools_router
 from src.engine.routers.mutations import router as mutations_router
-from src.services.logger import logger
+import uuid
+from src.services.logger import logger, request_id_var
 from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
 
@@ -46,6 +47,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GOSLING2 Engine", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def add_request_id_middleware(request: Request, call_next):
+    req_id = f"req_{uuid.uuid4().hex[:4]}"
+    token = request_id_var.set(req_id)
+    
+    logger.debug(f"[EngineServer] -> {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        logger.debug(f"[EngineServer] <- {request.method} {request.url.path} ({response.status_code})")
+        return response
+    except Exception as e:
+        logger.error(f"[EngineServer] <- {request.method} {request.url.path} FAILED: {e}")
+        raise
+    finally:
+        request_id_var.reset(token)
 
 
 @app.exception_handler(RequestValidationError)

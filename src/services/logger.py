@@ -1,6 +1,9 @@
 import datetime
 import os
 import sys
+import contextvars
+
+request_id_var = contextvars.ContextVar("request_id", default="")
 
 
 class Logger:
@@ -93,7 +96,11 @@ class Logger:
             return
 
         timestamp = datetime.datetime.now().isoformat()
-        line = f"{timestamp} [{level:8}] {msg}"
+        req_id = request_id_var.get()
+        if req_id:
+            line = f"{timestamp} [{level:8}] [{req_id}] {msg}"
+        else:
+            line = f"{timestamp} [{level:8}] {msg}"
 
         if self.console_enabled and level_val >= self.console_level:
             print(line)
