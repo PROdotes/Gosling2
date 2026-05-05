@@ -210,7 +210,7 @@ export function resetIngestStatus() {
 }
 
 export function resolveConflict(ghostId, stagedPath) {
-    return mutate({ update: [{ type: "ingest_conflict", ghost_id: ghostId, staged_path: stagedPath }] });
+    return fetchJson(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, { method: "POST" });
 }
 
 /**
