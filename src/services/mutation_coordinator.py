@@ -109,10 +109,10 @@ class MutationCoordinator:
                 else:
                     self._filing.delete_staging_file(song, Path(STAGING_DIR))
 
-            staging = Path(STAGING_DIR)
-            for old_path, _ in copied_files:
+            for old_path, new_path in copied_files:
                 old = Path(old_path)
-                if old.is_relative_to(staging) and old.exists():
+                new = Path(new_path)
+                if old.exists() and old.resolve() != new.resolve():
                     old.unlink()
                     logger.debug(f"[MutationCoordinator] Deleted original after move: {old}")
 
