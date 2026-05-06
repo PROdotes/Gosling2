@@ -313,11 +313,14 @@ Used by `update_identity_legal_name`.
 ### def _get_catalog_service() -> CatalogService
 **Internal**: Factory for the router.
 
-### async def inspect_file(song_id: int) -> SongView
-**HTTP**: `GET /api/v1/metabolic/inspect-file/{song_id}`
-- Reads physical file metadata via `MetadataService`.
-- Parses into domain model via `MetadataParser`.
-- Returns a `SongView` for UI comparison.
+### async def inspect_file(db_song: SongView) -> dict
+**HTTP**: `POST /api/v1/metabolic/inspect-file`
+- Accepts the caller's `SongView` as the request body (no DB re-hydration).
+- Reads physical file at `db_song.source_path` via `MetadataService` + `MetadataParser`.
+- Runs `MetadataService.compare_songs(db_song, file_song)` and returns `{diff, raw_tags}`.
+- `diff`: `{field_key: {db, file}}` — empty dict means in sync. Keys: `media_name`, `year`, `bpm`, `isrc`, `notes`, `credit:{Role}`, `tag:{Cat}`, `publisher`, `album`.
+- `raw_tags`: ID3 frames the parser did not map to any domain field.
+- Raises `HTTPException(400)` if `source_path` is empty, `HTTPException(404)` if file not found.
 
 ### async def get_id3_frames() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/metabolic/id3-frames`
@@ -473,13 +476,6 @@ Used by `update_identity_legal_name`.
 - Sets or clears the parent of a publisher. Pass `{"parent_id": null}` to clear.
 - Returns 404 if publisher or parent not found.
 - Wraps `CatalogService.set_publisher_parent`.
-
-### async def get_sync_status(song_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `GET /api/v1/songs/{song_id}/sync-status`
-- Compares DB state against physical ID3 tags.
-- Returns `{"in_sync": bool, "mismatches": [field_name, ...]}`.
-- Returns `{"in_sync": false, "mismatches": ["file_not_found"]}` if file is missing.
-- Wraps `MetadataService.compare_songs` and `MetadataService.filter_sync_mismatches`.
 
 ### async def sync_id3(song_id: int, service: CatalogService = Depends(_get_service))
 **HTTP**: `GET /api/v1/songs/{song_id}/sync-id3`

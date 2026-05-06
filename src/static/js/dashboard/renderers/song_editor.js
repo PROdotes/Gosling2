@@ -485,91 +485,58 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
  * @param {object} validationRules - state.validationRules (for tag parsing)
  */
 /**
- * Adds drift indicator dots to scalar field labels when DB value ≠ file value.
+ * Adds drift indicator dots to scalar/chip field labels for every drift entry.
  * Must be called after renderSongEditorV2.
  *
- * @param {object} dbSong - from getCatalogSong
- * @param {object} fileSong - from getSongDetail (inspect-file)
+ * @param {object|null} diff - {key: {db, file}} from inspect-file. null/empty = in sync.
+ *   Keys: media_name, year, bpm, isrc, notes (scalars); credit:{Role}, tag:{Cat},
+ *   publisher, album (chips). Unknown keys (e.g. duration) are silently ignored.
  */
-export function wireDriftIndicators(dbSong, fileSong) {
+export function wireDriftIndicators(diff) {
     document
         .querySelectorAll("#editor-panel .drift-dot")
         .forEach((el) => el.remove());
-    if (!fileSong) return;
+    if (!diff || Object.keys(diff).length === 0) return;
 
-    const SCALAR_FIELDS = [
-        { inputId: "ef-title", dbField: "media_name", fileField: "media_name" },
-        { inputId: "ef-year", dbField: "year", fileField: "year" },
-        { inputId: "ef-bpm", dbField: "bpm", fileField: "bpm" },
-        { inputId: "ef-isrc", dbField: "isrc", fileField: "isrc" },
-    ];
-    for (const { inputId, dbField, fileField } of SCALAR_FIELDS) {
-        const input = document.getElementById(inputId);
-        if (!input) continue;
-        const dbVal = dbSong[dbField] ?? null;
-        const fileVal = fileSong[fileField] ?? null;
-        if (String(dbVal ?? "") === String(fileVal ?? "")) continue;
-        appendDot(
-            input.closest(".editor-field")?.querySelector(".editor-label"),
-            `DB: ${dbVal ?? "(empty)"}\nFile: ${fileVal ?? "(empty)"}`,
-        );
-    }
+    const SCALAR_INPUT_BY_KEY = {
+        media_name: "ef-title",
+        year: "ef-year",
+        bpm: "ef-bpm",
+        isrc: "ef-isrc",
+        notes: "ef-notes",
+    };
+    const fmt = (v) => {
+        if (v == null || v === "") return "(empty)";
+        if (Array.isArray(v)) return v.length ? v.join(", ") : "(empty)";
+        return String(v);
+    };
 
-    const norm = (s) =>
-        String(s ?? "")
-            .trim()
-            .toLowerCase();
-    const keySet = (arr) =>
-        new Set((arr || []).map(norm).filter((x) => x !== ""));
-    const eqSet = (a, b) => a.size === b.size && [...a].every((v) => b.has(v));
+    for (const [key, entry] of Object.entries(diff)) {
+        const tooltip = `DB: ${fmt(entry.db)}\nFile: ${fmt(entry.file)}`;
+        let labelEl = null;
 
-    const creditsByRole = (song, role) =>
-        (song.credits || [])
-            .filter((c) => c.role_name === role)
-            .map((c) => c.display_name);
+        if (SCALAR_INPUT_BY_KEY[key]) {
+            const input = document.getElementById(SCALAR_INPUT_BY_KEY[key]);
+            labelEl = input
+                ?.closest(".editor-field")
+                ?.querySelector(".editor-label");
+        } else if (key.startsWith("credit:")) {
+            const role = key.slice(7).toLowerCase();
+            labelEl = document
+                .querySelector(`[data-chip-field="${role}"]`)
+                ?.querySelector(".editor-label");
+        } else if (key.startsWith("tag:")) {
+            // Tag drift surfaces on the unified Tags chip field.
+            labelEl = document
+                .querySelector(`[data-chip-field="tags"]`)
+                ?.querySelector(".editor-label");
+        } else if (key === "publisher" || key === "album") {
+            labelEl = document
+                .querySelector(`[data-chip-field="${key}"]`)
+                ?.querySelector(".editor-label");
+        }
 
-    const CHIP_FIELDS = [
-        {
-            fieldKey: "performer",
-            getDb: (s) => creditsByRole(s, "Performer"),
-            getFile: (s) => creditsByRole(s, "Performer"),
-        },
-        {
-            fieldKey: "composer",
-            getDb: (s) => creditsByRole(s, "Composer"),
-            getFile: (s) => creditsByRole(s, "Composer"),
-        },
-        {
-            fieldKey: "lyricist",
-            getDb: (s) => creditsByRole(s, "Lyricist"),
-            getFile: (s) => creditsByRole(s, "Lyricist"),
-        },
-        {
-            fieldKey: "producer",
-            getDb: (s) => creditsByRole(s, "Producer"),
-            getFile: (s) => creditsByRole(s, "Producer"),
-        },
-        {
-            fieldKey: "publisher",
-            getDb: (s) => (s.publishers || []).map((p) => p.name),
-            getFile: (s) => (s.publishers || []).map((p) => p.name),
-        },
-        {
-            fieldKey: "album",
-            getDb: (s) => (s.albums || []).map((a) => a.album_title),
-            getFile: (s) => (s.albums || []).map((a) => a.album_title),
-        },
-    ];
-    for (const { fieldKey, getDb, getFile } of CHIP_FIELDS) {
-        const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
-        if (!field) continue;
-        const dbItems = getDb(dbSong);
-        const fileItems = getFile(fileSong);
-        if (eqSet(keySet(dbItems), keySet(fileItems))) continue;
-        appendDot(
-            field.querySelector(".editor-label"),
-            `DB: ${dbItems.join(", ") || "(empty)"}\nFile: ${fileItems.join(", ") || "(empty)"}`,
-        );
+        if (labelEl) appendDot(labelEl, tooltip);
     }
 }
 
@@ -975,7 +942,7 @@ export function renderSongEditorEmpty() {
     if (sidebar) sidebar.innerHTML = "";
 }
 
-export function renderSongEditorV2(song, fileData = null) {
+export function renderSongEditorV2(song, diff = null, rawTags = null) {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
@@ -1029,68 +996,39 @@ export function renderSongEditorV2(song, fileData = null) {
 </div>
 
 ${(() => {
-    if (!fileData) return "";
-
-    const dbIsrc = (song.isrc || "").trim();
-    const fileIsrc = (fileData.isrc || "").trim();
-    const dbBpm = song.bpm != null ? String(song.bpm).trim() : "";
-    const fileBpm = fileData.bpm != null ? String(fileData.bpm).trim() : "";
-
-    const dbCreditsByRole = song.credits_by_role || {};
-    const fileCreditsByRole = fileData.credits_by_role || {};
-    const dbPublisherNames = new Set((song.publishers || []).map((p) => p.name.trim()));
-    const filePublisherNames = (fileData.publishers || []).map((p) => p.name.trim());
-    const dbTagKeys = new Set(
-        (song.tags || []).map((t) => (t.category ? `${t.category}::${t.name}` : t.name)),
-    );
-    const fileTagKeys = (fileData.tags || []).map((t) =>
-        t.category ? `${t.category}::${t.name}` : t.name,
-    );
+    if (!diff && !rawTags) return "";
 
     const rows = [];
 
-    if (fileIsrc && fileIsrc !== dbIsrc) {
-        rows.push(`<div class="raw-tag-row">
-        <span class="raw-tag-key">ISRC</span>
-        <span class="raw-tag-val">${escapeHtml(fileIsrc)}</span>
-      </div>`);
-    }
-    if (fileBpm && fileBpm !== dbBpm) {
-        rows.push(`<div class="raw-tag-row">
-        <span class="raw-tag-key">BPM</span>
-        <span class="raw-tag-val">${escapeHtml(fileBpm)}</span>
-      </div>`);
-    }
+    // Drift entries where the DB is empty and the file has a value:
+    // "the file knows something the DB doesn't". Mismatches where both have
+    // values are surfaced via drift dots, not here.
+    const isEmpty = (v) =>
+        v == null
+        || v === ""
+        || (Array.isArray(v) && v.length === 0);
+    const fmtVal = (v) => (Array.isArray(v) ? v.join(", ") : String(v));
+    const labelFor = (key) => {
+        if (key.startsWith("credit:")) return key.slice(7);
+        if (key.startsWith("tag:")) return key.slice(4);
+        if (key === "media_name") return "Title";
+        if (key === "isrc") return "ISRC";
+        if (key === "bpm") return "BPM";
+        return key.charAt(0).toUpperCase() + key.slice(1);
+    };
 
-    for (const [role, fileNames] of Object.entries(fileCreditsByRole)) {
-        const dbNames = new Set((dbCreditsByRole[role] || []).map((n) => n.trim()));
-        const missing = (fileNames || []).map((n) => n.trim()).filter((n) => !dbNames.has(n));
-        if (missing.length > 0) {
+    if (diff) {
+        for (const [key, entry] of Object.entries(diff)) {
+            if (!isEmpty(entry.db) || isEmpty(entry.file)) continue;
             rows.push(`<div class="raw-tag-row">
-        <span class="raw-tag-key">${escapeHtml(role)}</span>
-        <span class="raw-tag-val">${escapeHtml(missing.join(", "))}</span>
+        <span class="raw-tag-key">${escapeHtml(labelFor(key))}</span>
+        <span class="raw-tag-val">${escapeHtml(fmtVal(entry.file))}</span>
       </div>`);
         }
     }
 
-    const missingTags = fileTagKeys.filter((k) => !dbTagKeys.has(k));
-    if (missingTags.length > 0) {
-        rows.push(`<div class="raw-tag-row">
-        <span class="raw-tag-key">Tags</span>
-        <span class="raw-tag-val">${escapeHtml(missingTags.join(", "))}</span>
-      </div>`);
-    }
-
-    const missingPublishers = filePublisherNames.filter((n) => !dbPublisherNames.has(n));
-    if (missingPublishers.length > 0) {
-        rows.push(`<div class="raw-tag-row">
-        <span class="raw-tag-key">Publisher</span>
-        <span class="raw-tag-val">${escapeHtml(missingPublishers.join(", "))}</span>
-      </div>`);
-    }
-
-    if (fileData.raw_tags) {
-        for (const [k, vals] of Object.entries(fileData.raw_tags)) {
+    if (rawTags) {
+        for (const [k, vals] of Object.entries(rawTags)) {
             rows.push(`<div class="raw-tag-row">
         <span class="raw-tag-key">${escapeHtml(k)}</span>
         <span class="raw-tag-val">${escapeHtml(Array.isArray(vals) ? vals.join(", ") : String(vals))}</span>

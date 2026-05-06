@@ -99,7 +99,8 @@ const state = {
     id3Frames: null,
     allRoles: [],
     activeSong: null,
-    activeSongFile: null,
+    activeSongDiff: null,
+    activeSongRawTags: null,
     currentMode: "songs", // Renaming activeView to currentMode for consistency
     successCount: 0,
     actionCount: 0,
@@ -192,7 +193,8 @@ const ctx = {
     },
     clearSongEditorV2() {
         state.activeSong = null;
-        state.activeSongFile = null;
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
         renderSongEditorEmpty();
     },
     async refreshActiveSongV2(songId) {
@@ -210,7 +212,7 @@ const ctx = {
 
         if (structuralChange) {
             // Full re-render to handle new cards/structure
-            renderSongEditorV2(fresh, state.activeSongFile);
+            renderSongEditorV2(fresh, state.activeSongDiff, state.activeSongRawTags);
             state.chipHandles = wireChipInputs(
                 fresh,
                 () => ctx.refreshActiveSongV2(fresh.id),
@@ -229,7 +231,22 @@ const ctx = {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
         });
-        updateSyncLed(fresh.id);
+
+        // The DB just changed — the cached diff is stale. Show "checking" and
+        // refetch the file-side state in the background.
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
+        updateSyncLed(fresh.id, null);
+        wireDriftIndicators(null);
+        getSongDetail(fresh)
+            .catch(() => null)
+            .then((fileData) => {
+                if (!fileData || state.activeSong?.id !== fresh.id) return;
+                state.activeSongDiff = fileData.diff || {};
+                state.activeSongRawTags = fileData.raw_tags || {};
+                wireDriftIndicators(state.activeSongDiff);
+                updateSyncLed(fresh.id, state.activeSongDiff);
+            });
 
         if (!structuralChange && state.chipHandles && state.scalarHandles) {
             // Surgical updates for performance and focus preservation
@@ -708,12 +725,14 @@ async function openSelectedResult(index) {
         });
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
-        renderSongEditorV2(result, null);
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
+        renderSongEditorV2(result, null, null);
         renderActionSidebar(result, {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
         });
-        updateSyncLed(result.id);
+        updateSyncLed(result.id, null);
         state.scalarHandles = wireScalarInputs(
             result,
             state.validationRules,
@@ -736,7 +755,7 @@ async function openSelectedResult(index) {
                     const fresh = await getCatalogSong(songId);
                     state.activeSong = fresh;
                     state.chipHandles?.updateField(role, fresh);
-                    wireDriftIndicators(fresh, state.activeSongFile);
+                    wireDriftIndicators(state.activeSongDiff);
                     renderActionSidebar(fresh, {
                         searchEngines: state.searchEngines,
                         defaultSearchEngine: state.defaultSearchEngine,
@@ -759,7 +778,7 @@ async function openSelectedResult(index) {
                     const fresh = await getCatalogSong(songId);
                     state.activeSong = fresh;
                     state.chipHandles?.updateField("publisher", fresh);
-                    wireDriftIndicators(fresh, state.activeSongFile);
+                    wireDriftIndicators(state.activeSongDiff);
                     renderActionSidebar(fresh, {
                         searchEngines: state.searchEngines,
                         defaultSearchEngine: state.defaultSearchEngine,
@@ -777,12 +796,17 @@ async function openSelectedResult(index) {
             state.onSplitPublisher,
         );
 
-        getSongDetail(selected.id, { signal: request.signal })
+        getSongDetail(state.activeSong, { signal: request.signal })
             .catch(() => null)
             .then((fileData) => {
                 if (!fileData || !isActiveDetail("songs", selected.id)) return;
-                state.activeSongFile = fileData;
-                renderSongEditorV2(state.activeSong, fileData);
+                state.activeSongDiff = fileData.diff || {};
+                state.activeSongRawTags = fileData.raw_tags || {};
+                renderSongEditorV2(
+                    state.activeSong,
+                    state.activeSongDiff,
+                    state.activeSongRawTags,
+                );
                 state.scalarHandles = wireScalarInputs(
                     state.activeSong,
                     state.validationRules,
@@ -799,7 +823,8 @@ async function openSelectedResult(index) {
                     state.validationRules,
                     state.onSplitPublisher,
                 );
-                wireDriftIndicators(state.activeSong, fileData);
+                wireDriftIndicators(state.activeSongDiff);
+                updateSyncLed(state.activeSong.id, state.activeSongDiff);
             });
     } else if (state.currentMode === "albums") {
         await openAlbumDetail(selected);
@@ -1050,7 +1075,8 @@ document.addEventListener("checkchange", () => {
     } else if (checked.length === 0) {
         renderSongEditorEmpty();
         state.activeSong = null;
-        state.activeSongFile = null;
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
     }
     // If exactly 1 checked, the row click already opened the editor — do nothing
 });

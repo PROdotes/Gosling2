@@ -1,5 +1,5 @@
 import {
-    getSongDetail,
+    getCatalogSong,
     searchTags,
     ABORTED,
     addSongTag,
@@ -74,8 +74,8 @@ export async function orchestrateScrubber(ctx, songId, title) {
                 tags = state.activeSong.tags || [];
             } else {
                 // Otherwise fetch them
-                const detail = await getSongDetail(id);
-                tags = detail.tags || [];
+                const detail = await getCatalogSong(id);
+                tags = detail?.tags || [];
             }
             manageSongTags(ctx, id, name, tags);
         },

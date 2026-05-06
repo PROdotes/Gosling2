@@ -82,17 +82,21 @@ class MetadataService:
     def compare_songs(self, db_song: Song, file_song: Song) -> dict:
         """
         Compares two Song objects field by field.
-        Returns {in_sync: bool, mismatches: [field_name, ...]}
+        Returns a diff dict: {key: {"db": db_val, "file": file_val}, ...}
+        Empty dict means in sync. Keys align with frontend chip/scalar identifiers
+        (media_name, year, bpm, isrc, notes, credit:{Role}, tag:{Cat}, publisher, album).
+        Tag-category drift is suppressed for categories not present in the DB
+        (file-only tag categories don't count as drift).
         """
-        mismatches = []
+        diff: dict = {}
 
-        def _check_scalar(label: str, db_val, file_val):
+        def _check_scalar(key: str, db_val, file_val):
             if str(db_val or "") != str(file_val or ""):
-                mismatches.append(label)
+                diff[key] = {"db": db_val, "file": file_val}
 
-        def _check_list(label: str, db_list: list, file_list: list):
+        def _check_list(key: str, db_list: list, file_list: list):
             if sorted(db_list) != sorted(file_list):
-                mismatches.append(label)
+                diff[key] = {"db": db_list, "file": file_list}
 
         def _names_by_role(song: Song, role: str) -> list:
             return sorted(
@@ -102,77 +106,46 @@ class MetadataService:
         def _names_by_cat(song: Song, cat: str) -> list:
             return sorted(set(t.name for t in song.tags if t.category == cat))
 
-        # Scalars
-        _check_scalar("title", db_song.media_name, file_song.media_name)
+        _check_scalar("media_name", db_song.media_name, file_song.media_name)
         _check_scalar("year", db_song.year, file_song.year)
         _check_scalar("bpm", db_song.bpm, file_song.bpm)
         _check_scalar("isrc", db_song.isrc, file_song.isrc)
         _check_scalar("notes", db_song.notes, file_song.notes)
         _check_scalar("duration", db_song.duration_s, file_song.duration_s)
 
-        # Credits by role
         all_roles = set(c.role_name for c in db_song.credits if c.role_name) | set(
             c.role_name for c in file_song.credits if c.role_name
         )
         for role in all_roles:
-            if not role:
-                continue
             _check_list(
                 f"credit:{role}",
                 _names_by_role(db_song, role),
                 _names_by_role(file_song, role),
             )
 
-        # Tags by category
-        all_cats = set(t.category for t in db_song.tags if t.category) | set(
-            t.category for t in file_song.tags if t.category
-        )
-        for cat in all_cats:
-            if not cat:
-                continue
+        # Tag-category drift only matters for categories the DB knows about;
+        # file-only categories are surfaced via raw_tags / File-Only Data, not as drift.
+        db_tag_categories = set(t.category for t in db_song.tags if t.category)
+        for cat in db_tag_categories:
             _check_list(
                 f"tag:{cat}", _names_by_cat(db_song, cat), _names_by_cat(file_song, cat)
             )
 
-        # Publishers
         _check_list(
-            "publishers",
+            "publisher",
             sorted(set(p.name for p in db_song.publishers)),
             sorted(set(p.name for p in file_song.publishers)),
         )
 
-        # Album
         db_album = db_song.albums[0] if db_song.albums else None
         file_album = file_song.albums[0] if file_song.albums else None
         _check_scalar(
-            "album_title",
+            "album",
             db_album.album_title if db_album else None,
             file_album.album_title if file_album else None,
         )
-        _check_scalar(
-            "track",
-            db_album.track_number if db_album else None,
-            file_album.track_number if file_album else None,
-        )
-        _check_scalar(
-            "disc",
-            db_album.disc_number if db_album else None,
-            file_album.disc_number if file_album else None,
-        )
 
-        return {"in_sync": len(mismatches) == 0, "mismatches": mismatches}
-
-    def filter_sync_mismatches(self, db_song: Song, mismatches: list) -> list:
-        """
-        Filters raw compare_songs mismatches to only those relevant to DB state.
-        Removes tag:* mismatches for categories that exist only in the file, not in the DB.
-        """
-        db_tag_categories = set(t.category for t in db_song.tags)
-        return [
-            m
-            for m in mismatches
-            if not m.startswith("tag:") or m[4:] in db_tag_categories
-        ]
+        return diff
 
     def _read_tags(self, tags: Any) -> Dict[str, List[str]]:
         """Extracts and cleans all tags from mutagen into a clean list-based dictionary."""

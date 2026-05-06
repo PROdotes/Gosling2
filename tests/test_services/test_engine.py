@@ -765,16 +765,11 @@ class TestGetAlbum:
 
 
 # ===========================================================================
-# GET /api/v1/metabolic/inspect-file/{song_id}
+# POST /api/v1/metabolic/inspect-file
 # ===========================================================================
 class TestMetabolicInspectFile:
-    def test_not_found(self, client):
-        """Non-existent song returns 404."""
-        resp = client.get("/api/v1/metabolic/inspect-file/9999")
-        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
-
     def test_real_file_inspection(self, populated_db, monkeypatch):
-        """inspect-file with a real audio file returns SongView."""
+        """inspect-file POST with a real audio file returns {diff, raw_tags}."""
 
         fixture_path = os.path.abspath("tests/fixtures/silence.mp3")
         if not os.path.exists(fixture_path):
@@ -790,17 +785,27 @@ class TestMetabolicInspectFile:
 
         monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
         c = TestClient(app)
-        resp = c.get("/api/v1/metabolic/inspect-file/1")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        db_song = c.get("/api/v1/songs/1").json()
+        resp = c.post("/api/v1/metabolic/inspect-file", json=db_song)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert (
-            data["source_path"] == fixture_path
-        ), f"Expected source_path={fixture_path!r}, got {data['source_path']!r}"
+        assert "diff" in data, f"Expected 'diff' key in response, got {list(data.keys())}"
+        assert "raw_tags" in data, f"Expected 'raw_tags' key in response, got {list(data.keys())}"
+        assert isinstance(data["diff"], dict)
+        assert isinstance(data["raw_tags"], dict)
 
-    def test_missing_file_returns_500(self, client):
-        """Song with non-existent file path returns 500."""
-        resp = client.get("/api/v1/metabolic/inspect-file/1")
-        assert resp.status_code == 500, f"Expected 500, got {resp.status_code}"
+    def test_missing_file_returns_404(self, client):
+        """db_song with non-existent file path returns 404."""
+        db_song = client.get("/api/v1/songs/1").json()
+        resp = client.post("/api/v1/metabolic/inspect-file", json=db_song)
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
+
+    def test_missing_source_path_returns_400(self, client):
+        """db_song with empty source_path returns 400."""
+        db_song = client.get("/api/v1/songs/1").json()
+        db_song["source_path"] = ""
+        resp = client.post("/api/v1/metabolic/inspect-file", json=db_song)
+        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.text}"
 
 
 # ===========================================================================

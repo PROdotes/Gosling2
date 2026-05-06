@@ -42,8 +42,8 @@ Fetches tags matching query.
 ### getCatalogSong(id, options)
 Fetches basic catalog song data.
 
-### getSongDetail(id, options)
-Fetches high-fidelity metadata from InspectService (includes physical file info).
+### getSongDetail(dbSong, options)
+POSTs the caller's SongView to `POST /api/v1/metabolic/inspect-file`. Returns `{diff, raw_tags}` — diff is `{field_key: {db, file}}` (empty = in sync), raw_tags are unmapped ID3 frames. Result stored in `state.activeSongDiff` + `state.activeSongRawTags`.
 
 ### getSongWebSearch(id, engine)
 Triggers a web search for song metadata.
@@ -91,9 +91,6 @@ Moves song from staging to organized library.
 
 ### syncSongId3(id)
 Triggers ID3 tag sync from DB to physical file.
-
-### getSongSyncStatus(id)
-Checks if DB metadata matches physical file tags.
 
 ---
 

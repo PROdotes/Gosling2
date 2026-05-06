@@ -90,7 +90,7 @@ WAV_AUTO_CONVERT = True
 # Song Approval Pipeline
 AUTO_MOVE_ON_APPROVE = True
 PROMPT_BEFORE_MOVE = True
-AUTO_SAVE_ID3 = False
+AUTO_SAVE_ID3 = True
 DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = Path("json/rules.json")
 PARSER_PRESETS_PATH = Path("json/parser_presets.json")

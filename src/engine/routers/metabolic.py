@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
-from src.services.catalog_service import CatalogService
+from fastapi import APIRouter, HTTPException
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
 from src.services.metadata_frames_reader import load_id3_frames
@@ -8,31 +7,32 @@ from src.models.view_models import SongView
 router = APIRouter(prefix="/api/v1/metabolic", tags=["Metabolic"])
 
 
-def _get_catalog_service():
-    return CatalogService()
-
-
-@router.get("/inspect-file/{song_id}", response_model=SongView)
-async def inspect_file(
-    song_id: int, catalog: CatalogService = Depends(_get_catalog_service)
-):
+@router.post("/inspect-file")
+async def inspect_file(db_song: SongView):
     """
-    Reads a file's raw metadata and returns a SongView model.
-    Used for comparison against the stored database state.
-    """
-    song = catalog.get_song(song_id)
-    if not song or not song.source_path:
-        raise HTTPException(status_code=404, detail="Song or file path not found")
+    Reads the file at db_song.source_path, compares against db_song, and returns
+    {diff, raw_tags}. The frontend already holds the SongView in state, so we accept
+    it in the body to avoid a redundant DB hydration on this path.
 
-    reader = MetadataService()
-    parser = MetadataParser()
+    diff: {field_key: {db, file}} — empty when in sync. Keys align with frontend
+    chip/scalar identifiers (media_name, year, bpm, isrc, notes, credit:{Role},
+    tag:{Cat}, publisher, album).
+    raw_tags: every ID3 frame the parser didn't map to a domain field, for the
+    File-Only Data panel.
+    """
+    if not db_song.source_path:
+        raise HTTPException(status_code=400, detail="db_song missing source_path")
 
     try:
-        raw_map = reader.extract_metadata(song.source_path)
-        parsed_song = parser.parse(raw_map, song.source_path)
-        return SongView.from_domain(parsed_song)
+        raw_map = MetadataService().extract_metadata(db_song.source_path)
+        file_song = MetadataParser().parse(raw_map, db_song.source_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error inspecting file: {str(e)}")
+
+    diff = MetadataService().compare_songs(db_song, file_song)
+    return {"diff": diff, "raw_tags": file_song.raw_tags or {}}
 
 
 @router.get("/id3-frames")

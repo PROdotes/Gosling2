@@ -8,7 +8,7 @@ import {
     deleteSong,
     formatText,
     getIngestStatus,
-    getSongSyncStatus,
+    getSongDetail,
     getSongWebSearch,
     moveSongToLibrary,
     mutate,
@@ -37,32 +37,34 @@ import {
     resolvePendingCard,
 } from "../renderers/ingestion.js";
 
-export async function updateSyncLed(songId) {
+/**
+ * Renders the sync LED + mismatch chip list from a diff dict.
+ * Pure render; does no network. Pass null to show "checking" / unknown state.
+ *
+ * @param {number|string} songId
+ * @param {object|null} diff - {key: {db, file}} or null/empty when in sync.
+ */
+export function updateSyncLed(songId, diff) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
     if (!led) return;
-    led.title = "Checking sync...";
-    led.style.background = "var(--text-mute)";
     const mismatchEl = document.querySelector(
         `.sync-mismatch-list[data-song-id="${songId}"]`,
     );
-    if (mismatchEl) mismatchEl.textContent = "";
-    try {
-        const result = await getSongSyncStatus(songId);
-        led.style.background = result.in_sync
-            ? "var(--success)"
-            : "var(--danger)";
-        led.title = result.in_sync
-            ? "In sync"
-            : `Out of sync:\n${result.mismatches.join("\n")}`;
-        if (mismatchEl) {
-            const labels = result.mismatches.map((m) =>
-                m.replace(/^credit:/, ""),
-            );
-            mismatchEl.textContent = result.in_sync ? "" : labels.join(" · ");
-        }
-    } catch {
+
+    if (diff == null) {
+        led.title = "Checking sync...";
         led.style.background = "var(--text-mute)";
-        led.title = "Sync status unavailable";
+        if (mismatchEl) mismatchEl.textContent = "";
+        return;
+    }
+
+    const keys = Object.keys(diff);
+    const inSync = keys.length === 0;
+    led.style.background = inSync ? "var(--success)" : "var(--danger)";
+    led.title = inSync ? "In sync" : `Out of sync:\n${keys.join("\n")}`;
+    if (mismatchEl) {
+        const labels = keys.map((k) => k.replace(/^credit:/, ""));
+        mismatchEl.textContent = inSync ? "" : labels.join(" · ");
     }
 }
 
@@ -470,7 +472,14 @@ export class SongActionsHandler {
             await syncSongId3(id);
             if (this.ctx.showBanner)
                 this.ctx.showBanner("ID3 tags updated.", "success");
-            await updateSyncLed(id);
+            const activeSong = this.ctx.getState().activeSong;
+            if (activeSong && String(activeSong.id) === String(id)) {
+                const fileData = await getSongDetail(activeSong).catch(() => null);
+                const diff = fileData?.diff || {};
+                this.ctx.getState().activeSongDiff = diff;
+                this.ctx.getState().activeSongRawTags = fileData?.raw_tags || {};
+                updateSyncLed(id, diff);
+            }
         } catch (err) {
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`ID3 sync failed: ${err.message}`, "error");

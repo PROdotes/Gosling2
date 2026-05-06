@@ -291,22 +291,23 @@ class TestMetadataServiceCompare:
 
         service = MetadataService()
 
-        # Test Title mismatch
-        res = service.compare_songs(_s("A"), _s("B"))
-        assert not res["in_sync"]
-        assert "title" in res["mismatches"]
+        # Title mismatch (key is media_name in the unified diff)
+        diff = service.compare_songs(_s("A"), _s("B"))
+        assert diff
+        assert "media_name" in diff
+        assert diff["media_name"] == {"db": "A", "file": "B"}
 
-        # Test Year mismatch
-        res = service.compare_songs(_s("A", year=2020), _s("A", year=2021))
-        assert "year" in res["mismatches"]
+        # Year mismatch
+        diff = service.compare_songs(_s("A", year=2020), _s("A", year=2021))
+        assert "year" in diff
 
-        # Test BPM mismatch
-        res = service.compare_songs(_s("A", bpm=120), _s("A", bpm=128))
-        assert "bpm" in res["mismatches"]
+        # BPM mismatch
+        diff = service.compare_songs(_s("A", bpm=120), _s("A", bpm=128))
+        assert "bpm" in diff
 
-        # Test Notes mismatch (Bugfix verification)
-        res = service.compare_songs(_s("A", notes="Fine"), _s("A", notes="Corrupt"))
-        assert "notes" in res["mismatches"]
+        # Notes mismatch (Bugfix verification)
+        diff = service.compare_songs(_s("A", notes="Fine"), _s("A", notes="Corrupt"))
+        assert "notes" in diff
 
     def test_compare_songs_identifies_album_mismatches(self):
         """compare_songs must detect differences in album title, track, and disc."""
@@ -330,10 +331,7 @@ class TestMetadataServiceCompare:
 
         service = MetadataService()
 
-        # Test Album mismatch
-        res = service.compare_songs(_s("Album A"), _s("Album B"))
-        assert "album_title" in res["mismatches"]
-
-        # Test Disc mismatch (Bugfix verification)
-        res = service.compare_songs(_s("A", disc=1), _s("A", disc=2))
-        assert "disc" in res["mismatches"]
+        # Album title mismatch (key is "album" in the unified diff)
+        diff = service.compare_songs(_s("Album A"), _s("Album B"))
+        assert "album" in diff
+        assert diff["album"] == {"db": "Album A", "file": "Album B"}

@@ -119,15 +119,17 @@ export function getSongWebSearch(id, engine = null) {
     return fetchJson(url);
 }
 
-export async function getSongDetail(id, options = {}) {
-    const response = await fetch(
-        `/api/v1/metabolic/inspect-file/${id}`,
-        options,
-    );
+export async function getSongDetail(dbSong, options = {}) {
+    const response = await fetch(`/api/v1/metabolic/inspect-file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dbSong),
+        signal: options.signal,
+    });
     if (response.ok) {
         return response.json();
     }
-    if (response.status === 404 || response.status === 500) {
+    if (response.status === 404 || response.status === 500 || response.status === 400) {
         return null;
     }
     throw new Error(`Request failed: ${response.status}`);
@@ -311,10 +313,6 @@ export function mergeIdentity(sourceNameId, targetNameId) {
 
 export function syncSongId3(id) {
     return fetchJson(`/api/v1/songs/${id}/sync-id3`);
-}
-
-export function getSongSyncStatus(id) {
-    return fetchJson(`/api/v1/songs/${id}/sync-status`);
 }
 
 export function setPublisherParent(publisherId, parentId) {
