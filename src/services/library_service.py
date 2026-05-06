@@ -48,7 +48,9 @@ class LibraryService:
         actual_rules_path = rules_path or config.RENAME_RULES_PATH
         self._filing_service = FilingService(actual_rules_path)
 
-    def get_song(self, song_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]:
+    def get_song(
+        self, song_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
         logger.debug(f"[LibraryService] -> get_song(id={song_id})")
         if conn is not None:
@@ -162,15 +164,18 @@ class LibraryService:
 
     def get_songs_slim_by_publisher(self, publisher_id: int) -> List[dict]:
         """Fetch slim song rows for a given publisher."""
-        logger.debug(f"[LibraryService] -> get_songs_slim_by_publisher(id={publisher_id})")
+        logger.debug(
+            f"[LibraryService] -> get_songs_slim_by_publisher(id={publisher_id})"
+        )
         with self._pub_repo.get_connection() as conn:
             song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id, conn=conn)
             if not song_ids:
                 return []
             rows = self._song_repo.search_slim_by_ids(song_ids, conn=conn)
-            logger.debug(f"[LibraryService] <- get_songs_slim_by_publisher count={len(rows)}")
+            logger.debug(
+                f"[LibraryService] <- get_songs_slim_by_publisher count={len(rows)}"
+            )
             return rows
-
 
     def get_all_tags(self) -> List[Tag]:
         """Fetch the full directory of tags."""
@@ -212,29 +217,39 @@ class LibraryService:
             logger.debug(f"[LibraryService] <- get_songs_slim_by_tag count={len(rows)}")
             return rows
 
-
     def get_songs_slim_by_identity(self, identity_id: int) -> List[dict]:
         """Slim reverse credit lookup for an identity and its related aliases/members/groups."""
-        logger.debug(f"[LibraryService] -> get_songs_slim_by_identity(id={identity_id})")
+        logger.debug(
+            f"[LibraryService] -> get_songs_slim_by_identity(id={identity_id})"
+        )
         with self._identity_repo.get_connection() as conn:
             identity = self._identity_repo.get_by_id(identity_id, conn=conn)
             if not identity:
-                logger.warning(f"[LibraryService] Exit: Identity {identity_id} not found.")
+                logger.warning(
+                    f"[LibraryService] Exit: Identity {identity_id} not found."
+                )
                 return []
 
             related_ids = {identity.id}
-            members_by_id = self._identity_repo.get_members_batch([identity.id], conn=conn)
-            groups_by_id = self._identity_repo.get_groups_batch([identity.id], conn=conn)
+            members_by_id = self._identity_repo.get_members_batch(
+                [identity.id], conn=conn
+            )
+            groups_by_id = self._identity_repo.get_groups_batch(
+                [identity.id], conn=conn
+            )
 
             for member in members_by_id.get(identity.id, []):
                 related_ids.add(member.id)
             for group in groups_by_id.get(identity.id, []):
                 related_ids.add(group.id)
 
-            rows = self._song_repo.search_slim_by_identity_ids(list(related_ids), conn=conn)
-            logger.debug(f"[LibraryService] <- get_songs_slim_by_identity count={len(rows)}")
+            rows = self._song_repo.search_slim_by_identity_ids(
+                list(related_ids), conn=conn
+            )
+            logger.debug(
+                f"[LibraryService] <- get_songs_slim_by_identity count={len(rows)}"
+            )
             return rows
-
 
     def get_filter_values(self) -> dict:
         """Returns all distinct filter sidebar values."""
@@ -292,8 +307,12 @@ class LibraryService:
                 list(identity_ids)
             )
             identity_ids.update(group_ids)
-            identity_song_rows = self._song_repo.search_slim_by_identity_ids(list(identity_ids))
-            extra_rows = [r for r in identity_song_rows if r["SourceID"] not in seen_ids]
+            identity_song_rows = self._song_repo.search_slim_by_identity_ids(
+                list(identity_ids)
+            )
+            extra_rows = [
+                r for r in identity_song_rows if r["SourceID"] not in seen_ids
+            ]
             if extra_rows:
                 seen_ids.update(r["SourceID"] for r in extra_rows)
                 base_rows.extend(extra_rows)

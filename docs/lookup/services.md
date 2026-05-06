@@ -165,382 +165,199 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration.
 
 ---
 
-## EditService
-*Location: `src/services/edit_service.py`*
+## CatalogService
+*Location: `src/services/catalog_service.py`*
+**Responsibility**: The primary facade for all read operations and legacy/specialized write paths.
+
+### get_song(song_id: int) -> Optional[Song]
+### get_album(album_id: int) -> Optional[Album]
+### get_publisher(publisher_id: int) -> Optional[Publisher]
+### get_tag(tag_id: int) -> Optional[Tag]
+### get_identity(identity_id: int) -> Optional[Identity]
+
+### search_songs_slim(query: str) -> List[dict]
+### search_songs_deep_slim(query: str) -> List[dict]
+### search_albums_slim(query: str) -> List[dict]
+### search_publishers(query: str) -> List[Publisher]
+### search_tags(query: str) -> List[Tag]
+### search_identities(query: str) -> List[Identity]
+
+### get_all_publishers() -> List[Publisher]
+### get_all_albums() -> List[Album]
+### get_all_tags() -> List[Tag]
+### get_all_identities() -> List[Identity]
+### get_all_roles() -> List[str]
+
+### filter_songs_slim(...) -> List[dict]
+### get_filter_values() -> dict
+### get_tag_categories() -> List[str]
+### get_id3_frames_config() -> Dict[str, Any]
+
+### ingest_file(staged_path: str) -> Dict[str, Any]
+### ingest_batch(file_paths: List[str]) -> Dict[str, Any]
+### ingest_single(file_path: str) -> Dict[str, Any]
+### scan_folder(folder_path: str, recursive: bool) -> List[str]
+### check_ingestion(file_path: str) -> Dict[str, Any]
+### ingest_wav_as_converting(...) -> Dict[str, Any]
+### finalize_wav_conversion(...) -> int
+### resolve_conflict(...) -> Dict[str, Any]
 
 ### sync_id3_if_enabled(song_id: int) -> None
-Writes ID3 tags for a song after an edit if the metadata writer is enabled.
-
-### update_song_scalars(song_id: int, fields: Dict[str, Any]) -> None
-Partial update of core song metadata with validation.
-
-### add_song_credit(song_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> SongCredit
-Add a credited artist to a song.
-
-### remove_song_credit(song_id: int, credit_id: int) -> None
-Remove a credit link from a song.
-
-### update_credit_name(name_id: int, new_name: str) -> None
-Globally update an ArtistName.
-
-### add_song_album(song_id: int, album_id: int, track_number: int, disc_number: int) -> SongAlbum
-Link a song to an existing album.
-
-### remove_song_album(song_id: int, album_id: int) -> None
-Unlink a song from an album.
-
-### update_song_album_link(song_id: int, album_id: int, track_number: int, disc_number: int) -> None
-Update track metadata for a song-album association.
-
-### create_and_link_album(song_id: int, album_data: dict, track_number: int, disc_number: int) -> SongAlbum
-Atomic: Create and link album.
-
-### sync_album_with_song(album_id: int, song_id: int) -> Album
-Sync album metadata from a song (backend CW-1). Syncs: release_year (if missing), Performer credits, publishers. Atomic operation.
-
-### quick_create_album_for_song(song_id: int, title: Optional[str] = None) -> SongAlbum
-Quick-create an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
-
-### update_album(album_id: int, album_data: dict) -> Album
-Update album metadata.
-
-### add_album_credit(album_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> int
-Add a credit to an album.
-
-### remove_album_credit(album_id: int, name_id: int) -> None
-Remove a credit from an album.
-
-### add_album_publisher(album_id: int, publisher_name: str, publisher_id: Optional[int] = None) -> Publisher
-Add publisher to an album.
-
-### remove_album_publisher(album_id: int, publisher_id: int) -> None
-Remove publisher from an album.
-
-### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None, raw_tag: Optional[str] = None) -> Tag
-Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2).
-
-### remove_song_tag(song_id: int, tag_id: int) -> None
-Remove a tag from a song.
-
-### update_tag(tag_id: int, name: str, category: str) -> None
-Global tag update.
-
-### set_primary_song_tag(song_id: int, tag_id: int) -> Tag
-Promote a specific genre tag to primary status for a song.
-
-### add_song_publisher(song_id: int, publisher_name: str, publisher_id: Optional[int] = None) -> Publisher
-Link a master publisher to a song.
-
-### remove_song_publisher(song_id: int, publisher_id: int) -> None
-Remove song publisher link.
-
-### update_publisher(publisher_id: int, name: str) -> None
-Global publisher update.
-
-### set_publisher_parent(publisher_id: int, parent_id: Optional[int]) -> None
-Set or clear the parent of a publisher.
-
-### import_credits_bulk(song_id: int, credits: List[SpotifyCredit], publishers: List[str]) -> None
-Atomic import of Spotify credits and publishers. Now does backend identity resolution (CW-3).
-
-### format_entity_field(entity_type: str, entity_id: int, field: str, format_type: str) -> Any
-Standardizes the casing of an entity's metadata field.
-
-### delete_song(song_id: int) -> bool
-Soft-delete a single song. Handles physical cleanup if in staging.
-
 ### move_song_to_library(song_id: int) -> str
-Calculates the target routing, moves the physical file, and updates the database records.
-
+### delete_song(song_id: int) -> bool
 ### delete_original_source(song_id: int) -> bool
-Physical deletion of the original file linked to this song (e.g. from Downloads). Cleans up `StagingOrigins` mapping.
+### get_staging_origin(song_id: int) -> Optional[str]
 
-### delete_unlinked_tags(tag_ids: List[int]) -> int
-Soft-delete tags from the given list that have zero active song links.
-
-### delete_unlinked_albums(album_ids: List[int]) -> int
-Soft-delete albums from the given list that have zero active song links.
-
-### delete_unlinked_publishers(publisher_ids: List[int]) -> int
-Soft-delete publishers from the given list that have zero active songs AND zero active albums.
+### update_song_scalars(song_id: int, fields: dict)
+### add_song_credit(song_id: int, display_name: str, role_name: str)
+### remove_song_credit(song_id: int, credit_id: int)
+### update_credit_name(name_id: int, new_name: str)
+### add_song_album(song_id: int, album_id: int)
+### remove_song_album(song_id: int, album_id: int)
+### update_song_album_link(song_id: int, album_id: int, ...)
+### update_album(album_id: int, album_data: dict)
+### add_song_tag(song_id: int, tag_name: str)
+### remove_song_tag(song_id: int, tag_id: int)
+### update_tag(tag_id: int, new_name: str, new_category: str)
+### set_primary_song_tag(song_id: int, tag_id: int)
+### add_song_publisher(song_id: int, publisher_name: str)
+### remove_song_publisher(song_id: int, publisher_id: int)
+### update_publisher(publisher_id: int, new_name: str)
+### set_publisher_parent(publisher_id: int, parent_id: int)
+### add_album_credit(album_id: int, display_name: str)
+### remove_album_credit(album_id: int, artist_name_id: int)
+### add_album_publisher(album_id: int, publisher_name: str)
+### remove_album_publisher(album_id: int, publisher_id: int)
+### merge_identity_into(source_name_id: int, target_name_id: int)
+### set_identity_type(identity_id: int, type_: str)
+### add_identity_member(group_id: int, member_id: int)
+### remove_identity_member(group_id: int, member_id: int)
+### delete_unlinked_albums(album_ids: list)
+### delete_unlinked_publishers(publisher_ids: list)
+### delete_unlinked_identities(identity_ids: list)
+### delete_unlinked_tags(tag_ids: list)
+### import_credits_bulk(song_id: int, credits: list, publishers: list)
+### quick_create_album_for_song(song_id: int, title: str)
+### format_entity_field(field: str, value: str, format_type: str)
+### enrich_metadata(song_id: int, conn: sqlite3.Connection)
+### publisher_exists(name: str) -> bool
+### resolve_identity_by_name(name: str) -> Optional[int]
+### get_publisher_link_counts(publisher_ids: List[int]) -> dict
+### get_identity_song_counts(identity_ids: List[int]) -> dict
+### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
+### get_songs_slim_by_tag(tag_id: int) -> List[dict]
+### get_songs_slim_by_identity(identity_id: int) -> List[dict]
+### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int]) -> int
+### update_identity_legal_name(identity_id: int, legal_name: Optional[str])
+### remove_identity_alias(name_id: int)
+### create_and_link_album(song_id: int, album_data: dict)
 
 ---
 
-## CatalogService
-*Location: `src/services/catalog_service.py`*
-**Responsibility**: Entry point for song access. Stateless orchestrator that combines data from multiple repositories into complete Domain Models.
+## EditService
+*Location: `src/services/edit_service.py`*
+**Responsibility**: Specialized orchestrator for metadata modifications. Legacy layer being replaced by `MutationCoordinator`.
+
+### update_song_scalars(song_id: int, fields: dict)
+### add_song_credit(song_id: int, display_name: str, role_name: str)
+### remove_song_credit(song_id: int, credit_id: int)
+### update_credit_name(name_id: int, new_name: str)
+### add_song_album(song_id: int, album_id: int)
+### create_and_link_album(song_id: int, album_data: dict)
+### remove_song_album(song_id: int, album_id: int)
+### update_song_album_link(song_id: int, album_id: int, ...)
+### update_album(album_id: int, album_data: dict)
+### add_album_credit(album_id: int, display_name: str)
+### remove_album_credit(album_id: int, artist_name_id: int)
+### add_album_publisher(album_id: int, publisher_name: str)
+### remove_album_publisher(album_id: int, publisher_id: int)
+### sync_album_with_song(album_id: int, song_id: int)
+### quick_create_album_for_song(song_id: int, title: str)
+### add_song_tag(song_id: int, tag_name: str)
+### remove_song_tag(song_id: int, tag_id: int)
+### update_tag(tag_id: int, new_name: str, new_category: str)
+### set_primary_song_tag(song_id: int, tag_id: int)
+### add_song_publisher(song_id: int, publisher_name: str)
+### remove_song_publisher(song_id: int, publisher_id: int)
+### update_publisher(publisher_id: int, new_name: str)
+### set_publisher_parent(publisher_id: int, parent_id: int)
+### import_credits_bulk(song_id: int, credits: list, publishers: list)
+### format_entity_field(field: str, value: str, format_type: str)
+### delete_song(song_id: int)
+### move_song_to_library(song_id: int)
+### delete_unlinked_albums(album_ids: list)
+### delete_unlinked_publishers(publisher_ids: list)
+### delete_unlinked_tags(tag_ids: list)
+### sync_id3_if_enabled(song_id: int)
+### delete_original_source(song_id: int)
+
+---
+
+## MutationCoordinator
+*Location: `src/services/mutation_coordinator.py`*
+
+**Responsibility**: The high-level orchestrator for all database write operations. It coordinates multiple mutators and ensures atomicity across DB writes and physical file operations.
+
+### apply(body: MutationRequest) -> dict
+The single entry point for all mutations (Add, Remove, Update, Delete).
+- Coordinates `SongMutator`, `CreditMutator`, `TagMutator`, `PublisherMutator`, `AlbumMutator`, and `DeleteMutator`.
+- Ensures atomic transactions: if any mutation fails, the entire batch is rolled back.
+- Triggers physical file move/renaming via `FilingService` and ID3 writing via `MetadataWriter` for any touched songs.
+- Returns the updated song views and a list of warnings.
+
+---
+
+## SongMutator
+*Location: `src/services/mutators/song_mutator.py`*
+**Responsibility**: Handles scalar updates for the `Songs` and `MediaSources` tables.
+
+### apply_within(action: str, item: UpdateSongItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL update within an existing transaction.
+
+---
+
+## CreditMutator
+*Location: `src/services/mutators/credit_mutator.py`*
+**Responsibility**: Handles adding and removing artist credits.
+
+### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL operations for credit links.
+
+---
+
+## TagMutator
+*Location: `src/services/mutators/tag_mutator.py`*
+**Responsibility**: Handles adding, removing, and updating metadata tags.
+
+### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL operations for tag links and tag records.
+
+---
+
+## PublisherMutator
+*Location: `src/services/mutators/publisher_mutator.py`*
+**Responsibility**: Handles adding, removing, and updating publisher links.
+
+### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL operations for publisher links and publisher records.
+
+---
+
+## AlbumMutator
+*Location: `src/services/mutators/album_mutator.py`*
+**Responsibility**: Handles adding, removing, and updating album links.
+
+### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL operations for album links and album records.
+
+---
+
+## DeleteMutator
+*Location: `src/services/mutators/delete_mutator.py`*
+**Responsibility**: Handles soft-deletion of songs, albums, identities, and tags.
 
-### check_ingestion(file_path: str) -> Dict[str, Any]
-(-> `IngestionService.check_ingestion`)
-
-
-### ingest_file(staged_path: str) -> Dict[str, Any]
-(-> `IngestionService.ingest_file`)
-
-### ingest_single(file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]
-(-> `IngestionService.ingest_single`)
-
-### enrich_metadata(song_id: int, conn: sqlite3.Connection) -> None
-(-> `IngestionService.enrich_metadata`)
-
-### sync_id3_if_enabled(song_id: int) -> None
-Writes ID3 tags for a song if the metadata writer is enabled. No-op if disabled.
-
-### scan_folder(folder_path: str, recursive: bool = True) -> List[str]
-(-> `IngestionService.scan_folder`)
-
-
-### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
-(-> `IngestionService.ingest_batch`)
-
-
-### delete_song(song_id: int) -> bool
-Soft-delete a single song by SourceID. Handles physical cleanup if in staging.
-
-### get_filter_values() -> dict
-(-> `LibraryService.get_filter_values`)
-
-
-### filter_songs_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode) -> List[dict]
-Filter songs by sidebar criteria. Returns slim list-view rows.
-(-> `LibraryService.filter_songs_slim`)
-
-
-### ingest_wav_as_converting(staged_path: str) -> Dict[str, Any]
-(-> `IngestionService.ingest_wav_as_converting`)
-
-
-### finalize_wav_conversion(song_id: int, mp3_path: str) -> int
-(-> `IngestionService.finalize_wav_conversion`)
-
-
-### resolve_conflict(ghost_id: int, staged_path: str) -> Dict[str, Any]
-(-> `IngestionService.resolve_conflict`)
-
-### delete_original_source(song_id: int) -> bool
-(-> `EditService.delete_original_source`)
-
-### get_staging_origin(song_id: int) -> Optional[str]
-Fetch the original birth-path for this staged song via `StagingRepository`.
-
-
-
-### get_song(song_id: int) -> Optional[Song]
-(-> `LibraryService.get_song`)
-
-
-### get_identity(identity_id: int) -> Optional[Identity]
-(-> `IdentityService.get_identity`)
-
-### get_all_identities() -> List[Identity]
-(-> `IdentityService.get_all_identities`)
-
-### resolve_identity_by_name(display_name: str) -> Optional[int]
-(-> `IdentityService.resolve_identity_by_name`)
-
-
-
-### publisher_exists(name: str) -> bool
-Returns True if a Publisher with this exact name exists in the DB.
-
-### search_identities(query: str) -> List[Identity]
-(-> `IdentityService.search_identities`)
-
-
-### get_all_publishers() -> List[Publisher]
-(-> `LibraryService.get_all_publishers`)
-
-
-### get_all_albums() -> List[Album]
-(-> `LibraryService.get_all_albums`)
-
-
-### search_songs_slim(query: str) -> List[dict]
-(-> `LibraryService.search_songs_slim`)
-
-
-### search_songs_deep_slim(query: str) -> List[dict]
-(-> `LibraryService.search_songs_deep_slim`)
-
-
-### search_albums_slim(query: str) -> List[dict]
-(-> `LibraryService.search_albums_slim`)
-
-
-### get_album(album_id: int) -> Optional[Album]
-(-> `LibraryService.get_album`)
-
-
-### search_publishers(query: str) -> List[Publisher]
-(-> `LibraryService.search_publishers`)
-
-
-### get_publisher(publisher_id: int) -> Optional[Publisher]
-(-> `LibraryService.get_publisher`)
-
-
-
-### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
-(-> `LibraryService.get_songs_slim_by_publisher`)
-
-### get_all_tags() -> List[Tag]
-(-> `LibraryService.get_all_tags`)
-
-
-### get_tag_categories() -> List[str]
-(-> `LibraryService.get_tag_categories`)
-
-
-### get_all_roles() -> List[str]
-Returns a list of all distinct role names (e.g., Performer, Author, Publisher).
-
-### search_tags(query: str) -> List[Tag]
-(-> `LibraryService.search_tags`)
-
-
-### get_tag(tag_id: int) -> Optional[Tag]
-(-> `LibraryService.get_tag`)
-
-
-
-### get_songs_slim_by_tag(tag_id: int) -> List[dict]
-(-> `LibraryService.get_songs_slim_by_tag`)
-
-
-### get_songs_slim_by_identity(identity_id: int) -> List[dict]
-(-> `LibraryService.get_songs_slim_by_identity`)
-
-
-### merge_identity_into(source_name_id: int, target_name_id: int) -> None
-(-> `IdentityService.merge_identity_into`)
-
-
-### set_identity_type(identity_id: int, type_: str) -> None
-(-> `IdentityService.set_identity_type`)
-
-
-### add_identity_member(group_id: int, member_id: int) -> None
-(-> `IdentityService.add_identity_member`)
-
-
-### remove_identity_member(group_id: int, member_id: int) -> None
-(-> `IdentityService.remove_identity_member`)
-
-
-### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int] = None) -> int
-(-> `IdentityService.add_identity_alias`)
-
-
-### remove_identity_alias(name_id: int) -> None
-(-> `IdentityService.remove_identity_alias`)
-
-
-### update_song_scalars(song_id: int, body: Dict[str, Any]) -> None
-Partial update of core song metadata.
-
-### add_song_credit(song_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> SongCredit
-Add a credited artist to a song.
-
-### remove_song_credit(song_id: int, credit_id: int) -> None
-Remove a credit link from a song.
-
-### update_credit_name(name_id: int, new_name: str) -> None
-Globally update an ArtistName.
-
-### add_song_album(song_id: int, album_id: int, track_number: int, disc_number: int) -> None
-Link a song to an existing album.
-
-### remove_song_album(song_id: int, album_id: int) -> None
-Unlink a song from an album.
-
-### update_song_album_link(song_id: int, album_id: int, track_number: int, disc_number: int) -> None
-Update track metadata for a song-album association.
-
-### create_and_link_album(song_id: int, title: str, album_type: str, release_year: int, track_number: int, disc_number: int) -> int
-Atomic: Create and link album.
-
-### quick_create_album_for_song(song_id: int, title: Optional[str] = None) -> SongAlbum
-Quick-create an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
-
-### update_album(album_id: int, body: Dict[str, Any]) -> Album
-Update album metadata.
-
-### add_album_credit(album_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> int
-Add a credit to an album.
-
-### remove_album_credit(album_id: int, name_id: int) -> None
-Remove a credit from an album.
-
-### add_album_publisher(album_id: int, publisher_name: str, publisher_id: Optional[int] = None) -> Publisher
-Add publisher to an album.
-
-### remove_album_publisher(album_id: int, publisher_id: int) -> None
-Remove publisher from an album.
-
-### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None, raw_tag: Optional[str] = None) -> Tag
-Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2).
-
-- **Auto-Primary**: If category is 'Genre' and the song has no primary genre, the new link is automatically marked as primary.
-
-### remove_song_tag(song_id: int, tag_id: int) -> None
-Remove a tag from a song.
-
-### update_tag(tag_id: int, name: str, category: str) -> None
-Global tag update.
-
-### delete_unlinked_tags(tag_ids: List[int]) -> int
-Soft-delete tags from the given list that have zero active song links. All deletes run in one transaction. Returns count of tags deleted. For single delete pass `[tag_id]` — returns 0 if linked or not found, 1 if deleted.
-
-### delete_unlinked_albums(album_ids: List[int]) -> int
-Soft-delete albums from the given list that have zero active song links. Cleans up `AlbumCredits` + `AlbumPublishers` before soft-deleting. Returns count of albums deleted.
-
-### delete_unlinked_publishers(publisher_ids: List[int]) -> int
-Soft-delete publishers from the given list that have zero active songs AND zero active albums. Returns count of publishers deleted.
-
-### delete_unlinked_identities(identity_ids: List[int]) -> int
-(-> `IdentityService.delete_unlinked_identities`)
-
-
-### get_publisher_link_counts(publisher_ids: List[int]) -> Dict[int, Dict[str, int]]
-Batch fetch link counts (songs and albums) for a list of publishers. Returns `ID -> {"songs": N, "albums": M}`.
-
-### get_identity_song_counts(identity_ids: List[int]) -> Dict[int, int]
-(-> `IdentityService.get_identity_song_counts`)
-
-
-### set_primary_song_tag(song_id: int, tag_id: int) -> Tag
-Promote a specific genre tag to primary status for a song. 
-- **Strictly for Genres**: Only tags with category 'Genre' (case-insensitive) are allowed.
-- **Atomic Reset**: Orchestrates the atomic repository update to ensure only one primary genre exists.
-
-### add_song_publisher(song_id: int, publisher_name: str, publisher_id: Optional[int] = None) -> Publisher
-Link a master publisher to a song.
-
-### remove_song_publisher(song_id: int, publisher_id: int) -> None
-Remove song publisher link.
-
-### update_publisher(publisher_id: int, name: str) -> None
-Global publisher update.
-
-### set_publisher_parent(publisher_id: int, parent_id: Optional[int]) -> None
-Set or clear the parent of a publisher.
-
-### import_credits_bulk(song_id: int, credits: List[SpotifyCredit], publishers: List[str]) -> None
-Atomic import of Spotify credits and publishers. Now does backend identity resolution (CW-3).
-
-### get_id3_frames_config() -> Dict[str, Any]
-Returns the consolidated ID3 frame mapping.
-
-
-### move_song_to_library(song_id: int) -> str
-Calculates the target routing, moves the physical file, and updates the database records.
-
-### update_identity_legal_name(identity_id: int, legal_name: Optional[str]) -> None
-(-> `IdentityService.update_identity_legal_name`)
-
-
-### format_entity_field(entity_type: str, entity_id: int, field: str, format_type: str) -> Any
-Standardizes the casing of an entity's metadata field (Song/Album) based on "title" or "sentence" format.
+### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
+Performs the low-level SQL soft-delete operations.
 
 
 ---
@@ -558,6 +375,8 @@ Converts text to Sentence Case (First letter capitalized, the rest lowercase).
 
 ---
 
+---
+
 ## FilingService
 *Location: `src/services/filing_service.py`*
 
@@ -567,8 +386,17 @@ Calculates the target relative path based on rules.
 ### copy_to_library(song: Song, library_root: Path) -> Path
 Copies physical file to library. Handles same-file bypass logic.
 
-### move_to_library(song: Song, library_root: Path) -> Path
-Organizes a file into the library and removes the old source. Atomic-style transaction: Copy -> Confirm -> Delete.
+### write_id3_if_needed(song: Song, writer: MetadataWriter) -> List[str]
+Writes current DB state to the physical ID3 tags if they differ. Returns a list of warnings.
+
+### delete_staging_file(file_path: str) -> bool
+Physically deletes a file from the staging area.
+
+### delete_physical_file(file_path: str) -> bool
+Physically deletes a file from the library.
+
+### copy_if_needed(src: Path, dst: Path) -> None
+Copies file if destination doesn't exist or is different.
 
 ---
 
@@ -580,12 +408,8 @@ Extracts raw tags from audio files via Mutagen.
 
 ### compare_songs(db_song: Song, file_song: Song) -> dict
 Compares two Song objects field by field.
-Returns `{"in_sync": bool, "mismatches": [field_name, ...]}`.
-Mismatches are labelled `title`, `year`, `bpm`, `isrc`, `credit:{Role}`, `tag:{Category}`, `publishers`, `album_title`, `track`, `disc`.
-
-### filter_sync_mismatches(db_song: Song, mismatches: list) -> list
-Filters raw `compare_songs` mismatches to only those relevant to DB state.
-Removes `tag:*` mismatches for categories that exist only in the file (not in the DB).
+Returns a diff dict: `{key: {"db": db_val, "file": file_val}, ...}`.
+Empty dict means in sync. Keys align with frontend chip/scalar identifiers (media_name, year, bpm, isrc, notes, credit:{Role}, tag:{Cat}, publisher, album).
 
 ---
 

@@ -32,9 +32,13 @@ class CreditMutator:
 
     def _add(self, item: AddCreditItem, conn: sqlite3.Connection) -> None:
         if item.song_id is not None:
-            self._song_repo.add_credit(item.song_id, item.name, item.role, conn, identity_id=item.id)
+            self._song_repo.add_credit(
+                item.song_id, item.name, item.role, conn, identity_id=item.id
+            )
         else:
-            self._album_repo.add_credit(item.album_id, item.name, item.role, conn, identity_id=item.id)
+            self._album_repo.add_credit(
+                item.album_id, item.name, item.role, conn, identity_id=item.id
+            )
 
     def _remove(self, item: RemoveCreditItem, conn: sqlite3.Connection) -> None:
         if item.song_id is not None:
@@ -47,7 +51,9 @@ class CreditMutator:
     def _update(self, item: UpdateCreditEntityItem, conn: sqlite3.Connection) -> None:
         if item.display_name is None:
             return
-        existing_id = self._song_repo.get_name_id_by_display_name(item.display_name, conn)
+        existing_id = self._song_repo.get_name_id_by_display_name(
+            item.display_name, conn
+        )
         if existing_id is not None and existing_id != item.id:
             raise ValueError(f"MERGE_REQUIRED:{existing_id}")
         updated = self._song_repo.update_credit_name(item.id, item.display_name, conn)

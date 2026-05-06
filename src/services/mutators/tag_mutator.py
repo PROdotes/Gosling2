@@ -43,30 +43,55 @@ class TagMutator:
         is_primary = 0
         if category == "Genre":
             existing_links = self._repo.get_tags_for_songs([item.song_id], conn)
-            has_primary = any(t.is_primary for sid, t in existing_links if sid == item.song_id and t.category == "Genre")
+            has_primary = any(
+                t.is_primary
+                for sid, t in existing_links
+                if sid == item.song_id and t.category == "Genre"
+            )
             if item.make_primary or not has_primary:
                 is_primary = 1
 
-        self._repo.add_tag(item.song_id, name, category, conn, is_primary=is_primary, tag_id=item.id)
+        self._repo.add_tag(
+            item.song_id, name, category, conn, is_primary=is_primary, tag_id=item.id
+        )
 
     def _remove(self, item: RemoveTagItem, conn: sqlite3.Connection) -> None:
         links = self._repo.get_tags_for_songs([item.song_id], conn)
-        removed_link = next((t for sid, t in links if sid == item.song_id and t.id == item.id), None)
-        was_primary_genre = removed_link and removed_link.is_primary and removed_link.category == "Genre"
+        removed_link = next(
+            (t for sid, t in links if sid == item.song_id and t.id == item.id), None
+        )
+        was_primary_genre = (
+            removed_link
+            and removed_link.is_primary
+            and removed_link.category == "Genre"
+        )
         removed = self._repo.remove_tag(item.song_id, item.id, conn)
         if removed == 0:
             raise LookupError(f"Tag {item.id} not linked to song {item.song_id}")
         if was_primary_genre:
-            next_genre = next((t for sid, t in links if sid == item.song_id and t.category == "Genre" and t.id != item.id), None)
+            next_genre = next(
+                (
+                    t
+                    for sid, t in links
+                    if sid == item.song_id and t.category == "Genre" and t.id != item.id
+                ),
+                None,
+            )
             if next_genre:
                 self._repo.set_primary_tag(item.song_id, next_genre.id, conn)
 
-    def _update(self, item: Union[UpdateSongTagItem, UpdateTagEntityItem], conn: sqlite3.Connection) -> None:
+    def _update(
+        self,
+        item: Union[UpdateSongTagItem, UpdateTagEntityItem],
+        conn: sqlite3.Connection,
+    ) -> None:
         if isinstance(item, UpdateSongTagItem):
             if item.is_primary:
                 updated = self._repo.set_primary_tag(item.song_id, item.tag_id, conn)
                 if updated == 0:
-                    raise LookupError(f"Tag {item.tag_id} not linked to song {item.song_id}")
+                    raise LookupError(
+                        f"Tag {item.tag_id} not linked to song {item.song_id}"
+                    )
         elif isinstance(item, UpdateTagEntityItem):
             existing = self._repo.get_by_id(item.id, conn)
             if existing is None:
@@ -77,4 +102,6 @@ class TagMutator:
             if updated == 0:
                 raise LookupError(f"Tag {item.id} not found")
         else:
-            raise ValueError(f"TagMutator: unexpected update type '{getattr(item, 'type', '?')}'")
+            raise ValueError(
+                f"TagMutator: unexpected update type '{getattr(item, 'type', '?')}'"
+            )

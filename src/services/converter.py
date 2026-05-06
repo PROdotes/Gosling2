@@ -30,9 +30,7 @@ def convert_to_mp3(src_path: Path) -> Path:
             out_path.unlink()
         stderr = result.stderr.decode(errors="replace")
         logger.error(f"[Converter] ffmpeg failed (exit {result.returncode}): {stderr}")
-        raise RuntimeError(
-            f"ffmpeg failed (exit {result.returncode}): {stderr}"
-        )
+        raise RuntimeError(f"ffmpeg failed (exit {result.returncode}): {stderr}")
 
     if not out_path.exists():
         logger.error(f"[Converter] ffmpeg exited 0 but output not created: {out_path}")

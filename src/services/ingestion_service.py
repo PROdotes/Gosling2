@@ -252,7 +252,11 @@ class IngestionService:
             logger.info(
                 f"[IngestionService] <- ingest_wav_as_converting(path='{staged_path}') REJECTED: {check['status']}"
             )
-            if check["status"] != "CONFLICT" and os.path.exists(staged_path) and self._is_staged(staged_path):
+            if (
+                check["status"] != "CONFLICT"
+                and os.path.exists(staged_path)
+                and self._is_staged(staged_path)
+            ):
                 os.remove(staged_path)
             return check
 
@@ -402,10 +406,15 @@ class IngestionService:
                     notes=check["ghost_song"].get("notes"),
                 )
 
-            if os.path.exists(staged_path) and check["status"] not in (
-                "CONFLICT",
-                "PENDING_CONVERT",
-            ) and self._is_staged(staged_path):
+            if (
+                os.path.exists(staged_path)
+                and check["status"]
+                not in (
+                    "CONFLICT",
+                    "PENDING_CONVERT",
+                )
+                and self._is_staged(staged_path)
+            ):
                 os.remove(staged_path)
             return check
 

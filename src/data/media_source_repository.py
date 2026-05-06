@@ -180,7 +180,9 @@ class MediaSourceRepository(BaseRepository):
             notes=row["SourceNotes"] if "SourceNotes" in row.keys() else None,
         )
 
-    def soft_delete(self, source_id: int, conn: sqlite3.Connection, notes: str = None) -> bool:
+    def soft_delete(
+        self, source_id: int, conn: sqlite3.Connection, notes: str = None
+    ) -> bool:
         """
         Soft-delete a MediaSource by setting IsDeleted = 1.
         Returns True if a record was updated, False if not found or already deleted.

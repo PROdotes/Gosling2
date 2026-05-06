@@ -467,14 +467,17 @@ class IdentityRepository(BaseRepository):
         """Detach an alias from its identity by re-homing it to a new Identity row."""
         logger.debug(f"[IdentityRepository] -> delete_alias(name_id={name_id})")
         row = cursor.execute(
-            "SELECT IsPrimaryName, DisplayName FROM ArtistNames WHERE NameID = ?", (name_id,)
+            "SELECT IsPrimaryName, DisplayName FROM ArtistNames WHERE NameID = ?",
+            (name_id,),
         ).fetchone()
         if not row:
             return
         if row[0]:
             raise ValueError("Cannot detach the primary name of an identity")
 
-        cursor.execute("INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)")
+        cursor.execute(
+            "INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)"
+        )
         new_identity_id = cursor.lastrowid
         cursor.execute(
             "UPDATE ArtistNames SET OwnerIdentityID = ?, IsPrimaryName = 1, IsDeleted = 0 WHERE NameID = ?",

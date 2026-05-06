@@ -84,7 +84,9 @@ class SongAlbumRepository(BaseRepository):
         for album in albums:
             title = (album.album_title or "").strip()
             if not title or title.upper() == "N/A":
-                logger.debug(f"[SongAlbumRepository] <- insert_albums() skipping blank/N/A album for source_id={source_id}")
+                logger.debug(
+                    f"[SongAlbumRepository] <- insert_albums() skipping blank/N/A album for source_id={source_id}"
+                )
                 continue
             album_id, was_deleted = self._find_matching_album(cursor, album)
 
@@ -271,21 +273,30 @@ class SongAlbumRepository(BaseRepository):
 
     def has_primary(self, source_id: int, conn: sqlite3.Connection) -> bool:
         """Return True if the song already has a primary album link."""
-        return conn.execute(
-            "SELECT 1 FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1",
-            (source_id,),
-        ).fetchone() is not None
+        return (
+            conn.execute(
+                "SELECT 1 FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1",
+                (source_id,),
+            ).fetchone()
+            is not None
+        )
 
-    def set_primary(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> int:
+    def set_primary(
+        self, source_id: int, album_id: int, conn: sqlite3.Connection
+    ) -> int:
         """Demote all album links for the song, then promote the given album. Returns final rowcount. Does NOT commit."""
-        conn.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,))
+        conn.execute(
+            "UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,)
+        )
         cursor = conn.execute(
             "UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?",
             (source_id, album_id),
         )
         return cursor.rowcount
 
-    def clear_primary(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> int:
+    def clear_primary(
+        self, source_id: int, album_id: int, conn: sqlite3.Connection
+    ) -> int:
         """Set IsPrimary=0 for a specific song-album link. Returns rowcount. Does NOT commit."""
         cursor = conn.execute(
             "UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ? AND AlbumID = ?",
@@ -293,7 +304,9 @@ class SongAlbumRepository(BaseRepository):
         )
         return cursor.rowcount
 
-    def get_link(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> Optional[dict]:
+    def get_link(
+        self, source_id: int, album_id: int, conn: sqlite3.Connection
+    ) -> Optional[dict]:
         """Return the raw link row for a song-album pair, or None if not linked."""
         conn.row_factory = sqlite3.Row
         return conn.execute(

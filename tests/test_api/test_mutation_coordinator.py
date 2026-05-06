@@ -15,7 +15,6 @@ populated_db data map (relevant):
   Tags:  song 9 has tag_id=6 (Genre, primary)
   Albums: song 1 -> album 100, song 2 -> album 200
 """
-import os
 import pytest
 from fastapi.testclient import TestClient
 from pathlib import Path
@@ -471,7 +470,7 @@ class TestStagingFileCleanup:
 
         import sqlite3
         conn = sqlite3.connect(populated_db)
-        conn.execute(f"UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(staged_file),))
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(staged_file),))
         conn.commit()
         conn.close()
 

@@ -26,7 +26,13 @@ class DeleteMutator:
     def apply_within(
         self,
         action: str,
-        item: Union[DeleteSongItem, DeleteTagItem, DeletePublisherItem, DeleteAlbumItem, DeleteIdentityItem],
+        item: Union[
+            DeleteSongItem,
+            DeleteTagItem,
+            DeletePublisherItem,
+            DeleteAlbumItem,
+            DeleteIdentityItem,
+        ],
         conn: sqlite3.Connection,
     ) -> None:
         if action != "delete":
@@ -65,11 +71,15 @@ class DeleteMutator:
         if not deleted:
             raise LookupError(f"Tag {item.id} not found")
 
-    def _delete_publisher(self, item: DeletePublisherItem, conn: sqlite3.Connection) -> None:
+    def _delete_publisher(
+        self, item: DeletePublisherItem, conn: sqlite3.Connection
+    ) -> None:
         if item.unlinked:
             for pub in self._publisher_repo.get_all(conn):
                 song_ids = self._publisher_repo.get_song_ids_by_publisher(pub.id, conn)
-                album_ids = self._publisher_repo.get_album_ids_by_publisher(pub.id, conn)
+                album_ids = self._publisher_repo.get_album_ids_by_publisher(
+                    pub.id, conn
+                )
                 if not song_ids and not album_ids:
                     self._publisher_repo.soft_delete(pub.id, conn)
             return
@@ -92,22 +102,30 @@ class DeleteMutator:
             return
         linked = self._album_repo.get_song_ids_by_album(item.id, conn)
         if linked:
-            raise ValueError(f"Album {item.id} is still linked to {len(linked)} song(s)")
+            raise ValueError(
+                f"Album {item.id} is still linked to {len(linked)} song(s)"
+            )
         self._album_repo.delete_album_links(item.id, conn)
         deleted = self._album_repo.soft_delete(item.id, conn)
         if not deleted:
             raise LookupError(f"Album {item.id} not found")
 
-    def _delete_identity(self, item: DeleteIdentityItem, conn: sqlite3.Connection) -> None:
+    def _delete_identity(
+        self, item: DeleteIdentityItem, conn: sqlite3.Connection
+    ) -> None:
         if item.unlinked:
             for identity in self._identity_repo.get_all_identities(conn):
-                song_ids = self._identity_repo.get_song_ids_by_identity(identity.id, conn)
+                song_ids = self._identity_repo.get_song_ids_by_identity(
+                    identity.id, conn
+                )
                 if not song_ids:
                     self._identity_repo.soft_delete(identity.id, conn)
             return
         linked = self._identity_repo.get_song_ids_by_identity(item.id, conn)
         if linked:
-            raise ValueError(f"Identity {item.id} is still linked to {len(linked)} song(s)")
+            raise ValueError(
+                f"Identity {item.id} is still linked to {len(linked)} song(s)"
+            )
         deleted = self._identity_repo.soft_delete(item.id, conn)
         if not deleted:
             raise LookupError(f"Identity {item.id} not found")

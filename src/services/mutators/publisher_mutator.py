@@ -30,9 +30,13 @@ class PublisherMutator:
 
     def _add(self, item: AddPublisherItem, conn: sqlite3.Connection) -> None:
         if item.song_id is not None:
-            self._repo.add_song_publisher(item.song_id, item.name, conn, publisher_id=item.id)
+            self._repo.add_song_publisher(
+                item.song_id, item.name, conn, publisher_id=item.id
+            )
         else:
-            self._repo.add_album_publisher(item.album_id, item.name, conn, publisher_id=item.id)
+            self._repo.add_album_publisher(
+                item.album_id, item.name, conn, publisher_id=item.id
+            )
 
     def _remove(self, item: RemovePublisherItem, conn: sqlite3.Connection) -> None:
         if item.song_id is not None:
@@ -42,7 +46,9 @@ class PublisherMutator:
         if removed == 0:
             raise LookupError(f"Publisher {item.id} not linked")
 
-    def _update(self, item: UpdatePublisherEntityItem, conn: sqlite3.Connection) -> None:
+    def _update(
+        self, item: UpdatePublisherEntityItem, conn: sqlite3.Connection
+    ) -> None:
         fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
         if not fields:
             return

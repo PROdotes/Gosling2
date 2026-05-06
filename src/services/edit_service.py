@@ -1011,7 +1011,13 @@ class EditService:
             return CasingService.to_sentence_case(value)
         return value.strip()
 
-    def delete_song(self, song_id: int, staging_dir: Optional[Path] = None, notes: str = None, delete_file: bool = False) -> bool:
+    def delete_song(
+        self,
+        song_id: int,
+        staging_dir: Optional[Path] = None,
+        notes: str = None,
+        delete_file: bool = False,
+    ) -> bool:
         """Soft-delete a single song. Handles physical cleanup if in staging or if delete_file=True."""
         song = self._song_repo.get_by_id(song_id)
         if not song:
@@ -1076,7 +1082,10 @@ class EditService:
                 is_same_file = False
 
             if source_abs_path.exists() and not is_same_file:
-                if not new_abs_path.exists() or new_abs_path.stat().st_size != source_abs_path.stat().st_size:
+                if (
+                    not new_abs_path.exists()
+                    or new_abs_path.stat().st_size != source_abs_path.stat().st_size
+                ):
                     raise RuntimeError(
                         f"Copy verification failed: destination size mismatch or missing. "
                         f"Source: {source_abs_path}, Dest: {new_abs_path}"
@@ -1153,6 +1162,7 @@ class EditService:
         """Internal trigger for persistent ID3 writing."""
         if not AUTO_SAVE_ID3:
             return
+
         def _write():
             try:
                 song = self._library_service.get_song(song_id)
@@ -1160,6 +1170,7 @@ class EditService:
                     self._metadata_writer.write_metadata(song)
             except Exception as e:
                 logger.error(f"[EditService] ID3 sync failed: {e}")
+
         threading.Thread(target=_write, daemon=True).start()
 
     def delete_original_source(self, song_id: int) -> bool:

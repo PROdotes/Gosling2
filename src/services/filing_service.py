@@ -181,7 +181,9 @@ class FilingService:
                     )
                     return target_absolute
             except Exception as e:
-                logger.warning(f"[FilingService] samefile() check failed for {source_path} vs {target_absolute}: {e}")
+                logger.warning(
+                    f"[FilingService] samefile() check failed for {source_path} vs {target_absolute}: {e}"
+                )
             raise FileExistsError(
                 f"Target path already exists in library: {target_absolute}"
             )
@@ -197,6 +199,7 @@ class FilingService:
 
     def write_id3_if_needed(self, song: Song, writer) -> list[dict]:
         from src.engine.config import AUTO_SAVE_ID3
+
         if not AUTO_SAVE_ID3:
             return []
         try:
@@ -222,10 +225,14 @@ class FilingService:
             source.unlink()
             logger.info(f"[FilingService] Deleted physical file: {source}")
 
-    def copy_if_needed(self, song: Song, library_root: Path) -> tuple[list[dict], str | None]:
+    def copy_if_needed(
+        self, song: Song, library_root: Path
+    ) -> tuple[list[dict], str | None]:
         """Copy song to library if AUTO_MOVE_ON_APPROVE is enabled and song is reviewed.
-        Returns (warnings, new_path). Does NOT delete the source — caller handles that after DB commit."""
+        Returns (warnings, new_path). Does NOT delete the source — caller handles that after DB commit.
+        """
         from src.engine.config import AUTO_MOVE_ON_APPROVE, ProcessingStatus
+
         if not AUTO_MOVE_ON_APPROVE:
             return [], None
         if song.processing_status != ProcessingStatus.REVIEWED:
@@ -235,7 +242,9 @@ class FilingService:
         target_absolute = library_root / target_relative
         if source.exists() and target_absolute.exists():
             try:
-                if source.resolve() == target_absolute.resolve() or source.samefile(target_absolute):
+                if source.resolve() == target_absolute.resolve() or source.samefile(
+                    target_absolute
+                ):
                     return [], None
             except Exception:
                 pass

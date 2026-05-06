@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.engine.config import SCALAR_VALIDATION, YEAR_MIN, YEAR_MAX
 
-
 # ---------------------------------------------------------------------------
 # Shared validators
 # ---------------------------------------------------------------------------
@@ -22,6 +21,7 @@ def _reject_empty_string(v: Optional[str], field_name: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Add items
 # ---------------------------------------------------------------------------
+
 
 class AddCreditItem(BaseModel):
     type: Literal["credit"]
@@ -123,6 +123,7 @@ AddItem = Annotated[
 # Update items
 # ---------------------------------------------------------------------------
 
+
 class UpdateSongItem(BaseModel):
     # TODO: split into UpdateMediaItem / UpdateSongItem when MediaMutator boundary is designed
     type: Literal["song"]
@@ -145,7 +146,9 @@ class UpdateSongItem(BaseModel):
     @classmethod
     def isrc_format(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and not _ISRC_RE.match(v):
-            raise ValueError("ISRC must be 12 characters: 2 country + 3 registrant + 7 digits (e.g. GBAYE0000001)")
+            raise ValueError(
+                "ISRC must be 12 characters: 2 country + 3 registrant + 7 digits (e.g. GBAYE0000001)"
+            )
         return v
 
     @field_validator("year")
@@ -161,7 +164,9 @@ class UpdateSongItem(BaseModel):
         if v is not None:
             rules = SCALAR_VALIDATION["bpm"]
             if not (rules["min"] <= v <= rules["max"]):
-                raise ValueError(f"bpm must be between {rules['min']} and {rules['max']}")
+                raise ValueError(
+                    f"bpm must be between {rules['min']} and {rules['max']}"
+                )
         return v
 
 
@@ -261,6 +266,7 @@ UpdateItem = Annotated[
 # Remove items
 # ---------------------------------------------------------------------------
 
+
 class RemoveCreditItem(BaseModel):
     type: Literal["credit"]
     song_id: Optional[int] = None
@@ -308,6 +314,7 @@ RemoveItem = Annotated[
 # ---------------------------------------------------------------------------
 # Delete items (entity-level soft-delete)
 # ---------------------------------------------------------------------------
+
 
 class DeleteSongItem(BaseModel):
     type: Literal["song"]
@@ -376,7 +383,14 @@ class DeleteOriginalFileItem(BaseModel):
 
 
 DeleteItem = Annotated[
-    Union[DeleteSongItem, DeleteTagItem, DeletePublisherItem, DeleteAlbumItem, DeleteIdentityItem, DeleteOriginalFileItem],
+    Union[
+        DeleteSongItem,
+        DeleteTagItem,
+        DeletePublisherItem,
+        DeleteAlbumItem,
+        DeleteIdentityItem,
+        DeleteOriginalFileItem,
+    ],
     Field(discriminator="type"),
 ]
 
@@ -384,6 +398,7 @@ DeleteItem = Annotated[
 # ---------------------------------------------------------------------------
 # Top-level request
 # ---------------------------------------------------------------------------
+
 
 class MutationRequest(BaseModel):
     add: Optional[List[AddItem]] = None
@@ -394,5 +409,7 @@ class MutationRequest(BaseModel):
     @model_validator(mode="after")
     def at_least_one_change(self) -> "MutationRequest":
         if not (self.add or self.update or self.remove or self.delete):
-            raise ValueError("request must contain at least one item in add, update, remove, or delete")
+            raise ValueError(
+                "request must contain at least one item in add, update, remove, or delete"
+            )
         return self

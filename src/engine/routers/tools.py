@@ -104,10 +104,20 @@ def confirm(body: ConfirmRequest) -> dict:
                 status_code=422, detail="classification is required for credits"
             )
         for name in names:
-            add.append({"type": "credit", "song_id": body.song_id, "name": name, "id": None, "role": body.classification})
+            add.append(
+                {
+                    "type": "credit",
+                    "song_id": body.song_id,
+                    "name": name,
+                    "id": None,
+                    "role": body.classification,
+                }
+            )
     elif body.target == "publishers":
         for name in names:
-            add.append({"type": "publisher", "song_id": body.song_id, "name": name, "id": None})
+            add.append(
+                {"type": "publisher", "song_id": body.song_id, "name": name, "id": None}
+            )
 
     return {"add": add, "remove": remove}
 
@@ -143,12 +153,16 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
             try:
                 scalars["year"] = int(metadata["Year"])
             except ValueError:
-                logger.warning(f"[tools] Non-numeric Year for song {item.song_id}: {metadata['Year']!r}")
+                logger.warning(
+                    f"[tools] Non-numeric Year for song {item.song_id}: {metadata['Year']!r}"
+                )
         if "BPM" in metadata:
             try:
                 scalars["bpm"] = int(metadata["BPM"])
             except ValueError:
-                logger.warning(f"[tools] Non-numeric BPM for song {item.song_id}: {metadata['BPM']!r}")
+                logger.warning(
+                    f"[tools] Non-numeric BPM for song {item.song_id}: {metadata['BPM']!r}"
+                )
         if "ISRC" in metadata:
             scalars["isrc"] = metadata["ISRC"]
 
@@ -156,13 +170,33 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
             update.append({"type": "song", "id": item.song_id, **scalars})
 
         if "Artist" in metadata:
-            add.append({"type": "credit", "song_id": item.song_id, "name": metadata["Artist"], "role": "Performer"})
+            add.append(
+                {
+                    "type": "credit",
+                    "song_id": item.song_id,
+                    "name": metadata["Artist"],
+                    "role": "Performer",
+                }
+            )
 
         if "Genre" in metadata:
-            add.append({"type": "tag", "song_id": item.song_id, "name": metadata["Genre"], "category": "Genre"})
+            add.append(
+                {
+                    "type": "tag",
+                    "song_id": item.song_id,
+                    "name": metadata["Genre"],
+                    "category": "Genre",
+                }
+            )
 
         if "Publisher" in metadata:
-            add.append({"type": "publisher", "song_id": item.song_id, "name": metadata["Publisher"]})
+            add.append(
+                {
+                    "type": "publisher",
+                    "song_id": item.song_id,
+                    "name": metadata["Publisher"],
+                }
+            )
 
     result = {}
     if add:

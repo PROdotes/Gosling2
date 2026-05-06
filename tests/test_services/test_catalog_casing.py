@@ -1,5 +1,4 @@
 
-import pytest
 from src.services.catalog_service import CatalogService
 
 class TestCatalogCasing:

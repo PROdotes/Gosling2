@@ -13,6 +13,12 @@ Fetches server-side validation rules for tags, BPM, and other metadata.
 ### fetchAppConfig()
 Fetches general application configuration.
 
+### mutate(command)
+The single entry point for all database mutations.
+- **Command structure**: `{ add: [], remove: [], update: [], delete: [] }`.
+- Processes the batch atomically on the server.
+- Used internally by almost all mutation-specific helper functions (e.g. `patchSongScalars`, `addSongCredit`).
+
 ### abortAllSearches()
 Aborts all ongoing search requests (songs, albums, artists, etc).
 

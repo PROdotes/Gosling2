@@ -22,6 +22,12 @@ The main FastAPI application instance with CORS middleware.
 - Serves the single-page dashboard skeleton from `src/templates/dashboard.html`.
 - Loads modular Vanilla JS from `/static/js/dashboard/main.js`.
 
+### add_request_id_middleware(app: FastAPI)
+**Internal**: Registers middleware to ensure every request has a unique ID in context vars.
+
+### validation_exception_handler(request: Request, exc: RequestValidationError)
+**Internal**: Standardized handler for Pydantic validation errors. Returns 422 with structured details.
+
 ### _ensure_db()
 **Internal**: Initializes database schema on startup if not exists.
 

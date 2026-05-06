@@ -152,12 +152,15 @@ class Song(MediaSource):
         """True if the song is not located at its projected path."""
         if not self.source_path or not self.projected_path:
             return False
-        return os.path.normpath(self.source_path) != os.path.normpath(self.projected_path)
+        return os.path.normpath(self.source_path) != os.path.normpath(
+            self.projected_path
+        )
 
     @property
     def title(self) -> str:
         """Domain-level title alias for media_name."""
         return self.media_name
+
 
 # Recursive model rebuilding for Pydantic v2
 Publisher.model_rebuild()

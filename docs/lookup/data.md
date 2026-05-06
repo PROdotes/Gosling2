@@ -171,6 +171,9 @@ Get-or-create a Role by name. Returns role_id.
 
 Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or None. Read-only. Supports optional shared connection.
 
+### get_name_id_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
+Alternative accessor for find_by_display_name.
+
 ### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None) -> int
 
 Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
@@ -230,6 +233,21 @@ Remove a song-album link. Keeps Album record. Does NOT commit.
 ### update_track_info(source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None
 
 Update track/disc number for a song-album link. Does NOT commit.
+
+### has_primary(source_id: int, conn: sqlite3.Connection) -> bool
+Returns True if the song already has a link marked as primary.
+
+### set_primary(source_id: int, album_id: int, conn: sqlite3.Connection) -> None
+Sets the 'IsPrimary' flag for a specific song-album link. Does NOT clear others.
+
+### clear_primary(source_id: int, conn: sqlite3.Connection) -> None
+Clears 'IsPrimary' flag for ALL album links for a song.
+
+### get_link(source_id: int, album_id: int, conn: sqlite3.Connection) -> Optional[SongAlbum]
+Fetches a specific link record.
+
+### promote_next(source_id: int, conn: sqlite3.Connection) -> None
+If no primary exists, promotes the first available link to primary.
 
 ### _row_to_song_album(row: sqlite3.Row) -> SongAlbum
 

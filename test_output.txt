@@ -1,0 +1,422 @@
+============================= test session starts =============================
+platform win32 -- Python 3.10.5, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\glazb\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+PyQt6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.0
+rootdir: C:\Users\glazb\PycharmProjects\gosling2
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0, mock-3.15.1, qt-4.5.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_lookup_integrity.py::TestLookupIntegrity::test_lookup_protocol_integrity FAILED [100%]
+
+================================== FAILURES ===================================
+_____________ TestLookupIntegrity.test_lookup_protocol_integrity ______________
+
+self = <test_lookup_integrity.TestLookupIntegrity object at 0x000001EEFB91A6B0>
+
+    def test_lookup_protocol_integrity(self):
+        """
+        CONSTITUTION CHECK: Every non-model .py file and its methods
+        must exist in docs/lookup/ with strict signatures.
+        """
+        src_dir = os.path.abspath("src")
+        lookup_dir = os.path.abspath("docs/lookup")
+    
+        assert os.path.exists(lookup_dir), f"Lookup directory missing: {lookup_dir}"
+    
+        doc_map = get_documented_map(lookup_dir)
+        py_files = get_all_py_files(src_dir)
+    
+        assert len(py_files) > 0, f"No .py files found in src_dir '{src_dir}'"
+        assert (
+            len(doc_map) > 0
+        ), f"No documented locations found in '{lookup_dir}' -- lookup docs are empty"
+    
+        location_errors = []
+        signature_errors = []
+    
+        for py_file in py_files:
+            abs_path = os.path.abspath(py_file)
+            rel_path = os.path.relpath(py_file, os.path.abspath("."))
+    
+            covered_signatures = set()
+            is_covered = False
+    
+            for loc_path, sigs in doc_map.items():
+                if abs_path == loc_path or (
+                    os.path.isdir(loc_path) and abs_path.startswith(loc_path)
+                ):
+                    is_covered = True
+                    covered_signatures.update(sigs)
+    
+            if not is_covered:
+                location_errors.append(
+                    f"[LOCATION MISSING] {rel_path} is not mapped in any docs/lookup/*.md"
+                )
+                continue
+    
+            actual_members = get_members_to_verify(py_file)
+            for member in actual_members:
+                if member not in covered_signatures:
+                    signature_errors.append(
+                        f"[SIGNATURE MISSING] '{member}' in {rel_path} is not in docs/lookup/"
+                    )
+    
+        assert (
+            len(location_errors) == 0
+        ), "Lookup Protocol -- Location Violations:\n" + "\n".join(location_errors)
+>       assert (
+            len(signature_errors) == 0
+        ), "Lookup Protocol -- Signature Violations:\n" + "\n".join(signature_errors)
+E       AssertionError: Lookup Protocol -- Signature Violations:
+E         [SIGNATURE MISSING] 'add_request_id_middleware' in src\engine_server.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'validation_exception_handler' in src\engine_server.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'has_primary' in src\data\song_album_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_primary' in src\data\song_album_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'clear_primary' in src\data\song_album_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_link' in src\data\song_album_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'promote_next' in src\data\song_album_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_name_id_by_display_name' in src\data\song_credit_repository.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'PrepareAlbumFromSongBody' in src\engine\routers\album_updates.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'AddCreditItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'AddTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_name_and_category' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'AddPublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'AddAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'name_required_without_id' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateSongItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'media_name_not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'isrc_format' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'year_range' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'bpm_positive' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateTagEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateSongTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateSongAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateAlbumEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'year_range' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdateCreditEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'UpdatePublisherEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'MergeIdentityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'RemoveCreditItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'RemoveTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'RemovePublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'RemoveAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeleteSongItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeleteTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeletePublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeleteAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeleteIdentityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'DeleteOriginalFileItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'MutationRequest' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'at_least_one_change' in src\engine\routers\mutation_models.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'CatalogService' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'sync_id3_if_enabled' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'check_ingestion' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'ingest_wav_as_converting' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'finalize_wav_conversion' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'ingest_file' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'enrich_metadata' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'scan_folder' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'ingest_batch' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'ingest_single' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_song' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'resolve_conflict' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_song' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_identity' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_all_identities' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'resolve_identity_by_name' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_identity_alias' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_identity_alias' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_identity_legal_name' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'publisher_exists' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_identities' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_publisher_link_counts' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_identity_song_counts' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_all_publishers' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_all_albums' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_albums_slim' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_album' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_publishers' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_songs_slim_by_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_all_tags' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_tag_categories' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_tags' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_songs_slim_by_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_songs_slim_by_identity' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_filter_values' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'filter_songs_slim' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_songs_slim' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'search_songs_deep_slim' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'format_entity_field' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_song_scalars' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_all_roles' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_credit' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_credit' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_credit_name' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'merge_identity_into' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_identity_type' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_identity_member' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_identity_member' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_album' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'create_and_link_album' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'quick_create_album_for_song' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_album' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_song_album_link' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_album' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_album_credit' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_album_credit' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_album_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_album_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_albums' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_publishers' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_identities' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_tags' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_primary_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'import_credits_bulk' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_publisher' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_publisher_parent' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_id3_frames_config' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'move_song_to_library' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_original_source' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'get_staging_origin' in src\services\catalog_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'EditService' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_song_scalars' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_credit' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_credit' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_credit_name' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_album' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'create_and_link_album' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_album' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_song_album_link' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_album' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_album_credit' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_album_credit' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_album_publisher' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_album_publisher' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'sync_album_with_song' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'quick_create_album_for_song' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_tag' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_tag' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_tag' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_primary_song_tag' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'add_song_publisher' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'remove_song_publisher' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'update_publisher' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'set_publisher_parent' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'import_credits_bulk' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'format_entity_field' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_song' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'move_song_to_library' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_albums' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_publishers' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_unlinked_tags' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'sync_id3_if_enabled' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_original_source' in src\services\edit_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'write_id3_if_needed' in src\services\filing_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_staging_file' in src\services\filing_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'delete_physical_file' in src\services\filing_service.py is not in docs/lookup/
+E         [SIGNATURE MISSING] 'copy_if_needed' in src\services\filing_service.py is not in docs/lookup/
+E       assert 171 == 0
+E        +  where 171 = len(["[SIGNATURE MISSING] 'add_request_id_middleware' in src\\engine_server.py is not in docs/lookup/", "[SIGNATURE MISSING] 'validation_exception_handler' in src\\engine_server.py is not in docs/lookup/", "[SIGNATURE MISSING] 'has_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'clear_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_link' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'promote_next' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_name_id_by_display_name' in src\\data\\song_credit_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'PrepareAlbumFromSongBody' in src\\engine\\routers\\album_updates.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddCreditItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_name_and_category' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddPublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'name_required_without_id' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'media_name_not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'isrc_format' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'year_range' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'bpm_positive' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateTagEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateAlbumEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'year_range' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateCreditEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdatePublisherEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'MergeIdentityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveCreditItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemovePublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteSongItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeletePublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteIdentityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteOriginalFileItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'MutationRequest' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'at_least_one_change' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'CatalogService' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_id3_if_enabled' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'check_ingestion' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_wav_as_converting' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'finalize_wav_conversion' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_file' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'enrich_metadata' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'scan_folder' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_batch' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_single' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'resolve_conflict' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_identity' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'resolve_identity_by_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_identity_alias' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_identity_alias' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_identity_legal_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'publisher_exists' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_publisher_link_counts' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_identity_song_counts' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_albums' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_albums_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_tag_categories' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_identity' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_filter_values' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'filter_songs_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_songs_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_songs_deep_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'format_entity_field' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_scalars' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_roles' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_credit_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'merge_identity_into' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_identity_type' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_identity_member' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_identity_member' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'create_and_link_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'quick_create_album_for_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_album_link' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_albums' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'import_credits_bulk' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_publisher_parent' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_id3_frames_config' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'move_song_to_library' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_original_source' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_staging_origin' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'EditService' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_scalars' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_credit_name' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'create_and_link_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_album_link' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_album_with_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'quick_create_album_for_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_publisher_parent' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'import_credits_bulk' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'format_entity_field' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'move_song_to_library' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_albums' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_publishers' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_tags' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_id3_if_enabled' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_original_source' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'write_id3_if_needed' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_staging_file' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_physical_file' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'copy_if_needed' in src\\services\\filing_service.py is not in docs/lookup/"])
+
+tests\test_lookup_integrity.py:166: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_lookup_integrity.py::TestLookupIntegrity::test_lookup_protocol_integrity - AssertionError: Lookup Protocol -- Signature Violations:
+  [SIGNATURE MISSING] 'add_request_id_middleware' in src\engine_server.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'validation_exception_handler' in src\engine_server.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'has_primary' in src\data\song_album_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_primary' in src\data\song_album_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'clear_primary' in src\data\song_album_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_link' in src\data\song_album_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'promote_next' in src\data\song_album_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_name_id_by_display_name' in src\data\song_credit_repository.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'PrepareAlbumFromSongBody' in src\engine\routers\album_updates.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'AddCreditItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'AddTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_name_and_category' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'AddPublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'AddAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'name_required_without_id' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateSongItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'media_name_not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'isrc_format' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'year_range' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'bpm_positive' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateTagEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateSongTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateSongAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateAlbumEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'year_range' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdateCreditEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'UpdatePublisherEntityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'not_empty' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'MergeIdentityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'RemoveCreditItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'RemoveTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'RemovePublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'exactly_one_target' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'RemoveAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeleteSongItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeleteTagItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeletePublisherItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeleteAlbumItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeleteIdentityItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'id_or_unlinked' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'DeleteOriginalFileItem' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'MutationRequest' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'at_least_one_change' in src\engine\routers\mutation_models.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'CatalogService' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'sync_id3_if_enabled' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'check_ingestion' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'ingest_wav_as_converting' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'finalize_wav_conversion' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'ingest_file' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'enrich_metadata' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'scan_folder' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'ingest_batch' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'ingest_single' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_song' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'resolve_conflict' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_song' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_identity' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_all_identities' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'resolve_identity_by_name' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_identity_alias' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_identity_alias' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_identity_legal_name' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'publisher_exists' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_identities' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_publisher_link_counts' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_identity_song_counts' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_all_publishers' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_all_albums' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_albums_slim' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_album' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_publishers' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_songs_slim_by_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_all_tags' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_tag_categories' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_tags' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_songs_slim_by_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_songs_slim_by_identity' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_filter_values' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'filter_songs_slim' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_songs_slim' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'search_songs_deep_slim' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'format_entity_field' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_song_scalars' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_all_roles' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_credit' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_credit' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_credit_name' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'merge_identity_into' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_identity_type' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_identity_member' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_identity_member' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_album' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'create_and_link_album' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'quick_create_album_for_song' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_album' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_song_album_link' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_album' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_album_credit' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_album_credit' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_album_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_album_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_albums' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_publishers' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_identities' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_tags' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_primary_song_tag' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'import_credits_bulk' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_publisher' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_publisher_parent' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_id3_frames_config' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'move_song_to_library' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_original_source' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'get_staging_origin' in src\services\catalog_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'EditService' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_song_scalars' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_credit' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_credit' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_credit_name' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_album' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'create_and_link_album' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_album' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_song_album_link' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_album' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_album_credit' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_album_credit' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_album_publisher' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_album_publisher' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'sync_album_with_song' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'quick_create_album_for_song' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_tag' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_tag' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_tag' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_primary_song_tag' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'add_song_publisher' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'remove_song_publisher' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'update_publisher' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'set_publisher_parent' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'import_credits_bulk' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'format_entity_field' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_song' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'move_song_to_library' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_albums' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_publishers' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_unlinked_tags' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'sync_id3_if_enabled' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_original_source' in src\services\edit_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'write_id3_if_needed' in src\services\filing_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_staging_file' in src\services\filing_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'delete_physical_file' in src\services\filing_service.py is not in docs/lookup/
+  [SIGNATURE MISSING] 'copy_if_needed' in src\services\filing_service.py is not in docs/lookup/
+assert 171 == 0
+ +  where 171 = len(["[SIGNATURE MISSING] 'add_request_id_middleware' in src\\engine_server.py is not in docs/lookup/", "[SIGNATURE MISSING] 'validation_exception_handler' in src\\engine_server.py is not in docs/lookup/", "[SIGNATURE MISSING] 'has_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'clear_primary' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_link' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'promote_next' in src\\data\\song_album_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_name_id_by_display_name' in src\\data\\song_credit_repository.py is not in docs/lookup/", "[SIGNATURE MISSING] 'PrepareAlbumFromSongBody' in src\\engine\\routers\\album_updates.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddCreditItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_name_and_category' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddPublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'AddAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'name_required_without_id' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'media_name_not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'isrc_format' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'year_range' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'bpm_positive' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateTagEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateSongAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateAlbumEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'year_range' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdateCreditEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'UpdatePublisherEntityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'not_empty' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'MergeIdentityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveCreditItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemovePublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'exactly_one_target' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'RemoveAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteSongItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteTagItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeletePublisherItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteAlbumItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteIdentityItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'id_or_unlinked' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'DeleteOriginalFileItem' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'MutationRequest' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'at_least_one_change' in src\\engine\\routers\\mutation_models.py is not in docs/lookup/", "[SIGNATURE MISSING] 'CatalogService' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_id3_if_enabled' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'check_ingestion' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_wav_as_converting' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'finalize_wav_conversion' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_file' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'enrich_metadata' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'scan_folder' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_batch' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'ingest_single' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'resolve_conflict' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_identity' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'resolve_identity_by_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_identity_alias' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_identity_alias' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_identity_legal_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'publisher_exists' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_publisher_link_counts' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_identity_song_counts' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_albums' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_albums_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_tag_categories' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_songs_slim_by_identity' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_filter_values' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'filter_songs_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_songs_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'search_songs_deep_slim' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'format_entity_field' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_scalars' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_all_roles' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_credit_name' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'merge_identity_into' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_identity_type' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_identity_member' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_identity_member' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'create_and_link_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'quick_create_album_for_song' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_album_link' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_album' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_credit' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_albums' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_publishers' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_identities' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_tags' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary_song_tag' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'import_credits_bulk' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_publisher' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_publisher_parent' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_id3_frames_config' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'move_song_to_library' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_original_source' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'get_staging_origin' in src\\services\\catalog_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'EditService' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_scalars' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_credit_name' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'create_and_link_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_song_album_link' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_album' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_credit' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_album_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_album_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_album_with_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'quick_create_album_for_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_primary_song_tag' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'add_song_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'remove_song_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'update_publisher' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'set_publisher_parent' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'import_credits_bulk' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'format_entity_field' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_song' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'move_song_to_library' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_albums' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_publishers' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_unlinked_tags' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'sync_id3_if_enabled' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_original_source' in src\\services\\edit_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'write_id3_if_needed' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_staging_file' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'delete_physical_file' in src\\services\\filing_service.py is not in docs/lookup/", "[SIGNATURE MISSING] 'copy_if_needed' in src\\services\\filing_service.py is not in docs/lookup/"])
+============================== 1 failed in 1.04s ==============================

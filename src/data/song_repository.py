@@ -375,7 +375,6 @@ class SongRepository(MediaSourceRepository):
             logger.debug(f"[SongRepository] <- search_slim_by_ids() found {len(rows)}")
             return [dict(row) for row in rows]
 
-
     def search_slim_by_identity_ids(
         self,
         identity_ids: List[int],
@@ -421,7 +420,9 @@ class SongRepository(MediaSourceRepository):
         with self._get_connection() as new_conn:
             new_conn.row_factory = sqlite3.Row
             rows = new_conn.execute(query_sql, identity_ids).fetchall()
-            logger.debug(f"[SongRepository] <- search_slim_by_identity_ids() found {len(rows)}")
+            logger.debug(
+                f"[SongRepository] <- search_slim_by_identity_ids() found {len(rows)}"
+            )
             return [dict(row) for row in rows]
 
     def get_by_hash(

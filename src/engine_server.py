@@ -53,14 +53,18 @@ app = FastAPI(title="GOSLING2 Engine", lifespan=lifespan)
 async def add_request_id_middleware(request: Request, call_next):
     req_id = f"req_{uuid.uuid4().hex[:4]}"
     token = request_id_var.set(req_id)
-    
+
     logger.debug(f"[EngineServer] -> {request.method} {request.url.path}")
     try:
         response = await call_next(request)
-        logger.debug(f"[EngineServer] <- {request.method} {request.url.path} ({response.status_code})")
+        logger.debug(
+            f"[EngineServer] <- {request.method} {request.url.path} ({response.status_code})"
+        )
         return response
     except Exception as e:
-        logger.error(f"[EngineServer] <- {request.method} {request.url.path} FAILED: {e}")
+        logger.error(
+            f"[EngineServer] <- {request.method} {request.url.path} FAILED: {e}"
+        )
         raise
     finally:
         request_id_var.reset(token)

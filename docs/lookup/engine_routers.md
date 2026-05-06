@@ -306,199 +306,67 @@ Used by `update_identity_legal_name`.
 
 ---
 
+---
+
+## Mutations Router
+*Location: `src/engine/routers/mutations.py`*
+**Responsibility**: Unified entry point for all database write operations.
+
+### async def mutate(body: MutationRequest) -> dict
+**HTTP**: `POST /api/v1/mutate`
+- Processes a batch of add, remove, update, and delete operations in a single transaction.
+- Returns the updated song views and any warnings (e.g. file move issues).
+- Wraps `MutationCoordinator.apply`.
+
+---
+
 ## Metabolic Router
 *Location: `src/engine/routers/metabolic.py`*
 **Responsibility**: File-system inspection and comparison logic.
 
-### def _get_catalog_service() -> CatalogService
-**Internal**: Factory for the router.
-
 ### async def inspect_file(db_song: SongView) -> dict
 **HTTP**: `POST /api/v1/metabolic/inspect-file`
 - Accepts the caller's `SongView` as the request body (no DB re-hydration).
-- Reads physical file at `db_song.source_path` via `MetadataService` + `MetadataParser`.
+- Reads physical file at `db_song.source_path` via `MetadataService`.
 - Runs `MetadataService.compare_songs(db_song, file_song)` and returns `{diff, raw_tags}`.
-- `diff`: `{field_key: {db, file}}` — empty dict means in sync. Keys: `media_name`, `year`, `bpm`, `isrc`, `notes`, `credit:{Role}`, `tag:{Cat}`, `publisher`, `album`.
-- `raw_tags`: ID3 frames the parser did not map to any domain field.
-- Raises `HTTPException(400)` if `source_path` is empty, `HTTPException(404)` if file not found.
 
 ### async def get_id3_frames() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/metabolic/id3-frames`
 - Returns the full ID3 frame mapping configuration.
-- Unified source of truth for icons and categories.
 
 ---
-
----
-
 
 ## Song Updates Router
 *Location: `src/engine/routers/song_updates.py`*
-**Responsibility**: HTTP interface for partial metadata updates and relationship management.
+**Responsibility**: Roles and ID3 synchronization.
 
-### async def update_song_scalars(song_id: int, body: SongScalarUpdate, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/songs/{song_id}`
-- Partially updates core metadata (media_name, year, bpm, isrc, notes).
-- Raises `HTTPException(404)` if the song does not exist.
-- Wraps `CatalogService.update_song_scalars`.
-
-### async def get_all_roles(service: CatalogService = Depends(_get_service)) -> List[str]
+### async def get_all_roles() -> List[str]
 **HTTP**: `GET /api/v1/roles`
 - Returns all distinct artist credit roles from the database.
-- Wraps `CatalogService.get_all_roles`.
 
-### async def add_song_credit(song_id: int, body: AddCreditBody, service: CatalogService = Depends(_get_service)) -> SongCredit
-**HTTP**: `POST /api/v1/songs/{song_id}/credits`
-- Adds a credited artist with a specific role.
-- Get-or-creates `ArtistNames` and `Roles` globally.
-- Wraps `CatalogService.add_song_credit`.
-
-### async def remove_song_credit(song_id: int, credit_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/songs/{song_id}/credits/{credit_id}`
-- Removes the specific `SongCredits` link.
-- Wraps `CatalogService.remove_song_credit`.
-
-### async def update_credit_name(song_id: int, name_id: int, body: UpdateCreditNameBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/songs/{song_id}/credits/{name_id}`
-- Updates an `ArtistNames` record display name globally across all songs.
-- Wraps `CatalogService.update_credit_name`.
-
-### async def merge_identity(source_name_id: int, target_name_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `POST /api/v1/identities/merge`
-- Merges a solo identity into an existing one by repointing all credits.
-- Wraps `CatalogService.merge_identity_into`.
-
-### SetIdentityTypeBody *(see src/models/view_models.py)*
-`{ type: str }`
-
-### AddMemberBody *(see src/models/view_models.py)*
-`{ member_id: int }`
-
-### async def set_identity_type(identity_id: int, body: SetIdentityTypeBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/identities/{identity_id}/type`
-- Convert an identity between person and group.
-- Wraps `CatalogService.set_identity_type`.
-
-### async def add_identity_member(identity_id: int, body: AddMemberBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `POST /api/v1/identities/{identity_id}/members`
-- Add a person identity as a member of a group.
-- Wraps `CatalogService.add_identity_member`.
-
-### async def remove_identity_member(identity_id: int, member_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/identities/{identity_id}/members/{member_id}`
-- Remove a member from a group.
-- Wraps `CatalogService.remove_identity_member`.
-
-### async def add_song_album(song_id: int, body: AddAlbumBody, service: CatalogService = Depends(_get_service)) -> SongAlbum
-**HTTP**: `POST /api/v1/songs/{song_id}/albums`
-- Links a song to an existing album or creates a new album record and links it.
-- Resolves `album_id` vs `title` logic.
-- Wraps `CatalogService.add_song_album` and `CatalogService.create_and_link_album`.
-
-### async def remove_song_album(song_id: int, album_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/songs/{song_id}/albums/{album_id}`
-- Unlinks a song from an album.
-- Wraps `CatalogService.remove_song_album`.
-
-### async def update_song_album_link(song_id: int, album_id: int, body: UpdateAlbumLinkBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/songs/{song_id}/albums/{album_id}`
-- Updates the track/disc metadata for a specific song-album link.
-- Wraps `CatalogService.update_song_album_link`.
-
-### async def update_album(album_id: int, body: UpdateAlbumBody, service: CatalogService = Depends(_get_service)) -> Album
-**HTTP**: `PATCH /api/v1/albums/{album_id}`
-- Updates an `Albums` record metadata globally.
-- Wraps `CatalogService.update_album`.
-
-### async def add_album_credit(album_id: int, body: AddAlbumCreditBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `POST /api/v1/albums/{album_id}/credits`
-- Adds a credited artist to an album.
-- Wraps `CatalogService.add_album_credit`.
-
-### async def remove_album_credit(album_id: int, name_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/albums/{album_id}/credits/{name_id}`
-- Removes a credited artist from an album.
-- Wraps `CatalogService.remove_album_credit`.
-
-### async def add_album_publisher(album_id: int, body: AddAlbumPublisherBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `POST /api/v1/albums/{album_id}/publishers`
-- Adds a publisher to an album record. Get-or-creates by name or links by ID.
-- Wraps `CatalogService.add_album_publisher`.
-
-### async def remove_album_publisher(album_id: int, publisher_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/albums/{album_id}/publishers/{publisher_id}`
-- Removes a publisher from an album.
-- Wraps `CatalogService.remove_album_publisher`.
-
-### async def add_song_tag(song_id: int, body: AddTagBody, service: CatalogService = Depends(_get_service)) -> Tag
-**HTTP**: `POST /api/v1/songs/{song_id}/tags`
-- Adds a tag to a song. Get-or-creates the tag record. Supports raw_tag parsing (DT-1, DT-2).
-- Wraps `CatalogService.add_song_tag`.
-
-### async def quick_create_album(song_id: int, title: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> SongAlbum
-**HTTP**: `POST /api/v1/songs/{song_id}/quick-create-album`
-- Quick-creates an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
-- Wraps `CatalogService.quick_create_album_for_song`.
-
-### async def remove_song_tag(song_id: int, tag_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/songs/{song_id}/tags/{tag_id}`
-- Removes a tag-song link.
-- Wraps `CatalogService.remove_song_tag`.
-
-### async def update_tag(tag_id: int, body: UpdateTagBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/tags/{tag_id}`
-- Updates a tag name and category globally.
-- Wraps `CatalogService.update_tag`.
-
-### async def set_primary_song_tag(song_id: int, tag_id: int, service: CatalogService = Depends(_get_service)) -> Tag
-**HTTP**: `PATCH /api/v1/songs/{song_id}/tags/{tag_id}/primary`
-- Promote a specific genre tag to primary status for a song. 
-- Atomic reset of all other genre links.
-- Wraps `CatalogService.set_primary_song_tag`.
-
-### async def add_song_publisher(song_id: int, body: AddPublisherBody, service: CatalogService = Depends(_get_service)) -> Publisher
-**HTTP**: `POST /api/v1/songs/{song_id}/publishers`
-- Links a publisher to a song. Get-or-creates the publisher record.
-- Wraps `CatalogService.add_song_publisher`.
-
-### async def remove_song_publisher(song_id: int, publisher_id: int, service: CatalogService = Depends(_get_service))
-**HTTP**: `DELETE /api/v1/songs/{song_id}/publishers/{publisher_id}`
-- Removes a publisher-song link.
-- Wraps `CatalogService.remove_song_publisher`.
-
-### async def update_publisher(publisher_id: int, body: UpdatePublisherBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/publishers/{publisher_id}`
-- Updates a publisher name globally across all songs.
-- Wraps `CatalogService.update_publisher`.
-
-### async def set_publisher_parent(publisher_id: int, body: SetPublisherParentBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/publishers/{publisher_id}/parent`
-- Sets or clears the parent of a publisher. Pass `{"parent_id": null}` to clear.
-- Returns 404 if publisher or parent not found.
-- Wraps `CatalogService.set_publisher_parent`.
-
-### async def sync_id3(song_id: int, service: CatalogService = Depends(_get_service))
+### async def sync_id3(song_id: int) -> dict
 **HTTP**: `GET /api/v1/songs/{song_id}/sync-id3`
 - Writes current DB state to the physical ID3 tags of the song file.
-- Returns `{"status": "ok", "song_id": song_id}` on success.
-- Raises `HTTPException(400)` if file not found, `HTTPException(500)` on write failure.
-- Wraps `CatalogService._metadata_writer.write_metadata`.
-
-### async def move_song_to_library(song_id: int, service: CatalogService = Depends(_get_service)) -> str
-**HTTP**: `POST /api/v1/songs/{song_id}/move`
-- Moves a 'Reviewed' song from staging to the organized library.
-- Wraps `CatalogService.move_song_to_library`.
 
 ---
 
 ## Album Updates Router
 *Location: `src/engine/routers/album_updates.py`*
-**Responsibility**: HTTP interface for album-specific write operations.
+**Responsibility**: Preparing mutation payloads for album operations.
 
-### async def sync_album_with_song(album_id: int, song_id: int, service: CatalogService = Depends(_get_service)) -> Album
-**HTTP**: `POST /api/v1/albums/{album_id}/sync-from-song/{song_id}`
-- Syncs album metadata from a song (backend CW-1). Syncs: release_year (if missing), Performer credits, publishers. Atomic operation.
-- Wraps `CatalogService.sync_album_with_song`.
+### async def sync_album_from_song_diff(album_id: int, song_id: int) -> dict
+**HTTP**: `GET /api/v1/albums/{album_id}/sync-from-song/{song_id}`
+- Returns the add/update payload to sync an existing album from a song. Does not write.
+
+### async def prepare_album_from_song(body: PrepareAlbumFromSongBody) -> dict
+**HTTP**: `POST /api/v1/albums/prepare-from-song`
+- Returns the add/update payload to create and sync an album from a song. Does not write.
+
+### PrepareAlbumFromSongBody
+- `song_id: int`
+- `album_id: Optional[int]`
+- `title: Optional[str]`
+
 
 ---
 

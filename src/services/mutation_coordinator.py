@@ -55,12 +55,14 @@ class MutationCoordinator:
 
             deleted_songs = []
             delete_file_ids: set[int] = set()
-            for item in (body.delete or []):
+            for item in body.delete or []:
                 if isinstance(item, DeleteOriginalFileItem):
                     origin = self._staging_repo.get_origin(item.song_id)
                     if origin and Path(origin).exists():
                         Path(origin).unlink()
-                        logger.info(f"[MutationCoordinator] Deleted original source: {origin}")
+                        logger.info(
+                            f"[MutationCoordinator] Deleted original source: {origin}"
+                        )
                     self._staging_repo.clear_origin(item.song_id)
                     continue
                 if isinstance(item, DeleteSongItem):
@@ -71,15 +73,15 @@ class MutationCoordinator:
                         delete_file_ids.add(item.id)
                 self._delete_mutator.apply_within("delete", item, conn)
 
-            for item in (body.remove or []):
+            for item in body.remove or []:
                 self._route(item, "remove", conn)
                 self._collect_touched(item, touched_song_ids)
 
-            for item in (body.add or []):
+            for item in body.add or []:
                 self._route(item, "add", conn)
                 self._collect_touched(item, touched_song_ids)
 
-            for item in (body.update or []):
+            for item in body.update or []:
                 self._route(item, "update", conn)
                 self._collect_touched(item, touched_song_ids)
 
@@ -91,7 +93,9 @@ class MutationCoordinator:
                     continue
                 songs.append(post)
                 warnings += self._filing.write_id3_if_needed(post, self._id3_writer)
-                copy_warnings, new_path = self._filing.copy_if_needed(post, LIBRARY_ROOT)
+                copy_warnings, new_path = self._filing.copy_if_needed(
+                    post, LIBRARY_ROOT
+                )
                 warnings += copy_warnings
                 if new_path:
                     copied_files.append((post.source_path, new_path))
@@ -114,7 +118,9 @@ class MutationCoordinator:
                 new = Path(new_path)
                 if old.exists() and old.resolve() != new.resolve():
                     old.unlink()
-                    logger.debug(f"[MutationCoordinator] Deleted original after move: {old}")
+                    logger.debug(
+                        f"[MutationCoordinator] Deleted original after move: {old}"
+                    )
 
             return {"songs": [s.model_dump() for s in songs], "warnings": warnings}
 
@@ -124,7 +130,9 @@ class MutationCoordinator:
                 new = Path(new_path)
                 if new.exists():
                     new.unlink()
-                    logger.debug(f"[MutationCoordinator] Deleted copy after rollback: {new}")
+                    logger.debug(
+                        f"[MutationCoordinator] Deleted copy after rollback: {new}"
+                    )
             raise
         finally:
             conn.close()
@@ -132,7 +140,9 @@ class MutationCoordinator:
     def _route(self, item, action: str, conn: sqlite3.Connection) -> None:
         t = item.type
         if t == "identity_merge":
-            self._identity_service.merge_identity_into(item.source_name_id, item.target_name_id)
+            self._identity_service.merge_identity_into(
+                item.source_name_id, item.target_name_id
+            )
         elif t in _SONG_TYPES:
             self._song_mutator.apply_within(action, item, conn)
         elif t in _CREDIT_TYPES:
