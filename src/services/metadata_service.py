@@ -59,13 +59,6 @@ class MetadataService:
             pass
         except Exception as e:
             logger.error(f"[MetadataService] Mutagen error reading {file_path}: {e}")
-        finally:
-            # SCAR: Windows File Locking. Explicitly release handle.
-            if audio is not None:
-                try:
-                    audio.close()
-                except Exception as e:
-                    logger.warning(f"[MetadataService] Failed to close audio handle for {file_path}: {e}")
 
         # 3. Clean and map tags
         metadata = self._read_tags(tags)

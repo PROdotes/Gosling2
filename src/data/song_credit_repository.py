@@ -230,6 +230,15 @@ class SongCreditRepository(BaseRepository):
         )
         return cursor.rowcount
 
+    def get_name_id_by_display_name(
+        self, display_name: str, conn: sqlite3.Connection
+    ) -> Optional[int]:
+        row = conn.execute(
+            "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+            (display_name.strip(),),
+        ).fetchone()
+        return row[0] if row else None
+
     def update_credit_name(
         self, name_id: int, new_name: str, conn: sqlite3.Connection
     ) -> int:

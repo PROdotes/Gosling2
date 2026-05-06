@@ -734,17 +734,17 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     text-align: center;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     color: var(--text-dim);
-    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
     cursor: pointer;
     transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
 }
 
 #songs-workspace .sidebar-btn:hover {
-    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.07));
     color: var(--text);
-    border-color: var(--border-strong);
+    border-color: rgba(255,255,255,0.22);
 }
 
 #songs-workspace .sidebar-btn:active {
@@ -786,6 +786,7 @@
     color: var(--accent-hover);
     border-color: var(--accent);
 }
+
 
 /* Caution (file-impacting, non-destructive to data) */
 #songs-workspace .sidebar-btn.delete-original {

@@ -103,7 +103,7 @@ export class WebSearchHandler {
                 dropdown.innerHTML = otherEngines
                     .map(
                         ([id, label]) =>
-                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
+                            `<button class="web-search-option" data-engine="${id}" data-label="${label}">${label}</button>`,
                     )
                     .join("");
 
@@ -135,7 +135,7 @@ export class WebSearchHandler {
                 dropdown.innerHTML = otherEngines
                     .map(
                         ([id, label]) =>
-                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
+                            `<button class="web-search-option" data-engine="${id}" data-label="${label}">${label}</button>`,
                     )
                     .join("");
                 document.removeEventListener("click", close, true);

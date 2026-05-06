@@ -308,7 +308,7 @@ export function moveSongToLibrary(id) {
 }
 
 export function mergeIdentity(sourceNameId, targetNameId) {
-    return mutate({ update: [{ type: "identity", source_name_id: sourceNameId, target_name_id: targetNameId, merge: true }] });
+    return mutate({ update: [{ type: "identity_merge", source_name_id: sourceNameId, target_name_id: targetNameId }] });
 }
 
 export function syncSongId3(id) {

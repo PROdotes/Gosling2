@@ -303,7 +303,7 @@ export class NavigationHandler {
             if (event.key === "ArrowUp") {
                 event.preventDefault();
                 const state = this.ctx.getState();
-                state.selectedIndex = Math.max(state.selectedIndex - 1, -1);
+                state.selectedIndex = Math.max(state.selectedIndex - 1, 0);
                 this.ctx.updateSelection?.();
 
                 const cachedList = this.ctx.getActiveList?.();

@@ -21,4 +21,8 @@ async def mutate(body: MutationRequest) -> dict:
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        msg = str(e)
+        if msg.startswith("MERGE_REQUIRED:"):
+            parts = msg.split(":")
+            raise HTTPException(status_code=409, detail={"code": "MERGE_REQUIRED", "collision_name_id": int(parts[1])})
+        raise HTTPException(status_code=400, detail=msg)

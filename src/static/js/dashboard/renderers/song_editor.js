@@ -492,19 +492,19 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
  *   Keys: media_name, year, bpm, isrc, notes (scalars); credit:{Role}, tag:{Cat},
  *   publisher, album (chips). Unknown keys (e.g. duration) are silently ignored.
  */
+const SCALAR_DIFF_INPUT_BY_KEY = {
+    media_name: "ef-title",
+    year: "ef-year",
+    bpm: "ef-bpm",
+    isrc: "ef-isrc",
+    notes: "ef-notes",
+};
+
 export function wireDriftIndicators(diff) {
     document
         .querySelectorAll("#editor-panel .drift-dot")
         .forEach((el) => el.remove());
     if (!diff || Object.keys(diff).length === 0) return;
-
-    const SCALAR_INPUT_BY_KEY = {
-        media_name: "ef-title",
-        year: "ef-year",
-        bpm: "ef-bpm",
-        isrc: "ef-isrc",
-        notes: "ef-notes",
-    };
     const fmt = (v) => {
         if (v == null || v === "") return "(empty)";
         if (Array.isArray(v)) return v.length ? v.join(", ") : "(empty)";
@@ -515,8 +515,8 @@ export function wireDriftIndicators(diff) {
         const tooltip = `DB: ${fmt(entry.db)}\nFile: ${fmt(entry.file)}`;
         let labelEl = null;
 
-        if (SCALAR_INPUT_BY_KEY[key]) {
-            const input = document.getElementById(SCALAR_INPUT_BY_KEY[key]);
+        if (SCALAR_DIFF_INPUT_BY_KEY[key]) {
+            const input = document.getElementById(SCALAR_DIFF_INPUT_BY_KEY[key]);
             labelEl = input
                 ?.closest(".editor-field")
                 ?.querySelector(".editor-label");
@@ -869,12 +869,12 @@ export function renderActionSidebar(
         .filter(([k]) => k !== engine)
         .map(
             ([k, v]) =>
-                `<button class="web-search-option" data-engine="${escapeHtml(k)}">${escapeHtml(v)}</button>`,
+                `<button class="web-search-option" data-engine="${escapeHtml(k)}" data-label="${escapeHtml(v)}">${escapeHtml(v)}</button>`,
         )
         .join("");
     const searchSplitBtn = `
 <div class="web-search-split sidebar-split-btn">
-    <button class="sidebar-btn web-search-main" data-action="web-search" data-song-id="${song.id}" data-engine="${escapeHtml(engine)}" style="flex:1;border-right:none;border-radius:5px 0 0 5px">${escapeHtml(engineLabel)}</button><button class="sidebar-btn" data-action="web-search-set-engine" style="border-radius:0 5px 5px 0;padding:8px 6px;width:22px;flex-shrink:0">▾</button>
+    <button class="sidebar-btn web-search-main" data-action="web-search" data-song-id="${song.id}" data-engine="${escapeHtml(engine)}" data-label="${escapeHtml(engineLabel)}" style="flex:1;border-right:none;border-radius:5px 0 0 5px">Search [${escapeHtml(engineLabel.slice(0, 2).toUpperCase())}]</button><button class="sidebar-btn" data-action="web-search-set-engine" style="border-radius:0 5px 5px 0;padding:8px 6px;width:22px;flex-shrink:0">▾</button>
     <div class="web-search-dropdown" hidden>${otherEngines}</div>
 </div>`;
 
@@ -890,7 +890,7 @@ export function renderActionSidebar(
         : `<span class="file-indicator file-indicator--missing" title="File not found"></span>`;
     const playBtn = `<button class="sidebar-btn" data-action="open-scrubber" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">${fileIndicator} Play</button>`;
 
-    const syncLedHtml = `<span class="sync-led" data-song-id="${song.id}" title="Checking sync..."></span><span class="sync-mismatch-list" data-song-id="${song.id}"></span>`;
+    const syncLedHtml = `<span class="sync-led" data-song-id="${song.id}"></span>`;
 
     sidebar.innerHTML = `
 <div class="sidebar-group-label">File</div>
@@ -906,8 +906,7 @@ ${searchSplitBtn}
 <div class="sidebar-divider"></div>
 
 <div class="sidebar-group-label">Finalize</div>
-<div class="sidebar-sync-row">${syncLedHtml}</div>
-<button class="sidebar-btn sidebar-btn--id3" data-action="sync-id3" data-song-id="${song.id}">↑ Write ID3</button>
+<button class="sidebar-btn sidebar-btn--id3" data-action="sync-id3" data-song-id="${song.id}">${syncLedHtml} Write ID3</button>
 ${organizeBtn}
 ${unreviewBtn}
 ${targetPath}

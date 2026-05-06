@@ -236,6 +236,12 @@ class UpdatePublisherEntityItem(BaseModel):
         return _reject_empty_string(v, "name")
 
 
+class MergeIdentityItem(BaseModel):
+    type: Literal["identity_merge"]
+    source_name_id: int
+    target_name_id: int
+
+
 UpdateItem = Annotated[
     Union[
         UpdateSongItem,
@@ -245,6 +251,7 @@ UpdateItem = Annotated[
         UpdateAlbumEntityItem,
         UpdateCreditEntityItem,
         UpdatePublisherEntityItem,
+        MergeIdentityItem,
     ],
     Field(discriminator="type"),
 ]

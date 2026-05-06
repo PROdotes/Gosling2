@@ -662,6 +662,7 @@ class TestFileMoveOnApprove:
 
         monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
         monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", str(staging))
 
         coordinator = MutationCoordinator(populated_db)
         coordinator._filing = FilingService(rules_path=rules_file)
@@ -731,6 +732,43 @@ class TestFileMoveOnApprove:
         assert source_file.exists(), "Original must not be deleted when destination conflict exists"
         assert conflict_file.read_bytes() == b"different content", "Existing destination file must not be overwritten"
         assert any(w.get("kind") == "file_move" for w in result["warnings"]), "Warning must be returned for file conflict"
+
+    def test_source_already_in_library_at_correct_path_not_deleted(self, populated_db, monkeypatch, tmp_path):
+        """Regression: when source_path is already the correct library target, coordinator must not delete it.
+        The FilingService bypasses the physical copy but the coordinator cleanup must not treat it as a move."""
+        import sqlite3
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+        from src.services.filing_service import FilingService
+
+        library = tmp_path / "library"
+        library.mkdir(exist_ok=True)
+
+        # Place the file at the exact path the routing rule will produce:
+        # default_rule = "{year}/{artist} - {title}" -> 1991/Nirvana - Smells Like Teen Spirit.mp3
+        dest_dir = library / "1991"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        library_file = dest_dir / "Nirvana - Smells Like Teen Spirit.mp3"
+        library_file.write_bytes(b"original audio do not delete")
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (str(library_file),))
+        conn.commit()
+        conn.close()
+
+        rules_file = tmp_path / "rules.json"
+        rules_file.write_text('{"routing_rules": [], "default_rule": "{year}/{artist} - {title}"}')
+
+        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
+        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator._filing = FilingService(rules_path=rules_file)
+
+        coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+
+        assert library_file.exists(), "File was deleted by coordinator cleanup — source == target case not handled"
+        assert library_file.read_bytes() == b"original audio do not delete", "File contents were modified"
 
     def test_non_reviewed_song_not_moved(self, populated_db, monkeypatch, tmp_path):
         import src.engine.config as config_mod

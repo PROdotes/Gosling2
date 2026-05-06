@@ -47,6 +47,9 @@ class CreditMutator:
     def _update(self, item: UpdateCreditEntityItem, conn: sqlite3.Connection) -> None:
         if item.display_name is None:
             return
+        existing_id = self._song_repo.get_name_id_by_display_name(item.display_name, conn)
+        if existing_id is not None and existing_id != item.id:
+            raise ValueError(f"MERGE_REQUIRED:{existing_id}")
         updated = self._song_repo.update_credit_name(item.id, item.display_name, conn)
         if updated == 0:
             raise LookupError(f"ArtistName {item.id} not found")

@@ -12,6 +12,7 @@ from src.engine.routers.mutation_models import (
     UpdateSongItem,
 )
 from src.services.filing_service import FilingService
+from src.services.identity_service import IdentityService
 from src.services.logger import logger
 from src.services.library_service import LibraryService
 from src.services.metadata_writer import MetadataWriter
@@ -35,6 +36,7 @@ class MutationCoordinator:
         self._db_path = db_path
         self._conn_factory = BaseRepository(db_path)
         self._library = library_service or LibraryService(db_path)
+        self._identity_service = IdentityService(db_path)
         self._song_mutator = SongMutator(db_path)
         self._credit_mutator = CreditMutator(db_path)
         self._tag_mutator = TagMutator(db_path)
@@ -107,9 +109,10 @@ class MutationCoordinator:
                 else:
                     self._filing.delete_staging_file(song, Path(STAGING_DIR))
 
+            staging = Path(STAGING_DIR)
             for old_path, _ in copied_files:
                 old = Path(old_path)
-                if old.exists():
+                if old.is_relative_to(staging) and old.exists():
                     old.unlink()
                     logger.debug(f"[MutationCoordinator] Deleted original after move: {old}")
 
@@ -128,7 +131,9 @@ class MutationCoordinator:
 
     def _route(self, item, action: str, conn: sqlite3.Connection) -> None:
         t = item.type
-        if t in _SONG_TYPES:
+        if t == "identity_merge":
+            self._identity_service.merge_identity_into(item.source_name_id, item.target_name_id)
+        elif t in _SONG_TYPES:
             self._song_mutator.apply_within(action, item, conn)
         elif t in _CREDIT_TYPES:
             self._credit_mutator.apply_within(action, item, conn)

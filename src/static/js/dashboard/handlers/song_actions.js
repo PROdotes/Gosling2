@@ -47,25 +47,17 @@ import {
 export function updateSyncLed(songId, diff) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
     if (!led) return;
-    const mismatchEl = document.querySelector(
-        `.sync-mismatch-list[data-song-id="${songId}"]`,
-    );
-
+    const btn = led.closest("button");
     if (diff == null) {
-        led.title = "Checking sync...";
         led.style.background = "var(--text-mute)";
-        if (mismatchEl) mismatchEl.textContent = "";
+        if (btn) btn.title = "Checking sync...";
         return;
     }
 
     const keys = Object.keys(diff);
     const inSync = keys.length === 0;
     led.style.background = inSync ? "var(--success)" : "var(--danger)";
-    led.title = inSync ? "In sync" : `Out of sync:\n${keys.join("\n")}`;
-    if (mismatchEl) {
-        const labels = keys.map((k) => k.replace(/^credit:/, ""));
-        mismatchEl.textContent = inSync ? "" : labels.join(" · ");
-    }
+    if (btn) btn.title = inSync ? "In sync" : `Out of sync:\n${keys.join("\n")}`;
 }
 
 import { showConfirm } from "../components/confirm_modal.js";
@@ -666,14 +658,16 @@ export class SongActionsHandler {
                 const newLabel = btn.textContent.trim();
                 const mainBtn = splitEl.querySelector(".web-search-main");
                 const oldEngine = mainBtn.dataset.engine;
-                const oldLabel = mainBtn.textContent.trim();
+                const oldLabel = mainBtn.dataset.label;
 
                 // Swap main button (preserve songId)
                 mainBtn.dataset.engine = newEngine;
-                mainBtn.textContent = newLabel;
+                mainBtn.dataset.label = newLabel;
+                mainBtn.textContent = `Search [${newLabel.slice(0, 2).toUpperCase()}]`;
 
                 // Swap this option to show the old engine
                 btn.dataset.engine = oldEngine;
+                btn.dataset.label = oldLabel;
                 btn.textContent = oldLabel;
                 btn.dataset.songId = mainBtn.dataset.songId;
 
