@@ -349,6 +349,7 @@ export async function manageArtist(ctx, artistId, artistName) {
     };
     const otherAliases = aliases.filter((a) => !a.is_primary);
     const members = identity.members || [];
+    const groups = identity.groups || [];
     const isGroup = identity.type === "group";
     const hasMembers = members.length > 0;
 
@@ -396,13 +397,17 @@ export async function manageArtist(ctx, artistId, artistName) {
             type: "chipList",
             label: "Aliases",
             items: otherAliases.map((a) => ({ id: a.id, label: a.display_name })),
+            createLabel: (q) => `Add "${q}" as new alias`,
             onSearch: async (q) => {
                 const results = await searchArtists(q);
                 return (results || []).map((a) => ({ id: a.id, label: a.resolved_name }));
             },
             onAdd: async (opt) => {
-                const result = await addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
-                return { id: result.name_id, label: result.display_name };
+                const displayName = opt.rawInput || opt.label;
+                await addIdentityAlias(artistId, displayName, opt.id);
+                const fresh = await getArtistTree(artistId);
+                const added = (fresh.aliases || []).find((a) => a.display_name === displayName);
+                return added ? { id: added.id, label: added.display_name } : { id: opt.id, label: displayName };
             },
             onRemove: async (item) => {
                 await removeIdentityAlias(artistId, item.id);
@@ -430,6 +435,14 @@ export async function manageArtist(ctx, artistId, artistName) {
             },
         },
     };
+
+    if (!isGroup && groups.length > 0) {
+        fields.groups = {
+            type: "readOnlyList",
+            label: "Member Of",
+            items: groups.map((g) => ({ id: g.id, label: g.display_name })),
+        };
+    }
 
     if (isGroup) {
         fields.members = {

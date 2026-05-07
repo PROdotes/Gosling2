@@ -1,11 +1,5 @@
 import os
-import re
 import threading
-from src.services.metadata_frames_reader import (
-    register_tag_category,
-    unregister_tag_category,
-    load_tag_categories,
-)
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -20,14 +14,12 @@ from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Album,
-    SongAlbum,
     Publisher,
     SongCredit,
     Tag,
 )
 from src.services.logger import logger
 from src.services.metadata_writer import MetadataWriter
-from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
 from src.services.library_service import LibraryService
 from src.services.identity_service import IdentityService
@@ -41,7 +33,6 @@ from src.engine.config import (
     METADATA_ALLOWED,
     AUTO_SAVE_ID3,
     ProcessingStatus,
-    ALBUM_DEFAULT_TYPE,
 )
 from src.engine.models.spotify import SpotifyCredit
 
@@ -87,7 +78,6 @@ class EditService:
 
         # Edit Helpers
         self._metadata_writer = MetadataWriter()
-        self._casing_service = CasingService()
         actual_rules_path = rules_path or RENAME_RULES_PATH
         self._filing_service = FilingService(actual_rules_path)
 
@@ -204,52 +194,6 @@ class EditService:
         finally:
             conn.close()
 
-    def add_song_credit(
-        self,
-        song_id: int,
-        display_name: str,
-        role_name: str = "Performer",
-        identity_id: Optional[int] = None,
-    ) -> SongCredit:
-        """Add a credited artist to a song."""
-        logger.debug(
-            f"[EditService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}')"
-        )
-        if not display_name or not display_name.strip():
-            raise ValueError("Artist name cannot be empty")
-
-        conn = self._credit_repo.get_connection()
-        try:
-            credit = self._credit_repo.add_credit(
-                song_id, display_name, role_name, conn, identity_id
-            )
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-            return credit
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- add_song_credit FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def remove_song_credit(self, song_id: int, credit_id: int) -> None:
-        """Remove a credit link from a song."""
-        logger.debug(
-            f"[EditService] -> remove_song_credit(song_id={song_id}, credit_id={credit_id})"
-        )
-        conn = self._credit_repo.get_connection()
-        try:
-            self._credit_repo.remove_credit(credit_id, conn)
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- remove_song_credit FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
     def update_credit_name(self, name_id: int, new_name: str) -> None:
         """Update an artist's display name globally."""
         logger.debug(
@@ -328,149 +272,6 @@ class EditService:
             fields[key] = val
         return fields
 
-    def add_song_album(
-        self,
-        song_id: int,
-        album_id: int,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-    ) -> SongAlbum:
-        """Link an existing album to a song."""
-        logger.debug(
-            f"[EditService] -> add_song_album(song_id={song_id}, album_id={album_id})"
-        )
-        if not self._song_repo.get_by_id(song_id):
-            raise LookupError(f"Song {song_id} not found")
-        if not self._library_service.get_album(album_id):
-            raise LookupError(f"Album {album_id} not found")
-
-        fields = {}
-        if track_number is not None:
-            fields["track_number"] = track_number
-        if disc_number is not None:
-            fields["disc_number"] = disc_number
-        if fields:
-            self._validate_album_scalars(fields)
-
-        conn = self._album_repo.get_connection()
-        try:
-            self._album_repo.add_album(
-                song_id, album_id, track_number, disc_number, conn
-            )
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- add_song_album FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-        links = self._album_repo.get_albums_for_songs([song_id])
-        return next((link for link in links if link.album_id == album_id), None)
-
-    def create_and_link_album(
-        self,
-        song_id: int,
-        album_data: dict,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-    ) -> SongAlbum:
-        """Create a new album record and link it to a song."""
-        title = album_data.get("title", "").strip()
-        if not title:
-            raise ValueError("Album title cannot be empty")
-        if not self._song_repo.get_by_id(song_id):
-            raise LookupError(f"Song {song_id} not found")
-
-        fields = {}
-        if track_number is not None:
-            fields["track_number"] = track_number
-        if disc_number is not None:
-            fields["disc_number"] = disc_number
-        if "release_year" in album_data and album_data["release_year"] is not None:
-            fields["release_year"] = album_data["release_year"]
-        if fields:
-            self._validate_album_scalars(fields)
-
-        conn = self._album_repo_dir.get_connection()
-        try:
-            album_id = self._album_repo_dir.create_album(
-                title,
-                album_data.get("album_type"),
-                album_data.get("release_year"),
-                conn,
-            )
-            self._album_repo.add_album(
-                song_id, album_id, track_number, disc_number, conn
-            )
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-
-            links = self._album_repo.get_albums_for_songs([song_id])
-            return next((link for link in links if link.album_id == album_id), None)
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- create_and_link_album FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def remove_song_album(self, song_id: int, album_id: int) -> None:
-        """Unlink a song from an album."""
-        conn = self._album_repo.get_connection()
-        try:
-            self._album_repo.remove_album(song_id, album_id, conn)
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- remove_song_album FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def update_song_album_link(
-        self,
-        song_id: int,
-        album_id: int,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-        fields_set: set = None,
-    ) -> None:
-        """Update track/disc numbers for a song-album link."""
-        existing_links = self._album_repo.get_albums_for_songs([song_id])
-        if not any(link.album_id == album_id for link in existing_links):
-            raise LookupError(f"Song {song_id} is not linked to Album {album_id}")
-
-        to_validate = {}
-        if track_number is not None:
-            to_validate["track_number"] = track_number
-        if disc_number is not None:
-            to_validate["disc_number"] = disc_number
-        if to_validate:
-            self._validate_album_scalars(to_validate)
-
-        fields_set = fields_set or set(to_validate.keys())
-
-        conn = self._album_repo.get_connection()
-        try:
-            self._album_repo.update_track_info(
-                song_id,
-                album_id,
-                track_number if "track_number" in fields_set else ...,
-                disc_number if "disc_number" in fields_set else ...,
-                conn,
-            )
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] <- update_song_album_link FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record fields globally."""
         if "title" in album_data and not album_data["title"].strip():
@@ -493,50 +294,6 @@ class EditService:
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- update_album FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def add_album_credit(
-        self,
-        album_id: int,
-        display_name: str,
-        role_name: str = "Performer",
-        identity_id: Optional[int] = None,
-    ) -> int:
-        """Add a credited artist to an album."""
-        if not self._library_service.get_album(album_id):
-            raise LookupError(f"Album {album_id} not found")
-        conn = self._album_credit_repo.get_connection()
-        try:
-            name_id = self._album_credit_repo.add_credit(
-                album_id, display_name, role_name, conn, identity_id
-            )
-            conn.commit()
-            # ID3 sync for all linked songs
-            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
-            for sid in song_ids:
-                self.sync_id3_if_enabled(sid)
-            return name_id
-        except Exception as e:
-            logger.error(f"[EditService] add_album_credit FAILED: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-    def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
-        """Remove a credited artist from an album."""
-        conn = self._album_credit_repo.get_connection()
-        try:
-            self._album_credit_repo.remove_credit(album_id, artist_name_id, conn)
-            conn.commit()
-            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
-            for sid in song_ids:
-                self.sync_id3_if_enabled(sid)
-        except Exception as e:
-            logger.error(f"[EditService] remove_album_credit FAILED: {e}")
-            conn.rollback()
             raise
         finally:
             conn.close()
@@ -589,255 +346,6 @@ class EditService:
         finally:
             conn.close()
 
-    def sync_album_with_song(self, album_id: int, song_id: int) -> Album:
-        """
-        Sync album metadata from a song (backend implementation of CW-1).
-        Syncs: release_year (if missing), Performer credits, publishers.
-        Atomic operation — all-or-nothing via single connection.
-        """
-        logger.info(
-            f"[EditService] -> sync_album_with_song(album_id={album_id}, song_id={song_id})"
-        )
-        song = self._library_service.get_song(song_id)
-        if not song:
-            raise LookupError(f"Song {song_id} not found")
-
-        album = self._library_service.get_album(album_id)
-        if not album:
-            raise LookupError(f"Album {album_id} not found")
-
-        conn = self._album_repo_dir.get_connection()
-        try:
-            # Sync release_year if missing on album but present on song
-            if not album.release_year and song.year:
-                self._album_repo_dir.update_album(
-                    album_id, {"release_year": song.year}, conn
-                )
-                logger.debug(f"[EditService] synced release_year={song.year} to album")
-
-            # Sync Performer credits (only role that gets synced per original logic)
-            existing_credit_name_ids = {c.name_id for c in (album.credits or [])}
-            for credit in song.credits or []:
-                if credit.role_name != "Performer":
-                    continue
-                if credit.name_id not in existing_credit_name_ids:
-                    name_id = self._album_credit_repo.add_credit(
-                        album_id,
-                        credit.display_name,
-                        credit.role_name,
-                        conn,
-                        identity_id=credit.identity_id or None,
-                    )
-                    existing_credit_name_ids.add(name_id)
-                    logger.debug(
-                        f"[EditService] added credit '{credit.display_name}' to album"
-                    )
-
-            # Sync publishers
-            existing_pub_ids = {p.id for p in (album.publishers or [])}
-            for pub in song.publishers or []:
-                if pub.id not in existing_pub_ids:
-                    self._pub_repo.add_album_publisher(
-                        album_id, pub.name, conn, publisher_id=pub.id
-                    )
-                    existing_pub_ids.add(pub.id)
-                    logger.debug(f"[EditService] added publisher '{pub.name}' to album")
-
-            conn.commit()
-            # ID3 sync for all linked songs
-            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
-            for sid in song_ids:
-                self.sync_id3_if_enabled(sid)
-
-            result = self._library_service.get_album(album_id)
-            logger.info(f"[EditService] <- sync_album_with_song() OK '{result.title}'")
-            return result
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] sync_album_with_song FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def quick_create_album_for_song(
-        self, song_id: int, title: Optional[str] = None
-    ) -> SongAlbum:
-        """
-        Quick-create an album from a song (backend implementation of CW-2).
-        Creates album with song's media_name, defaults disc=1, track=1,
-        then syncs metadata from song atomically.
-        """
-        logger.info(
-            f"[EditService] -> quick_create_album_for_song(song_id={song_id}, title='{title}')"
-        )
-        song = self._library_service.get_song(song_id)
-        if not song:
-            raise LookupError(f"Song {song_id} not found")
-
-        album_title = (title or song.media_name or "Unknown Album").strip()
-        if not album_title:
-            raise ValueError("Album title cannot be empty")
-
-        conn = self._album_repo_dir.get_connection()
-        try:
-            # Create album
-            album_id = self._album_repo_dir.create_album(
-                album_title, ALBUM_DEFAULT_TYPE, song.year, conn
-            )
-            # Link to song with defaults
-            self._album_repo.add_album(song_id, album_id, 1, 1, conn)
-            logger.debug(
-                f"[EditService] created album_id={album_id}, linked to song_id={song_id}"
-            )
-
-            # Sync metadata (Performer credits + publishers) using already-fetched data
-            # We need to re-fetch album within this transaction to get credits/publishers
-            # For simplicity, just sync the album we just created
-            # Sync Performer credits
-            existing_credit_name_ids = set()
-            for credit in song.credits or []:
-                if credit.role_name != "Performer":
-                    continue
-                name_id = self._album_credit_repo.add_credit(
-                    album_id,
-                    credit.display_name,
-                    credit.role_name,
-                    conn,
-                    identity_id=credit.identity_id or None,
-                )
-                existing_credit_name_ids.add(name_id)
-
-            # Sync publishers
-            for pub in song.publishers or []:
-                self._pub_repo.add_album_publisher(
-                    album_id, pub.name, conn, publisher_id=pub.id
-                )
-
-            conn.commit()
-            # ID3 sync
-            self.sync_id3_if_enabled(song_id)
-
-            # Return the link info
-            links = self._album_repo.get_albums_for_songs([song_id], conn)
-            result = next((link for link in links if link.album_id == album_id), None)
-            logger.info(
-                f"[EditService] <- quick_create_album_for_song() OK album_id={album_id}"
-            )
-            return result
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"[EditService] quick_create_album_for_song FAILED: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def _parse_raw_tag(self, raw: str) -> dict:
-        """
-        Parse a raw tag input string into {name, category}.
-        Uses TAG_CATEGORY_DELIMITER and TAG_INPUT_FORMAT from config.
-        """
-        delimiter = "::"  # config.TAG_CATEGORY_DELIMITER
-        default_category = "Genre"  # config.TAG_DEFAULT_CATEGORY
-        format_ = "tag:category"  # config.TAG_INPUT_FORMAT
-        name_first = format_.lower().startswith("tag")
-
-        raw = raw.strip()
-        if not raw:
-            raise ValueError("Tag name cannot be empty")
-
-        if delimiter not in raw:
-            return {"name": raw, "category": default_category}
-
-        idx = raw.find(delimiter)
-        a = raw[:idx].strip()
-        b = raw[idx + len(delimiter) :].strip()
-        if name_first:
-            return {"name": a, "category": b}
-        else:
-            return {"name": b, "category": a}
-
-    def add_song_tag(
-        self,
-        song_id: int,
-        tag_name: Optional[str] = None,
-        category: Optional[str] = None,
-        tag_id: Optional[int] = None,
-        raw_tag: Optional[str] = None,
-    ) -> Tag:
-        """Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2)."""
-        # Parse raw_tag if provided (backend tag parsing)
-        if raw_tag is not None:
-            parsed = self._parse_raw_tag(raw_tag)
-            tag_name = parsed["name"]
-            category = parsed["category"]
-
-        if tag_id is not None:
-            existing = self._tag_repo.get_by_id(tag_id)
-            if not existing:
-                raise LookupError(f"Tag {tag_id} not found")
-            tag_name = existing.name
-            category = existing.category
-        else:
-            if not tag_name or not tag_name.strip():
-                raise ValueError("Tag name cannot be empty")
-            if not category or not category.strip():
-                raise ValueError("Tag category cannot be empty")
-            tag_name = tag_name.strip()
-            category = category.strip().title()
-
-        is_primary = 0
-        if category == "Genre":
-            existing_links = self._tag_repo.get_tags_for_songs([song_id])
-            if not any(
-                t.is_primary
-                for sid, t in existing_links
-                if sid == song_id and t.category == "Genre"
-            ):
-                is_primary = 1
-
-        conn = self._tag_repo.get_connection()
-        try:
-            tag = self._tag_repo.add_tag(
-                song_id, tag_name, category, conn, is_primary=is_primary, tag_id=tag_id
-            )
-            conn.commit()
-            if category not in load_tag_categories():
-                register_tag_category(category)
-            self.sync_id3_if_enabled(song_id)
-            return tag
-        except Exception as e:
-            logger.error(f"[EditService] add_song_tag FAILED: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-    def remove_song_tag(self, song_id: int, tag_id: int) -> None:
-        """Remove a tag link from a song."""
-        existing = self._tag_repo.get_by_id(tag_id)
-        category = existing.category if existing else None
-
-        conn = self._tag_repo.get_connection()
-        try:
-            self._tag_repo.remove_tag(song_id, tag_id, conn)
-            conn.commit()
-            if category:
-                remaining = conn.execute(
-                    """SELECT COUNT(*) FROM MediaSourceTags st
-                       JOIN Tags t ON t.TagID = st.TagID
-                       WHERE t.TagCategory = ? AND t.IsDeleted = 0""",
-                    (category,),
-                ).fetchone()[0]
-                if remaining == 0:
-                    unregister_tag_category(category)
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            logger.error(f"[EditService] remove_song_tag FAILED: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
     def update_tag(self, tag_id: int, new_name: str, new_category: str) -> None:
         """Update tag name/category globally."""
         if not new_name or not new_name.strip():
@@ -856,27 +364,6 @@ class EditService:
             raise
         finally:
             conn.close()
-
-    def set_primary_song_tag(self, song_id: int, tag_id: int) -> Tag:
-        """Promote a specific tag to primary (Genre only)."""
-        tag = self._tag_repo.get_by_id(tag_id)
-        if not tag or tag.category != "Genre":
-            raise ValueError("Only Genre tags can be primary")
-
-        conn = self._tag_repo.get_connection()
-        try:
-            self._tag_repo.set_primary_tag(song_id, tag_id, conn)
-            conn.commit()
-            self.sync_id3_if_enabled(song_id)
-        except Exception as e:
-            logger.error(f"[EditService] set_primary_song_tag FAILED: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-        song = self._library_service.get_song(song_id)
-        return next((t for t in song.tags if t.id == tag_id), None)
 
     def add_song_publisher(
         self,
@@ -942,19 +429,6 @@ class EditService:
         finally:
             conn.close()
 
-    def set_publisher_parent(self, publisher_id: int, parent_id: Optional[int]) -> None:
-        """Set or clear the parent of a publisher."""
-        conn = self._pub_repo.get_connection()
-        try:
-            self._pub_repo.set_parent(publisher_id, parent_id, conn)
-            conn.commit()
-        except Exception as e:
-            logger.error(f"[EditService] set_publisher_parent FAILED: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
     def import_credits_bulk(
         self, song_id: int, credits: List[SpotifyCredit], publishers: List[str]
     ) -> None:
@@ -998,19 +472,6 @@ class EditService:
         finally:
             conn.close()
 
-    def format_entity_field(
-        self, field_name: str, value: str, format_type: str = "title"
-    ) -> str:
-        """Standardizes casing for any entity field."""
-        if not value:
-            return value
-
-        if format_type == "title":
-            return CasingService.to_title_case(value)
-        elif format_type == "sentence":
-            return CasingService.to_sentence_case(value)
-        return value.strip()
-
     def delete_song(
         self,
         song_id: int,
@@ -1049,57 +510,6 @@ class EditService:
             return False
         finally:
             conn.close()
-
-    def move_song_to_library(
-        self, song_id: int, library_root_path: Optional[Path] = None
-    ) -> str:
-        """Orchestrates organization and organization of a song into the library folder."""
-        song = self._library_service.get_song(song_id)
-        if not song or song.processing_status != ProcessingStatus.REVIEWED:
-            raise ValueError("Song not found or not in Reviewed state")
-
-        library_root = library_root_path or LIBRARY_ROOT
-        source_abs_path = Path(song.source_path)
-        try:
-            new_abs_path = self._filing_service.copy_to_library(song, library_root)
-            updates = {"source_path": str(new_abs_path)}
-            self.update_song_scalars(song_id, updates)
-            # Mandatory ID3 write
-            shipped_song = self._library_service.get_song(song_id)
-            if shipped_song:
-                self._metadata_writer.write_metadata(shipped_song)
-
-            # Unlink ONLY if there was an actual physical move (bypasses in-place ingestion logic safely)
-            try:
-                is_same_file = (
-                    source_abs_path.resolve() == new_abs_path.resolve()
-                    or source_abs_path.samefile(new_abs_path)
-                )
-            except Exception as e:
-                logger.debug(
-                    f"[EditService] move_song_to_library file compare failed: {e}"
-                )
-                is_same_file = False
-
-            if source_abs_path.exists() and not is_same_file:
-                if (
-                    not new_abs_path.exists()
-                    or new_abs_path.stat().st_size != source_abs_path.stat().st_size
-                ):
-                    raise RuntimeError(
-                        f"Copy verification failed: destination size mismatch or missing. "
-                        f"Source: {source_abs_path}, Dest: {new_abs_path}"
-                    )
-                source_abs_path.unlink()
-
-            # Origin stays until user confirms deletion OR it's been handled manually.
-            # Actually, user wants a reminder. If we clear it here, the reminder is gone.
-            # So we keep it.
-
-            return str(new_abs_path.relative_to(library_root))
-        except Exception as e:
-            logger.error(f"[EditService] move_song_to_library FAILED: {e}")
-            raise
 
     def delete_unlinked_albums(self, album_ids: List[int]) -> int:
         """Soft-delete albums with zero active song links."""

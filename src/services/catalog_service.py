@@ -12,21 +12,15 @@ from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Song,
     Album,
-    SongAlbum,
     Identity,
     Publisher,
-    SongCredit,
     Tag,
 )
 
-from src.services.metadata_parser import MetadataParser
 from src.engine.config import (
     STAGING_DIR,
     SCALAR_VALIDATION,
-    LIBRARY_ROOT,
     get_db_path,
-    SCALAR_ALLOWED,
-    METADATA_ALLOWED,
 )
 from src.services.identity_service import IdentityService
 from src.services.library_service import LibraryService
@@ -37,9 +31,6 @@ from src.engine.models.spotify import SpotifyCredit
 
 class CatalogService:
     """Entry point for song access. Stateless orchestrator."""
-
-    _SCALAR_ALLOWED = SCALAR_ALLOWED
-    _METADATA_ALLOWED = METADATA_ALLOWED
 
     def __init__(self, db_path=None):
         if db_path is None:
@@ -82,8 +73,6 @@ class CatalogService:
             album_credit_repo=self._album_credit_repo,
         )
 
-        self._metadata_parser = MetadataParser()
-
     def sync_id3_if_enabled(self, song_id: int) -> None:
         """Internal trigger for persistent ID3 writing (Delegated)."""
         return self._edit_service.sync_id3_if_enabled(song_id)
@@ -117,12 +106,6 @@ class CatalogService:
     def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
         """Scan a folder for audio files and return their paths."""
         return self._ingestion_service.scan_folder(folder_path, recursive)
-
-    def ingest_batch(
-        self, file_paths: List[str], max_workers: int = 10
-    ) -> Dict[str, Any]:
-        """Ingest multiple already-staged files in parallel."""
-        return self._ingestion_service.ingest_batch(file_paths, max_workers)
 
     def ingest_single(
         self, file_path: str, original_path: Optional[str] = None
@@ -295,47 +278,6 @@ class CatalogService:
         """Deep slim search."""
         return self._library_service.search_songs_deep_slim(query)
 
-    def format_entity_field(
-        self, entity_type: str, entity_id: int, field: str, format_type: str
-    ) -> Any:
-        """Standardizes casing for any entity field via EditService."""
-        current_value = None
-        if entity_type == "song":
-            entity = self.get_song(entity_id)
-            current_value = getattr(entity, field, None)
-        elif entity_type == "album":
-            entity = self.get_album(entity_id)
-            current_value = getattr(entity, field, None)
-        elif entity_type == "publisher":
-            entity = self.get_publisher(entity_id)
-            current_value = entity.name if entity else None
-            field = "name"
-        elif entity_type == "credit":
-            identity = self._identity_repo.get_by_id(entity_id)
-            current_value = identity.display_name if identity else None
-            field = "name"
-        else:
-            raise ValueError(f"Unknown entity type: {entity_type}")
-
-        if current_value is None:
-            raise LookupError(f"{entity_type} {entity_id} not found")
-
-        new_value = self._edit_service.format_entity_field(
-            field, current_value, format_type=format_type
-        )
-
-        if new_value != current_value:
-            if entity_type == "song":
-                self.update_song_scalars(entity_id, {field: new_value})
-            elif entity_type == "album":
-                self.update_album(entity_id, {field: new_value})
-            elif entity_type == "publisher":
-                self.update_publisher(entity_id, new_value)
-            elif entity_type == "credit":
-                self.update_credit_name(entity_id, new_value)
-
-        return new_value
-
     def update_song_scalars(self, song_id: int, fields: Dict[str, Any]) -> Song:
         """Delegate scalar updates to EditService."""
         self._edit_service.update_song_scalars(
@@ -345,22 +287,6 @@ class CatalogService:
 
     def get_all_roles(self) -> list[str]:
         return self._credit_repo.get_all_roles()
-
-    def add_song_credit(
-        self,
-        song_id: int,
-        display_name: str,
-        role_name: str = "Performer",
-        identity_id: Optional[int] = None,
-    ) -> SongCredit:
-        """Add artist credit via EditService."""
-        return self._edit_service.add_song_credit(
-            song_id, display_name, role_name, identity_id
-        )
-
-    def remove_song_credit(self, song_id: int, credit_id: int) -> None:
-        """Remove a credit link via EditService."""
-        return self._edit_service.remove_song_credit(song_id, credit_id)
 
     def update_credit_name(self, name_id: int, new_name: str) -> None:
         """Update artist display name globally via EditService."""
@@ -372,88 +298,9 @@ class CatalogService:
             source_name_id, target_name_id
         )
 
-    def set_identity_type(self, identity_id: int, type_: str) -> None:
-        """Convert an identity between person and group."""
-        return self._identity_service.set_identity_type(identity_id, type_)
-
-    def add_identity_member(self, group_id: int, member_id: int) -> None:
-        """Add a person identity as a member of a group."""
-        return self._identity_service.add_identity_member(group_id, member_id)
-
-    def remove_identity_member(self, group_id: int, member_id: int) -> None:
-        """Remove a member from a group."""
-        return self._identity_service.remove_identity_member(group_id, member_id)
-
-    def add_song_album(
-        self,
-        song_id: int,
-        album_id: int,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-    ) -> SongAlbum:
-        """Link an existing album via EditService."""
-        return self._edit_service.add_song_album(
-            song_id, album_id, track_number, disc_number
-        )
-
-    def create_and_link_album(
-        self,
-        song_id: int,
-        album_data: dict,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-    ) -> SongAlbum:
-        """Create and link album via EditService."""
-        return self._edit_service.create_and_link_album(
-            song_id, album_data, track_number, disc_number
-        )
-
-    def quick_create_album_for_song(
-        self, song_id: int, title: Optional[str] = None
-    ) -> SongAlbum:
-        """Quick-create album from song (backend implementation of CW-2)."""
-        return self._edit_service.quick_create_album_for_song(song_id, title)
-
-    def remove_song_album(self, song_id: int, album_id: int) -> None:
-        """Unlink album via EditService."""
-        return self._edit_service.remove_song_album(song_id, album_id)
-
-    def update_song_album_link(
-        self,
-        song_id: int,
-        album_id: int,
-        track_number: Optional[int] = None,
-        disc_number: Optional[int] = None,
-        fields_set: set = None,
-    ) -> None:
-        """Update link metadata via EditService."""
-        return self._edit_service.update_song_album_link(
-            song_id,
-            album_id,
-            track_number,
-            disc_number,
-            fields_set=fields_set,
-        )
-
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record via EditService."""
         return self._edit_service.update_album(album_id, album_data)
-
-    def add_album_credit(
-        self,
-        album_id: int,
-        display_name: str,
-        role_name: str = "Performer",
-        identity_id: Optional[int] = None,
-    ) -> int:
-        """Add album credit via EditService."""
-        return self._edit_service.add_album_credit(
-            album_id, display_name, role_name, identity_id
-        )
-
-    def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
-        """Remove album credit via EditService."""
-        return self._edit_service.remove_album_credit(album_id, artist_name_id)
 
     def add_album_publisher(
         self,
@@ -469,23 +316,6 @@ class CatalogService:
     def remove_album_publisher(self, album_id: int, publisher_id: int) -> None:
         """Remove album publisher via EditService."""
         return self._edit_service.remove_album_publisher(album_id, publisher_id)
-
-    def add_song_tag(
-        self,
-        song_id: int,
-        tag_name: Optional[str] = None,
-        category: Optional[str] = None,
-        tag_id: Optional[int] = None,
-        raw_tag: Optional[str] = None,
-    ) -> Tag:
-        """Add song tag via EditService. Supports raw_tag (DT-1, DT-2)."""
-        return self._edit_service.add_song_tag(
-            song_id, tag_name, category, tag_id, raw_tag
-        )
-
-    def remove_song_tag(self, song_id: int, tag_id: int) -> None:
-        """Remove song tag via EditService."""
-        return self._edit_service.remove_song_tag(song_id, tag_id)
 
     def update_tag(self, tag_id: int, new_name: str, new_category: str) -> None:
         """Update tag via EditService."""
@@ -506,10 +336,6 @@ class CatalogService:
     def delete_unlinked_tags(self, tag_ids: List[int]) -> int:
         """Clean up unlinked tags via EditService."""
         return self._edit_service.delete_unlinked_tags(tag_ids)
-
-    def set_primary_song_tag(self, song_id: int, tag_id: int) -> Tag:
-        """Set primary tag via EditService."""
-        return self._edit_service.set_primary_song_tag(song_id, tag_id)
 
     def add_song_publisher(
         self,
@@ -535,20 +361,6 @@ class CatalogService:
     def update_publisher(self, publisher_id: int, new_name: str) -> None:
         """Update publisher via EditService."""
         return self._edit_service.update_publisher(publisher_id, new_name)
-
-    def set_publisher_parent(self, publisher_id: int, parent_id: Optional[int]) -> None:
-        """Update hierarchy via EditService."""
-        return self._edit_service.set_publisher_parent(publisher_id, parent_id)
-
-    def get_id3_frames_config(self) -> Dict[str, Any]:
-        """Returns the ID3 frame configuration."""
-        return self._metadata_parser.config
-
-    def move_song_to_library(self, song_id: int) -> str:
-        """Organize library via EditService."""
-        return self._edit_service.move_song_to_library(
-            song_id, library_root_path=LIBRARY_ROOT
-        )
 
     def delete_original_source(self, song_id: int) -> bool:
         """Physical deletion of the original file linked to this song."""

@@ -152,10 +152,7 @@ class IdentityService:
             conn.close()
 
     def set_identity_type(self, identity_id: int, type_: str) -> None:
-        """Convert an identity between person and group."""
-        logger.debug(
-            f"[IdentityService] -> set_identity_type(id={identity_id}, type={type_!r})"
-        )
+        logger.debug(f"[IdentityService] -> set_identity_type(id={identity_id}, type={type_!r})")
         with self._identity_repo.get_connection() as conn:
             try:
                 self._identity_repo.set_type(identity_id, type_, conn)
@@ -169,10 +166,7 @@ class IdentityService:
                 raise
 
     def add_identity_member(self, group_id: int, member_id: int) -> None:
-        """Add a person identity as a member of a group."""
-        logger.debug(
-            f"[IdentityService] -> add_identity_member(group={group_id}, member={member_id})"
-        )
+        logger.debug(f"[IdentityService] -> add_identity_member(group={group_id}, member={member_id})")
         with self._identity_repo.get_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -187,10 +181,7 @@ class IdentityService:
                 raise
 
     def remove_identity_member(self, group_id: int, member_id: int) -> None:
-        """Remove a member from a group. Noop if not linked."""
-        logger.debug(
-            f"[IdentityService] -> remove_identity_member(group={group_id}, member={member_id})"
-        )
+        logger.debug(f"[IdentityService] -> remove_identity_member(group={group_id}, member={member_id})")
         with self._identity_repo.get_connection() as conn:
             cursor = conn.cursor()
             try:

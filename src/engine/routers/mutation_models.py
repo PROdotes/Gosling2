@@ -88,6 +88,25 @@ class AddPublisherItem(BaseModel):
         return self
 
 
+class AddIdentityMemberItem(BaseModel):
+    type: Literal["identity_member"]
+    group_id: int
+    member_id: int
+
+
+class AddIdentityAliasItem(BaseModel):
+    type: Literal["identity_alias"]
+    identity_id: int
+    display_name: Optional[str] = None
+    name_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def name_or_id(self) -> "AddIdentityAliasItem":
+        if self.display_name is None and self.name_id is None:
+            raise ValueError("either display_name or name_id is required")
+        return self
+
+
 class AddAlbumItem(BaseModel):
     type: Literal["album"]
     song_id: int
@@ -114,7 +133,7 @@ class AddAlbumItem(BaseModel):
 
 
 AddItem = Annotated[
-    Union[AddCreditItem, AddTagItem, AddPublisherItem, AddAlbumItem],
+    Union[AddCreditItem, AddTagItem, AddPublisherItem, AddAlbumItem, AddIdentityMemberItem, AddIdentityAliasItem],
     Field(discriminator="type"),
 ]
 
@@ -247,6 +266,19 @@ class MergeIdentityItem(BaseModel):
     target_name_id: int
 
 
+class UpdateIdentityItem(BaseModel):
+    type: Literal["identity"]
+    id: int
+    identity_type: Optional[str] = None
+
+    @field_validator("identity_type")
+    @classmethod
+    def valid_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ("person", "group"):
+            raise ValueError("identity_type must be 'person' or 'group'")
+        return v
+
+
 UpdateItem = Annotated[
     Union[
         UpdateSongItem,
@@ -257,6 +289,7 @@ UpdateItem = Annotated[
         UpdateCreditEntityItem,
         UpdatePublisherEntityItem,
         MergeIdentityItem,
+        UpdateIdentityItem,
     ],
     Field(discriminator="type"),
 ]
@@ -305,8 +338,20 @@ class RemoveAlbumItem(BaseModel):
     id: int
 
 
+class RemoveIdentityMemberItem(BaseModel):
+    type: Literal["identity_member"]
+    group_id: int
+    member_id: int
+
+
+class RemoveIdentityAliasItem(BaseModel):
+    type: Literal["identity_alias"]
+    identity_id: int
+    name_id: int
+
+
 RemoveItem = Annotated[
-    Union[RemoveCreditItem, RemoveTagItem, RemovePublisherItem, RemoveAlbumItem],
+    Union[RemoveCreditItem, RemoveTagItem, RemovePublisherItem, RemoveAlbumItem, RemoveIdentityMemberItem, RemoveIdentityAliasItem],
     Field(discriminator="type"),
 ]
 

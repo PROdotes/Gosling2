@@ -11,44 +11,48 @@ populated_db fixtures:
 """
 
 import pytest
+from src.services.identity_service import IdentityService
+
+
+@pytest.fixture
+def identity_service(populated_db):
+    return IdentityService(populated_db)
 
 
 class TestSetIdentityType:
-    def test_happy_path(self, catalog_service):
-        catalog_service.set_identity_type(4, "group")
-        assert catalog_service.get_identity(4).type == "group"
+    def test_happy_path(self, identity_service):
+        identity_service.set_identity_type(4, "group")
+        assert identity_service.get_identity(4).type == "group"
 
-    def test_not_found_raises(self, catalog_service):
+    def test_not_found_raises(self, identity_service):
         with pytest.raises(LookupError):
-            catalog_service.set_identity_type(9999, "group")
+            identity_service.set_identity_type(9999, "group")
 
-    def test_blocked_raises(self, catalog_service):
+    def test_blocked_raises(self, identity_service):
         with pytest.raises(ValueError):
-            catalog_service.set_identity_type(2, "person")  # Nirvana has members
+            identity_service.set_identity_type(2, "person")  # Nirvana has members
 
 
 class TestAddIdentityMember:
-    def test_happy_path(self, catalog_service):
-        catalog_service.add_identity_member(2, 4)
-        member_ids = {m.id for m in catalog_service.get_identity(2).members}
+    def test_happy_path(self, identity_service):
+        identity_service.add_identity_member(2, 4)
+        member_ids = {m.id for m in identity_service.get_identity(2).members}
         assert 4 in member_ids
 
-    def test_not_found_raises(self, catalog_service):
+    def test_not_found_raises(self, identity_service):
         with pytest.raises(LookupError):
-            catalog_service.add_identity_member(9999, 1)
+            identity_service.add_identity_member(9999, 1)
 
-    def test_guard_raises(self, catalog_service):
+    def test_guard_raises(self, identity_service):
         with pytest.raises(ValueError):
-            catalog_service.add_identity_member(2, 2)  # self-membership
+            identity_service.add_identity_member(2, 2)  # self-membership
 
 
 class TestRemoveIdentityMember:
-    def test_happy_path(self, catalog_service):
-        catalog_service.remove_identity_member(2, 1)
-        member_ids = {m.id for m in catalog_service.get_identity(2).members}
+    def test_happy_path(self, identity_service):
+        identity_service.remove_identity_member(2, 1)
+        member_ids = {m.id for m in identity_service.get_identity(2).members}
         assert 1 not in member_ids
 
-    def test_noop_if_not_linked(self, catalog_service):
-        catalog_service.remove_identity_member(
-            2, 4
-        )  # Taylor not in Nirvana — should not raise
+    def test_noop_if_not_linked(self, identity_service):
+        identity_service.remove_identity_member(2, 4)  # Taylor not in Nirvana — should not raise

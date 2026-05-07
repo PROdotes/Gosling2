@@ -1,9 +1,5 @@
 """
-API tests for identity type conversion and group membership endpoints.
-
-PATCH  /api/v1/identities/{id}/type
-POST   /api/v1/identities/{id}/members
-DELETE /api/v1/identities/{id}/members/{member_id}
+API tests for identity type conversion and group membership via the mutate endpoint.
 
 populated_db fixtures:
   ID=1: person  "Dave Grohl"    aliases: Grohlton(11), Late!(12), Ines Prajo(33)
@@ -24,71 +20,65 @@ def api(populated_db, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# PATCH /api/v1/identities/{id}/type
+# identity type via POST /api/v1/mutate
 # ---------------------------------------------------------------------------
 
 
 class TestSetIdentityTypeApi:
-    def test_person_to_group_returns_204(self, api):
-        resp = api.patch("/api/v1/identities/4/type", json={"type": "group"})
-        assert resp.status_code == 204, resp.text
+    def test_person_to_group_returns_200(self, api):
+        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 4, "identity_type": "group"}]})
+        assert resp.status_code == 200, resp.text
 
-    def test_group_to_person_no_members_returns_204(self, api):
-        # Remove Dave from Nirvana first
-        api.delete("/api/v1/identities/2/members/1")
-        resp = api.patch("/api/v1/identities/2/type", json={"type": "person"})
-        assert resp.status_code == 204, resp.text
+    def test_group_to_person_no_members_returns_200(self, api):
+        api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]})
+        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]})
+        assert resp.status_code == 200, resp.text
 
     def test_group_to_person_with_members_returns_400(self, api):
-        resp = api.patch("/api/v1/identities/2/type", json={"type": "person"})
+        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]})
         assert resp.status_code == 400, resp.text
 
-    def test_invalid_type_returns_400(self, api):
-        resp = api.patch("/api/v1/identities/1/type", json={"type": "band"})
-        assert resp.status_code == 400, resp.text
+    def test_invalid_type_returns_422(self, api):
+        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 1, "identity_type": "band"}]})
+        assert resp.status_code == 422, resp.text
 
     def test_not_found_returns_404(self, api):
-        resp = api.patch("/api/v1/identities/9999/type", json={"type": "group"})
+        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 9999, "identity_type": "group"}]})
         assert resp.status_code == 404, resp.text
 
 
 # ---------------------------------------------------------------------------
-# POST /api/v1/identities/{id}/members
+# identity members via POST /api/v1/mutate
 # ---------------------------------------------------------------------------
 
 
 class TestAddIdentityMemberApi:
-    def test_add_member_returns_204(self, api):
-        resp = api.post("/api/v1/identities/2/members", json={"member_id": 4})
-        assert resp.status_code == 204, resp.text
+    def test_add_member_returns_200(self, api):
+        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 4}]})
+        assert resp.status_code == 200, resp.text
 
     def test_add_self_returns_400(self, api):
-        resp = api.post("/api/v1/identities/2/members", json={"member_id": 2})
+        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 2}]})
         assert resp.status_code == 400, resp.text
 
     def test_add_group_as_member_returns_400(self, api):
-        resp = api.post("/api/v1/identities/2/members", json={"member_id": 3})
+        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 3}]})
         assert resp.status_code == 400, resp.text
 
     def test_group_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/identities/9999/members", json={"member_id": 1})
+        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 9999, "member_id": 1}]})
         assert resp.status_code == 404, resp.text
 
     def test_member_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/identities/2/members", json={"member_id": 9999})
+        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 9999}]})
         assert resp.status_code == 404, resp.text
 
 
-# ---------------------------------------------------------------------------
-# DELETE /api/v1/identities/{id}/members/{member_id}
-# ---------------------------------------------------------------------------
-
-
 class TestRemoveIdentityMemberApi:
-    def test_remove_member_returns_204(self, api):
-        resp = api.delete("/api/v1/identities/2/members/1")
-        assert resp.status_code == 204, resp.text
+    def test_remove_member_returns_200(self, api):
+        resp = api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]})
+        assert resp.status_code == 200, resp.text
 
-    def test_remove_nonexistent_member_returns_204(self, api):
-        resp = api.delete("/api/v1/identities/2/members/4")  # Taylor not in Nirvana
-        assert resp.status_code == 204, resp.text
+    def test_remove_nonexistent_member_returns_200(self, api):
+        resp = api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 4}]})
+        assert resp.status_code == 200, resp.text

@@ -241,26 +241,6 @@ class SongRepository(MediaSourceRepository):
             )
             return [self._row_to_song(row) for row in rows]
 
-    def get_by_title(
-        self, query: str, conn: Optional[sqlite3.Connection] = None
-    ) -> List[Song]:
-        """Find songs by title match."""
-        logger.debug(f"[SongRepository] Searching for songs with title LIKE: {query}")
-        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.MediaName LIKE ?"
-
-        if conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
-            return [self._row_to_song(row) for row in rows]
-
-        with self._get_connection() as new_conn:
-            new_conn.row_factory = sqlite3.Row
-            rows = new_conn.execute(query_sql, (f"%{query}%",)).fetchall()
-            logger.debug(
-                f"[SongRepository] Found {len(rows)} matches for query: '{query}'"
-            )
-            return [self._row_to_song(row) for row in rows]
-
     def search_slim(
         self, query: str, conn: Optional[sqlite3.Connection] = None
     ) -> List[dict]:

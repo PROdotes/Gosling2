@@ -160,7 +160,11 @@ export function createChipInput({
             return results;
         },
         onSelect: async (opt) => {
-            await onAdd(opt);
+            const newItem = await onAdd(opt);
+            if (newItem) {
+                items = [...items, newItem];
+                renderChips();
+            }
         },
         renderItem,
         allowCreate,

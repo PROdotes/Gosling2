@@ -52,6 +52,8 @@ function renderFields() {
             sections.push(renderSearchField(key, field));
         } else if (field.type === "chipList") {
             sections.push(renderChipListField(key, field));
+        } else if (field.type === "readOnlyList") {
+            sections.push(renderReadOnlyListField(key, field));
         }
     }
 
@@ -137,6 +139,18 @@ function renderChipListField(key, field) {
                 placeholder="Type to search or add..." autocomplete="off">
             <div class="link-modal-dropdown" data-field-key="${key}" style="display:none"></div>
         </div>
+    `;
+}
+
+function renderReadOnlyListField(key, field) {
+    const { label, items = [] } = field;
+    const chips = items.length
+        ? items.map((item) => `<span class="link-chip"><span class="link-chip-label">${escapeHtml(item.label)}</span></span>`).join("")
+        : '<span class="link-modal-empty">None</span>';
+
+    return `
+        <div class="edit-modal-section-title">${escapeHtml(label || key)}</div>
+        <div class="link-modal-items" data-field-key="${key}">${chips}</div>
     `;
 }
 

@@ -163,10 +163,16 @@
     background: rgba(255, 184, 77, 0.08);
 }
 
-#entity-workspace .pill.artist {
+#entity-workspace .pill.person {
     color: #7dd3fc;
     border-color: rgba(125, 211, 252, 0.3);
     background: rgba(125, 211, 252, 0.08);
+}
+
+#entity-workspace .pill.group {
+    color: #c084fc;
+    border-color: rgba(192, 132, 252, 0.3);
+    background: rgba(192, 132, 252, 0.08);
 }
 
 /* ── DETAIL PANE ────────────────────────────────────────────────────────── */

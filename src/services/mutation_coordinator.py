@@ -143,6 +143,19 @@ class MutationCoordinator:
             self._identity_service.merge_identity_into(
                 item.source_name_id, item.target_name_id
             )
+        elif t == "identity":
+            if item.identity_type is not None:
+                self._identity_service.set_identity_type(item.id, item.identity_type)
+        elif t == "identity_member":
+            if action == "add":
+                self._identity_service.add_identity_member(item.group_id, item.member_id)
+            elif action == "remove":
+                self._identity_service.remove_identity_member(item.group_id, item.member_id)
+        elif t == "identity_alias":
+            if action == "add":
+                self._identity_service.add_identity_alias(item.identity_id, item.display_name, item.name_id)
+            elif action == "remove":
+                self._identity_service.remove_identity_alias(item.name_id)
         elif t in _SONG_TYPES:
             self._song_mutator.apply_within(action, item, conn)
         elif t in _CREDIT_TYPES:

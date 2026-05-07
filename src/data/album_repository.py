@@ -102,9 +102,9 @@ class AlbumRepository(BaseRepository):
     ) -> List[int]:
         """Fetch all song IDs linked to an album."""
         logger.debug(f"[AlbumRepository] -> get_song_ids_by_album(id={album_id})")
-        return self.get_song_ids_for_albums([album_id], conn).get(album_id, [])
+        return self._get_song_ids_for_albums([album_id], conn).get(album_id, [])
 
-    def get_song_ids_for_albums(
+    def _get_song_ids_for_albums(
         self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> Dict[int, List[int]]:
         """Batch fetch song IDs for a set of albums in a single query."""
@@ -112,7 +112,7 @@ class AlbumRepository(BaseRepository):
             return {}
 
         logger.debug(
-            f"[AlbumRepository] -> get_song_ids_for_albums(count={len(album_ids)})"
+            f"[AlbumRepository] -> _get_song_ids_for_albums(count={len(album_ids)})"
         )
         placeholders = ",".join(["?"] * len(album_ids))
         query = f"""
@@ -136,7 +136,7 @@ class AlbumRepository(BaseRepository):
                 results.setdefault(album_id, []).append(song_id)
 
             logger.debug(
-                f"[AlbumRepository] <- get_song_ids_for_albums() grouped={len(results)} albums"
+                f"[AlbumRepository] <- _get_song_ids_for_albums() grouped={len(results)} albums"
             )
             return results
 

@@ -2,7 +2,6 @@ import os
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.data.song_repository import SongRepository
 from src.data.album_repository import AlbumRepository
@@ -534,39 +533,6 @@ class IngestionService:
                     if Path(entry).suffix.lower() in ACCEPTED_EXTENSIONS:
                         audio_files.append(file_path)
         return audio_files
-
-    def ingest_batch(
-        self, file_paths: List[str], max_workers: int = 10
-    ) -> Dict[str, Any]:
-        """
-        Ingest multiple files in parallel.
-        """
-        logger.info(f"[IngestionService] -> ingest_batch(count={len(file_paths)})")
-        results = []
-        stats = {"INGESTED": 0, "ALREADY_EXISTS": 0, "CONFLICT": 0, "ERROR": 0}
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_path = {
-                executor.submit(self.ingest_single, p): p for p in file_paths
-            }
-            for future in as_completed(future_to_path):
-                try:
-                    report = future.result()
-                    status = report["status"]
-                    stats[status if status in stats else "ERROR"] += 1
-                    results.append(report)
-                except Exception as e:
-                    stats["ERROR"] += 1
-                    results.append({"status": "ERROR", "message": str(e)})
-
-        return {
-            "total_files": len(file_paths),
-            "ingested": stats["INGESTED"],
-            "duplicates": stats["ALREADY_EXISTS"],
-            "conflicts": stats["CONFLICT"],
-            "errors": stats["ERROR"],
-            "results": results,
-        }
 
     def ingest_single(
         self, file_path: str, original_path: Optional[str] = None

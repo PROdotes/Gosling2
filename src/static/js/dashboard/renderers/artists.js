@@ -57,10 +57,9 @@ export function renderArtists(ctx, artists) {
                     ${escapeHtml(artist.display_name || "Unnamed Identity")}
                     <span class="entity-row-id">#${escapeHtml(artist.id || "-")}</span>
                 </div>
-                <div class="entity-row-sub">${escapeHtml(artist.type || "identity")}</div>
             </div>
             <div class="entity-row-meta">
-                <span class="pill artist">${escapeHtml(artist.type || "identity")}</span>
+                <span class="pill ${escapeHtml(artist.type || "")}">${escapeHtml(artist.type || "identity")}</span>
                 ${artist.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
             </div>
         </div>

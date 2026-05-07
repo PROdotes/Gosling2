@@ -75,35 +75,6 @@ class PublisherRepository(BaseRepository):
             )
             return result
 
-    def get_publishers(
-        self,
-        publisher_ids: List[int],
-        conn: Optional[sqlite3.Connection] = None,
-    ) -> Dict[int, Publisher]:
-        """Resolve a flat list of ID -> Publisher objects."""
-        logger.debug(
-            f"[PublisherRepository] -> get_publishers(count={len(publisher_ids)})"
-        )
-        if not publisher_ids:
-            return {}
-
-        placeholders = ",".join(["?" for _ in publisher_ids])
-        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders}) AND IsDeleted = 0"
-
-        if conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(query, publisher_ids).fetchall()
-            return {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
-
-        with self._get_connection() as new_conn:
-            new_conn.row_factory = sqlite3.Row
-            rows = new_conn.execute(query, publisher_ids).fetchall()
-            result = {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
-            logger.debug(
-                f"[PublisherRepository] <- get_publishers() resolved={len(result)}"
-            )
-            return result
-
     def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]:
         """Fetch the full directory of active publishers."""
         logger.debug("[PublisherRepository] -> get_all()")
