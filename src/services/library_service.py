@@ -267,6 +267,7 @@ class LibraryService:
         statuses: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         live_only: bool = False,
+        has_original: bool = False,
         mode: str = "ALL",
     ) -> List[dict]:
         """Filter songs by sidebar criteria. Returns slim list-view rows."""
@@ -281,6 +282,7 @@ class LibraryService:
             statuses=statuses,
             tags=tags,
             live_only=live_only,
+            has_original=has_original,
             mode=mode,
         )
 

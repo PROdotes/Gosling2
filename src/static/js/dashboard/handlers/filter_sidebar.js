@@ -16,11 +16,11 @@ function loadSavedFilterState() {
     }
 }
 
-function saveFilterState(active, liveOnly, mode, sidebarVisible) {
+function saveFilterState(active, liveOnly, hasOriginal, mode, sidebarVisible) {
     try {
         localStorage.setItem(
             FILTER_STORAGE_KEY,
-            JSON.stringify({ active, liveOnly, mode, sidebarVisible }),
+            JSON.stringify({ active, liveOnly, hasOriginal, mode, sidebarVisible }),
         );
     } catch {}
 }
@@ -51,6 +51,7 @@ export class FilterSidebarHandler {
             tag_categories: {},
         };
         this._liveOnly = saved?.liveOnly ?? false;
+        this._hasOriginal = saved?.hasOriginal ?? false;
         this._mode =
             saved?.mode === "ALL" || saved?.mode === "ANY" ? saved.mode : "ALL";
         this._sidebarVisible = saved?.sidebarVisible ?? false;
@@ -95,14 +96,14 @@ export class FilterSidebarHandler {
         this._sidebarVisible = true;
         const sidebar = document.getElementById("filter-sidebar");
         if (sidebar) sidebar.style.display = "flex";
-        saveFilterState(this._active, this._liveOnly, this._mode, true);
+        saveFilterState(this._active, this._liveOnly, this._hasOriginal, this._mode, true);
     }
 
     hide() {
         this._sidebarVisible = false;
         const sidebar = document.getElementById("filter-sidebar");
         if (sidebar) sidebar.style.display = "none";
-        saveFilterState(this._active, this._liveOnly, this._mode, false);
+        saveFilterState(this._active, this._liveOnly, this._hasOriginal, this._mode, false);
     }
 
     toggle() {
@@ -128,7 +129,8 @@ export class FilterSidebarHandler {
             Object.values(this._active.tag_categories).some(
                 (v) => v.length > 0,
             ) ||
-            this._liveOnly
+            this._liveOnly ||
+            this._hasOriginal
         );
     }
 
@@ -145,6 +147,7 @@ export class FilterSidebarHandler {
             tag_categories: {},
         };
         this._liveOnly = false;
+        this._hasOriginal = false;
         this._render();
         this._applyFilters();
     }
@@ -196,6 +199,14 @@ export class FilterSidebarHandler {
             return;
         }
 
+        // Has original toggle
+        if (target.closest("#filter-has-original-toggle")) {
+            this._hasOriginal = !this._hasOriginal;
+            this._render();
+            this._applyFilters();
+            return;
+        }
+
         // Section collapse toggle
         const sectionHeader = target.closest("[data-filter-section]");
         if (sectionHeader && target.closest(".filter-section-header")) {
@@ -213,6 +224,8 @@ export class FilterSidebarHandler {
             const cat = chipRemove.dataset.filterCat;
             if (key === "live") {
                 this._liveOnly = false;
+            } else if (key === "has_original") {
+                this._hasOriginal = false;
             } else {
                 this._toggleValue(key, value, cat);
             }
@@ -262,6 +275,7 @@ export class FilterSidebarHandler {
         saveFilterState(
             this._active,
             this._liveOnly,
+            this._hasOriginal,
             this._mode,
             this._sidebarVisible,
         );
@@ -289,7 +303,7 @@ export class FilterSidebarHandler {
         }
         if (tagPairs.length) filters["tags"] = tagPairs;
 
-        const result = filterSongs(filters, this._mode, this._liveOnly);
+        const result = filterSongs(filters, this._mode, this._liveOnly, this._hasOriginal);
         this.ctx.onFilterResults?.(result);
     }
 
@@ -390,6 +404,7 @@ export class FilterSidebarHandler {
                             })
                             .join("")}
                         ${liveMatches ? `<button id="filter-live-toggle" class="filter-value${this._liveOnly ? " active" : ""}" data-filter-key="live">Live Only</button>` : ""}
+                        <button id="filter-has-original-toggle" class="filter-value${this._hasOriginal ? " active" : ""}" data-filter-key="has_original">Has Original</button>
                     </div>`
                     }
                 </div>`;
@@ -503,6 +518,11 @@ export class FilterSidebarHandler {
         if (this._liveOnly) {
             chips.push(
                 `<span class="filter-chip" data-filter-key="live">Live Only <button class="filter-chip-remove" data-filter-key="live">✕</button></span>`,
+            );
+        }
+        if (this._hasOriginal) {
+            chips.push(
+                `<span class="filter-chip" data-filter-key="has_original">Has Original <button class="filter-chip-remove" data-filter-key="has_original">✕</button></span>`,
             );
         }
 

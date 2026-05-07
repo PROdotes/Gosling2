@@ -880,8 +880,12 @@ export function renderActionSidebar(
 
     // ── Delete Original ────────────────────────────────────────────────────────
     const hasOriginal = song.original_exists && song.estimated_original_path;
+    const hasStaleOrigin = !song.original_exists && song.estimated_original_path;
     const deleteOriginalBtn = hasOriginal
-        ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-song-id="${song.id}" data-path="${escapeHtml(song.estimated_original_path)}">⚠ Delete Original</button>
+        ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-song-id="${song.id}" data-path="${escapeHtml(song.estimated_original_path)}">Delete Original</button>
+           <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
+        : hasStaleOrigin
+        ? `<button class="sidebar-btn" data-action="cleanup-original" data-song-id="${song.id}" data-path="${escapeHtml(song.estimated_original_path)}">Clear Stale Origin Record</button>
            <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
         : "";
 

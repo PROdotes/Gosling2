@@ -636,6 +636,7 @@ class SongRepository(MediaSourceRepository):
         statuses: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         live_only: bool = False,
+        has_original: bool = False,
         mode: str = "ALL",
         conn: Optional[sqlite3.Connection] = None,
     ) -> List[dict]:
@@ -750,6 +751,7 @@ class SongRepository(MediaSourceRepository):
             id_filter = " AND ".join([f"m.SourceID IN ({sq})" for sq in subqueries])
 
         live_clause = "AND m.IsActive = 1" if live_only else ""
+        original_clause = "AND EXISTS (SELECT 1 FROM StagingOrigins so WHERE so.SourceID = m.SourceID)" if has_original else ""
 
         query_sql = f"""
             SELECT
@@ -770,7 +772,7 @@ class SongRepository(MediaSourceRepository):
             LEFT JOIN Roles r ON sc.RoleID = r.RoleID
             LEFT JOIN MediaSourceTags mst ON m.SourceID = mst.SourceID
             LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
-            WHERE {id_filter} {live_clause}
+            WHERE {id_filter} {live_clause} {original_clause}
             GROUP BY m.SourceID
         """
 

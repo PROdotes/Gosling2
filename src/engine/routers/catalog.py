@@ -54,6 +54,7 @@ async def filter_songs(
     statuses: Optional[List[str]] = Query(default=None),
     tags: Optional[List[str]] = Query(default=None),
     live_only: bool = False,
+    has_original: bool = False,
     mode: str = "ALL",
     service: CatalogService = Depends(_get_service),
 ) -> List[SongSlimView]:
@@ -69,6 +70,7 @@ async def filter_songs(
         statuses=statuses,
         tags=tags,
         live_only=live_only,
+        has_original=has_original,
         mode=mode,
     )
     return [SongSlimView.from_row(r) for r in rows]
@@ -109,31 +111,11 @@ async def get_song(song_id: int) -> SongView:
     if "staging" in source_path:
         from pathlib import Path
 
-        # 1. Estimated original source path (Downloads heuristic - metadata independent)
-        try:
-            from src.engine.config import get_downloads_folder
-
-            downloads = get_downloads_folder()
-            if downloads:
-                # Extract original filename from UUID prefix (36 hex + 1 underscore)
-                filename = Path(song.source_path).name
-                if len(filename) > 37 and "_" in filename[:38]:
-                    original_name = filename.split("_", 1)[1]
-                    view.estimated_original_path = str(Path(downloads) / original_name)
-                else:
-                    # Fallback for non-UUID files already in staging
-                    view.estimated_original_path = str(Path(downloads) / filename)
-
-                # Check if it actually exists (to color code the UI)
-                import os
-
-                if os.path.exists(view.estimated_original_path):
-                    view.original_exists = True
-
-        except Exception as e:
-            logger.debug(
-                f"[CatalogRouter] Original path preview failed for song {song_id}: {e}"
-            )
+        # 1. Original source path — from StagingOrigins DB record only
+        if view.estimated_original_path:
+            import os
+            if os.path.exists(view.estimated_original_path):
+                view.original_exists = True
 
         # 2. Organized destination preview (May fail due to metadata error)
         try:

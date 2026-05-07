@@ -534,10 +534,11 @@ export function getFilterValues() {
     return fetchJson("/api/v1/songs/filter-values");
 }
 
-export function filterSongs(filters, mode = "ALL", liveOnly = false) {
+export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal = false) {
     const params = new URLSearchParams();
     params.set("mode", mode);
     if (liveOnly) params.set("live_only", "true");
+    if (hasOriginal) params.set("has_original", "true");
     for (const [key, values] of Object.entries(filters)) {
         for (const v of values) {
             params.append(key, v);
