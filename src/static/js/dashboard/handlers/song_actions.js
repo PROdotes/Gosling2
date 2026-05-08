@@ -790,16 +790,25 @@ export class SongActionsHandler {
     }
 
     async handleCleanupOriginal(actionTarget) {
-        const { path } = actionTarget.dataset;
-        if (
-            !(await showConfirm(
-                `Permanently delete the original file?\n\nPath: ${path}`,
-                { title: "Delete Original File" },
-            ))
-        ) {
+        if (!actionTarget.classList.contains("confirming")) {
+            const originalText = actionTarget.textContent;
+            actionTarget.classList.add("confirming");
+            actionTarget.textContent = "Confirm Delete?";
+
+            setTimeout(() => {
+                if (
+                    actionTarget.classList.contains("confirming") &&
+                    !actionTarget.disabled
+                ) {
+                    actionTarget.classList.remove("confirming");
+                    actionTarget.textContent = originalText;
+                }
+            }, 3000);
             return;
         }
 
+        actionTarget.disabled = true;
+        actionTarget.classList.remove("confirming");
         actionTarget.style.opacity = "0.5";
         actionTarget.style.pointerEvents = "none";
         const songId = actionTarget.dataset.id || actionTarget.dataset.songId;
@@ -817,6 +826,7 @@ export class SongActionsHandler {
                 );
             }
         } catch (err) {
+            actionTarget.disabled = false;
             actionTarget.style.opacity = "1";
             actionTarget.style.pointerEvents = "auto";
             if (this.ctx.showBanner) {
