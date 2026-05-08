@@ -16,7 +16,6 @@ from src.models.domain import (
     Album,
     Publisher,
     SongCredit,
-    Tag,
 )
 from src.services.logger import logger
 from src.services.metadata_writer import MetadataWriter
@@ -26,7 +25,6 @@ from src.services.identity_service import IdentityService
 from src.engine.config import (
     get_db_path,
     RENAME_RULES_PATH,
-    LIBRARY_ROOT,
     STAGING_DIR,
     SCALAR_VALIDATION,
     SCALAR_ALLOWED,

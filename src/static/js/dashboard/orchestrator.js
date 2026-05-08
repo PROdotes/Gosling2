@@ -154,12 +154,14 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
         },
         onAdd: async (opt) => {
             const rawTag = opt.id == null ? (opt.rawInput || opt.name || opt.label) : null;
+            const { name: parsedName, category: parsedCategory } = rawTag
+                ? parseTagInput(rawTag, rules)
+                : { name: null, category: null };
             const result = await addSongTag(
                 songId,
-                null,
-                null,
+                opt.id == null ? parsedName : null,
+                opt.id == null ? parsedCategory : null,
                 opt.id ?? null,
-                rawTag,
             );
             const song = result?.songs?.[0];
             if (song) {

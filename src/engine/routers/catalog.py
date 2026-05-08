@@ -109,7 +109,6 @@ async def get_song(song_id: int) -> SongView:
     # Calculate previews if in staging
     source_path = (song.source_path or "").lower()
     if "staging" in source_path:
-        from pathlib import Path
 
         # 1. Original source path — from StagingOrigins DB record only
         if view.estimated_original_path:
