@@ -349,6 +349,48 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch categories: {e}")
             raise
 
+    def find_by_name_category(
+        self, name: str, category: str, conn: sqlite3.Connection
+    ) -> Optional[int]:
+        """Return TagID for an exact (case-insensitive) name+category match, or None."""
+        row = conn.execute(
+            "SELECT TagID FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+            (name, category),
+        ).fetchone()
+        return row[0] if row else None
+
+    def merge_into(
+        self, source_id: int, target_id: int, conn: sqlite3.Connection
+    ) -> None:
+        """Re-links all song links to target, then soft-deletes source. Does NOT commit."""
+        logger.info(
+            f"[TagRepository] -> merge_into(source={source_id}, target={target_id})"
+        )
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM MediaSourceTags
+            WHERE TagID = ?
+              AND EXISTS (
+                SELECT 1 FROM MediaSourceTags mst2
+                WHERE mst2.SourceID = MediaSourceTags.SourceID
+                  AND mst2.TagID = ?
+              )
+            """,
+            (source_id, target_id),
+        )
+        cursor.execute(
+            "UPDATE MediaSourceTags SET TagID = ? WHERE TagID = ?",
+            (target_id, source_id),
+        )
+        cursor.execute(
+            "UPDATE Tags SET IsDeleted = 1 WHERE TagID = ?", (source_id,)
+        )
+        logger.info(
+            f"[TagRepository] <- merge_into OK — tag {source_id} -> {target_id}"
+        )
+
     def _row_to_tag(self, row: Mapping[str, Any]) -> Tag:
         """Map a database row to a Tag Pydantic model."""
         return Tag(

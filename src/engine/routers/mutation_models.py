@@ -266,6 +266,18 @@ class MergeIdentityItem(BaseModel):
     target_name_id: int
 
 
+class MergePublisherItem(BaseModel):
+    type: Literal["publisher_merge"]
+    source_id: int
+    target_id: int
+
+
+class MergeTagItem(BaseModel):
+    type: Literal["tag_merge"]
+    source_id: int
+    target_id: int
+
+
 class UpdateIdentityItem(BaseModel):
     type: Literal["identity"]
     id: int
@@ -289,6 +301,8 @@ UpdateItem = Annotated[
         UpdateCreditEntityItem,
         UpdatePublisherEntityItem,
         MergeIdentityItem,
+        MergePublisherItem,
+        MergeTagItem,
         UpdateIdentityItem,
     ],
     Field(discriminator="type"),

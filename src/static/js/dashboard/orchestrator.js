@@ -27,9 +27,11 @@ import {
     removeIdentityMember,
     getPublisherDetail,
     updatePublisher,
+    mergePublisher,
     setPublisherParent,
     getTagDetail,
     updateTag,
+    mergeTag,
     getTagCategories,
     syncAlbumFromSong,
 } from "./api.js";
@@ -365,13 +367,13 @@ export async function manageArtist(ctx, artistId, artistName) {
                     if (ctx.refreshLayout) ctx.refreshLayout();
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
-                        const { collision_name_id } = err.detail;
+                        const { collision_id } = err.detail;
                         const confirmed = await showConfirm(
                             `"${val}" already exists. Merge into existing identity?`,
                             { title: "Merge Identity", okLabel: "Merge" },
                         );
                         if (confirmed) {
-                            await mergeIdentity(primary.id, collision_name_id);
+                            await mergeIdentity(primary.id, collision_id);
                             if (ctx.refreshLayout) ctx.refreshLayout();
                         }
                     } else if (err.detail?.code === "UNSAFE_MERGE") {
@@ -417,13 +419,13 @@ export async function manageArtist(ctx, artistId, artistName) {
                     await updateCreditName(item.id, newName);
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
-                        const { collision_name_id } = err.detail;
+                        const { collision_id } = err.detail;
                         const confirmed = await showConfirm(
                             `"${newName}" already exists. Merge into existing identity?`,
                             { title: "Merge Identity", okLabel: "Merge" },
                         );
                         if (confirmed) {
-                            await mergeIdentity(item.id, collision_name_id);
+                            await mergeIdentity(item.id, collision_id);
                             if (ctx.refreshLayout) ctx.refreshLayout();
                         }
                     } else if (err.detail?.code === "UNSAFE_MERGE") {
@@ -485,7 +487,23 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                 value: detail ? detail.name : publisherName,
                 caseButton: true,
                 onSave: async (val) => {
-                    await updatePublisher(publisherId, val);
+                    try {
+                        await updatePublisher(publisherId, val);
+                    } catch (err) {
+                        if (err.detail?.code === "MERGE_REQUIRED") {
+                            const { collision_id } = err.detail;
+                            const confirmed = await showConfirm(
+                                `"${val}" already exists. Merge into existing publisher?`,
+                                { title: "Merge Publisher", okLabel: "Merge" },
+                            );
+                            if (confirmed) {
+                                await mergePublisher(publisherId, collision_id);
+                                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            }
+                        } else {
+                            throw err;
+                        }
+                    }
                 },
             },
             subPublishers: {
@@ -506,7 +524,23 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                     await setPublisherParent(item.id, null);
                 },
                 onRename: async (item, newName) => {
-                    await updatePublisher(item.id, newName);
+                    try {
+                        await updatePublisher(item.id, newName);
+                    } catch (err) {
+                        if (err.detail?.code === "MERGE_REQUIRED") {
+                            const { collision_id } = err.detail;
+                            const confirmed = await showConfirm(
+                                `"${newName}" already exists. Merge into existing publisher?`,
+                                { title: "Merge Publisher", okLabel: "Merge" },
+                            );
+                            if (confirmed) {
+                                await mergePublisher(item.id, collision_id);
+                                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            }
+                        } else {
+                            throw err;
+                        }
+                    }
                 },
                 createLabel: (q) => `Add "${q}" as sub-publisher`,
             },
@@ -529,8 +563,24 @@ export async function manageTag(ctx, tagId) {
                 label: "Name",
                 value: tagDetail.name,
                 onSave: async (val) => {
-                    await updateTag(tagId, val, tagDetail.category);
-                    tagDetail.name = val;
+                    try {
+                        await updateTag(tagId, val, tagDetail.category);
+                        tagDetail.name = val;
+                    } catch (err) {
+                        if (err.detail?.code === "MERGE_REQUIRED") {
+                            const { collision_id } = err.detail;
+                            const confirmed = await showConfirm(
+                                `"${val}" already exists in this category. Merge into existing tag?`,
+                                { title: "Merge Tag", okLabel: "Merge" },
+                            );
+                            if (confirmed) {
+                                await mergeTag(tagId, collision_id);
+                                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            }
+                        } else {
+                            throw err;
+                        }
+                    }
                 },
             },
             category: {
@@ -539,8 +589,24 @@ export async function manageTag(ctx, tagId) {
                 value: tagDetail.category,
                 editable: true,
                 onSave: async (val) => {
-                    await updateTag(tagId, tagDetail.name, val);
-                    tagDetail.category = val;
+                    try {
+                        await updateTag(tagId, tagDetail.name, val);
+                        tagDetail.category = val;
+                    } catch (err) {
+                        if (err.detail?.code === "MERGE_REQUIRED") {
+                            const { collision_id } = err.detail;
+                            const confirmed = await showConfirm(
+                                `"${tagDetail.name}" already exists in category "${val}". Merge into existing tag?`,
+                                { title: "Merge Tag", okLabel: "Merge" },
+                            );
+                            if (confirmed) {
+                                await mergeTag(tagId, collision_id);
+                                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            }
+                        } else {
+                            throw err;
+                        }
+                    }
                 },
                 onSearch: async (q) => {
                     const all = await getTagCategories();

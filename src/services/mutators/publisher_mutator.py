@@ -46,6 +46,18 @@ class PublisherMutator:
         if removed == 0:
             raise LookupError(f"Publisher {item.id} not linked")
 
+    def merge_within(
+        self, source_id: int, target_id: int, conn: sqlite3.Connection
+    ) -> None:
+        source = self._repo.get_by_id(source_id, conn)
+        if source is None:
+            raise LookupError(f"Publisher {source_id} not found")
+        if source.parent_id is not None:
+            raise ValueError(f"Publisher {source_id} has a parent — hierarchy merge not supported yet")
+        if self._repo.get_children(source_id, conn):
+            raise ValueError(f"Publisher {source_id} has children — hierarchy merge not supported yet")
+        self._repo.merge_into(source_id, target_id, conn)
+
     def _update(
         self, item: UpdatePublisherEntityItem, conn: sqlite3.Connection
     ) -> None:
@@ -53,6 +65,9 @@ class PublisherMutator:
         if not fields:
             return
         if "name" in fields:
+            existing_id = self._repo.find_by_name(item.name, conn)
+            if existing_id is not None and existing_id != item.id:
+                raise ValueError(f"MERGE_REQUIRED:publisher:{existing_id}")
             updated = self._repo.update_publisher(item.id, item.name, conn)
             if updated == 0:
                 raise LookupError(f"Publisher {item.id} not found")

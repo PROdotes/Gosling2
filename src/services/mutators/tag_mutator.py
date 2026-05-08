@@ -80,6 +80,13 @@ class TagMutator:
             if next_genre:
                 self._repo.set_primary_tag(item.song_id, next_genre.id, conn)
 
+    def merge_within(
+        self, source_id: int, target_id: int, conn: sqlite3.Connection
+    ) -> None:
+        if self._repo.get_by_id(source_id, conn) is None:
+            raise LookupError(f"Tag {source_id} not found")
+        self._repo.merge_into(source_id, target_id, conn)
+
     def _update(
         self,
         item: Union[UpdateSongTagItem, UpdateTagEntityItem],
@@ -98,6 +105,9 @@ class TagMutator:
                 raise LookupError(f"Tag {item.id} not found")
             name = item.name if item.name is not None else existing.name
             category = item.category if item.category is not None else existing.category
+            existing_id = self._repo.find_by_name_category(name, category, conn)
+            if existing_id is not None and existing_id != item.id:
+                raise ValueError(f"MERGE_REQUIRED:tag:{existing_id}")
             updated = self._repo.update_tag(item.id, name, category, conn)
             if updated == 0:
                 raise LookupError(f"Tag {item.id} not found")

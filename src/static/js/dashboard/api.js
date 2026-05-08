@@ -323,6 +323,10 @@ export function updatePublisher(publisherId, name) {
     return mutate({ update: [{ type: "publisher", id: publisherId, name }] });
 }
 
+export function mergePublisher(sourceId, targetId) {
+    return mutate({ update: [{ type: "publisher_merge", source_id: sourceId, target_id: targetId }] });
+}
+
 export function searchTags(query = "") {
     const url = query
         ? `/api/v1/tags/search?q=${encodeURIComponent(query)}`
@@ -344,6 +348,10 @@ export function getTagCategories() {
 
 export function updateTag(tagId, name, category) {
     return mutate({ update: [{ type: "tag", id: tagId, name, category }] });
+}
+
+export function mergeTag(sourceId, targetId) {
+    return mutate({ update: [{ type: "tag_merge", source_id: sourceId, target_id: targetId }] });
 }
 
 export function deleteTag(tagId) {

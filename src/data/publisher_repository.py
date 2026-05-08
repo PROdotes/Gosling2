@@ -585,6 +585,56 @@ class PublisherRepository(BaseRepository):
         logger.debug("[PublisherRepository] <- set_parent() done")
         return cursor.rowcount
 
+    def merge_into(
+        self, source_id: int, target_id: int, conn: sqlite3.Connection
+    ) -> None:
+        """Re-links all song and album links to target, then soft-deletes source. Does NOT commit."""
+        logger.info(
+            f"[PublisherRepository] -> merge_into(source={source_id}, target={target_id})"
+        )
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM RecordingPublishers
+            WHERE PublisherID = ?
+              AND EXISTS (
+                SELECT 1 FROM RecordingPublishers rp2
+                WHERE rp2.SourceID = RecordingPublishers.SourceID
+                  AND rp2.PublisherID = ?
+              )
+            """,
+            (source_id, target_id),
+        )
+        cursor.execute(
+            "UPDATE RecordingPublishers SET PublisherID = ? WHERE PublisherID = ?",
+            (target_id, source_id),
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM AlbumPublishers
+            WHERE PublisherID = ?
+              AND EXISTS (
+                SELECT 1 FROM AlbumPublishers ap2
+                WHERE ap2.AlbumID = AlbumPublishers.AlbumID
+                  AND ap2.PublisherID = ?
+              )
+            """,
+            (source_id, target_id),
+        )
+        cursor.execute(
+            "UPDATE AlbumPublishers SET PublisherID = ? WHERE PublisherID = ?",
+            (target_id, source_id),
+        )
+
+        cursor.execute(
+            "UPDATE Publishers SET IsDeleted = 1 WHERE PublisherID = ?", (source_id,)
+        )
+        logger.info(
+            f"[PublisherRepository] <- merge_into OK — publisher {source_id} -> {target_id}"
+        )
+
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""
         return Publisher(

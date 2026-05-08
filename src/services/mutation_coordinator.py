@@ -143,6 +143,10 @@ class MutationCoordinator:
             self._identity_service.merge_identity_into(
                 item.source_name_id, item.target_name_id
             )
+        elif t == "publisher_merge":
+            self._publisher_mutator.merge_within(item.source_id, item.target_id, conn)
+        elif t == "tag_merge":
+            self._tag_mutator.merge_within(item.source_id, item.target_id, conn)
         elif t == "identity":
             if item.identity_type is not None:
                 self._identity_service.set_identity_type(item.id, item.identity_type)
