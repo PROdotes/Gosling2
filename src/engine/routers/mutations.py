@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from src.engine.config import get_db_path
 from src.engine.routers.mutation_models import MutationRequest
+from src.models.exceptions import MergeRequiredError
 from src.services.logger import logger
 from src.services.mutation_coordinator import MutationCoordinator
 
@@ -20,16 +21,10 @@ async def mutate(body: MutationRequest) -> dict:
         return coordinator.apply(body)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except MergeRequiredError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "MERGE_REQUIRED", "entity_type": e.entity_type, "collision_id": e.collision_id},
+        )
     except ValueError as e:
-        msg = str(e)
-        if msg.startswith("MERGE_REQUIRED:"):
-            _, entity_type, collision_id = msg.split(":")
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "MERGE_REQUIRED",
-                    "entity_type": entity_type,
-                    "collision_id": int(collision_id),
-                },
-            )
-        raise HTTPException(status_code=400, detail=msg)
+        raise HTTPException(status_code=400, detail=str(e))

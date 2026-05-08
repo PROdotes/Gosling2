@@ -33,6 +33,15 @@ class ReingestionConflictError(IngestionError):
         super().__init__(message, status_code=409)
 
 
+class MergeRequiredError(Exception):
+    """Raised when a rename collides with an existing entity and the user must confirm a merge."""
+
+    def __init__(self, entity_type: str, collision_id: int):
+        self.entity_type = entity_type
+        self.collision_id = collision_id
+        super().__init__(f"Merge required: {entity_type} {collision_id}")
+
+
 class DuplicateConflictError(IngestionError):
     """Error raised when a file matches an ACTIVE record."""
 

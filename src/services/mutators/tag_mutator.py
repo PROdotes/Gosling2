@@ -8,6 +8,7 @@ from src.engine.routers.mutation_models import (
     UpdateTagEntityItem,
     UpdateSongTagItem,
 )
+from src.models.exceptions import MergeRequiredError
 
 
 class TagMutator:
@@ -107,7 +108,7 @@ class TagMutator:
             category = item.category if item.category is not None else existing.category
             existing_id = self._repo.find_by_name_category(name, category, conn)
             if existing_id is not None and existing_id != item.id:
-                raise ValueError(f"MERGE_REQUIRED:tag:{existing_id}")
+                raise MergeRequiredError("tag", existing_id)
             updated = self._repo.update_tag(item.id, name, category, conn)
             if updated == 0:
                 raise LookupError(f"Tag {item.id} not found")

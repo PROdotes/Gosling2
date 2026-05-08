@@ -7,6 +7,7 @@ from src.engine.routers.mutation_models import (
     RemovePublisherItem,
     UpdatePublisherEntityItem,
 )
+from src.models.exceptions import MergeRequiredError
 
 
 class PublisherMutator:
@@ -67,7 +68,7 @@ class PublisherMutator:
         if "name" in fields:
             existing_id = self._repo.find_by_name(item.name, conn)
             if existing_id is not None and existing_id != item.id:
-                raise ValueError(f"MERGE_REQUIRED:publisher:{existing_id}")
+                raise MergeRequiredError("publisher", existing_id)
             updated = self._repo.update_publisher(item.id, item.name, conn)
             if updated == 0:
                 raise LookupError(f"Publisher {item.id} not found")

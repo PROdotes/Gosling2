@@ -8,6 +8,7 @@ from src.engine.routers.mutation_models import (
     RemoveCreditItem,
     UpdateCreditEntityItem,
 )
+from src.models.exceptions import MergeRequiredError
 
 
 class CreditMutator:
@@ -55,7 +56,7 @@ class CreditMutator:
             item.display_name, conn
         )
         if existing_id is not None and existing_id != item.id:
-            raise ValueError(f"MERGE_REQUIRED:credit:{existing_id}")
+            raise MergeRequiredError("credit", existing_id)
         updated = self._song_repo.update_credit_name(item.id, item.display_name, conn)
         if updated == 0:
             raise LookupError(f"ArtistName {item.id} not found")
