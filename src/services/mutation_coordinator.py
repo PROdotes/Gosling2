@@ -6,13 +6,34 @@ from src.data.base_repository import BaseRepository
 from src.data.staging_repository import StagingRepository
 from src.engine.config import LIBRARY_ROOT, RENAME_RULES_PATH, STAGING_DIR
 from src.engine.routers.mutation_models import (
+    AddAlbumItem,
+    AddCreditItem,
+    AddIdentityAliasItem,
+    AddIdentityMemberItem,
+    AddPublisherItem,
+    AddTagItem,
     DeleteOriginalFileItem,
     DeleteSongItem,
+    MergeIdentityItem,
+    MergePublisherItem,
+    MergeTagItem,
     MutationRequest,
+    RemoveAlbumItem,
+    RemoveCreditItem,
+    RemoveIdentityAliasItem,
+    RemoveIdentityMemberItem,
+    RemovePublisherItem,
+    RemoveTagItem,
+    UpdateAlbumEntityItem,
+    UpdateCreditEntityItem,
+    UpdateIdentityItem,
+    UpdatePublisherEntityItem,
+    UpdateSongAlbumItem,
     UpdateSongItem,
+    UpdateSongTagItem,
+    UpdateTagEntityItem,
 )
 from src.services.filing_service import FilingService
-from src.services.identity_service import IdentityService
 from src.services.logger import logger
 from src.services.library_service import LibraryService
 from src.services.metadata_writer import MetadataWriter
@@ -20,15 +41,10 @@ from src.services.metadata_writer import MetadataWriter
 from src.services.mutators.album_mutator import AlbumMutator
 from src.services.mutators.credit_mutator import CreditMutator
 from src.services.mutators.delete_mutator import DeleteMutator
+from src.services.mutators.identity_mutator import IdentityMutator
 from src.services.mutators.publisher_mutator import PublisherMutator
 from src.services.mutators.song_mutator import SongMutator
 from src.services.mutators.tag_mutator import TagMutator
-
-_CREDIT_TYPES = {"credit"}
-_TAG_TYPES = {"tag", "song_tag"}
-_PUBLISHER_TYPES = {"publisher"}
-_ALBUM_TYPES = {"album", "song_album"}
-_SONG_TYPES = {"song"}
 
 
 class MutationCoordinator:
@@ -36,20 +52,53 @@ class MutationCoordinator:
         self._db_path = db_path
         self._conn_factory = BaseRepository(db_path)
         self._library = library_service or LibraryService(db_path)
-        self._identity_service = IdentityService(db_path)
         self._song_mutator = SongMutator(db_path)
         self._credit_mutator = CreditMutator(db_path)
         self._tag_mutator = TagMutator(db_path)
         self._publisher_mutator = PublisherMutator(db_path)
         self._album_mutator = AlbumMutator(db_path)
         self._delete_mutator = DeleteMutator(db_path)
+        self._identity_mutator = IdentityMutator(db_path)
         self._staging_repo = StagingRepository(db_path)
         self._id3_writer = MetadataWriter()
         self._filing = FilingService(RENAME_RULES_PATH)
 
+        s = self._song_mutator
+        c = self._credit_mutator
+        t = self._tag_mutator
+        p = self._publisher_mutator
+        a = self._album_mutator
+        i = self._identity_mutator
+
+        self._dispatch: dict[type, Any] = {
+            UpdateSongItem:            s,
+            AddCreditItem:             c,
+            RemoveCreditItem:          c,
+            UpdateCreditEntityItem:    c,
+            AddTagItem:                t,
+            RemoveTagItem:             t,
+            UpdateTagEntityItem:       t,
+            UpdateSongTagItem:         t,
+            MergeTagItem:              t,
+            AddPublisherItem:          p,
+            RemovePublisherItem:       p,
+            UpdatePublisherEntityItem: p,
+            MergePublisherItem:        p,
+            AddAlbumItem:              a,
+            RemoveAlbumItem:           a,
+            UpdateAlbumEntityItem:     a,
+            UpdateSongAlbumItem:       a,
+            AddIdentityAliasItem:      i,
+            RemoveIdentityAliasItem:   i,
+            AddIdentityMemberItem:     i,
+            RemoveIdentityMemberItem:  i,
+            UpdateIdentityItem:        i,
+            MergeIdentityItem:         i,
+        }
+
     def apply(self, body: MutationRequest) -> dict[str, Any]:
         conn = self._conn_factory.get_connection()
-        copied_files: list[tuple[str, str]] = []  # (old_path, new_path)
+        copied_files: list[tuple[str, str]] = []
         try:
             touched_song_ids: set[int] = set()
 
@@ -84,6 +133,9 @@ class MutationCoordinator:
             for item in body.update or []:
                 self._route(item, "update", conn)
                 self._collect_touched(item, touched_song_ids)
+
+            for item in body.merge or []:
+                self._route(item, "merge", conn)
 
             songs = []
             warnings = []
@@ -138,40 +190,10 @@ class MutationCoordinator:
             conn.close()
 
     def _route(self, item, action: str, conn: sqlite3.Connection) -> None:
-        t = item.type
-        if t == "identity_merge":
-            self._identity_service.merge_identity_into(
-                item.source_name_id, item.target_name_id
-            )
-        elif t == "publisher_merge":
-            self._publisher_mutator.merge_within(item.source_id, item.target_id, conn)
-        elif t == "tag_merge":
-            self._tag_mutator.merge_within(item.source_id, item.target_id, conn)
-        elif t == "identity":
-            if item.identity_type is not None:
-                self._identity_service.set_identity_type(item.id, item.identity_type)
-        elif t == "identity_member":
-            if action == "add":
-                self._identity_service.add_identity_member(item.group_id, item.member_id)
-            elif action == "remove":
-                self._identity_service.remove_identity_member(item.group_id, item.member_id)
-        elif t == "identity_alias":
-            if action == "add":
-                self._identity_service.add_identity_alias(item.identity_id, item.display_name, item.name_id)
-            elif action == "remove":
-                self._identity_service.remove_identity_alias(item.name_id)
-        elif t in _SONG_TYPES:
-            self._song_mutator.apply_within(action, item, conn)
-        elif t in _CREDIT_TYPES:
-            self._credit_mutator.apply_within(action, item, conn)
-        elif t in _TAG_TYPES:
-            self._tag_mutator.apply_within(action, item, conn)
-        elif t in _PUBLISHER_TYPES:
-            self._publisher_mutator.apply_within(action, item, conn)
-        elif t in _ALBUM_TYPES:
-            self._album_mutator.apply_within(action, item, conn)
-        else:
-            raise ValueError(f"Unknown mutation item type: {t!r}")
+        mutator = self._dispatch.get(type(item))
+        if mutator is None:
+            raise ValueError(f"Unknown mutation item type: {item.type!r}")
+        mutator.apply_within(action, item, conn)
 
     def _collect_touched(self, item, touched: set[int]) -> None:
         if isinstance(item, UpdateSongItem):

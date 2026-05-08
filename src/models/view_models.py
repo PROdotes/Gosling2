@@ -719,6 +719,7 @@ class IngestionReportView(BaseModel):
     duration_s: Optional[float] = None
     year: Optional[int] = None
     isrc: Optional[str] = None
+    notes: Optional[str] = None
     staged_path: Optional[str] = None
 
     @computed_field

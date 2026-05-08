@@ -4,6 +4,7 @@ from typing import Union
 from src.data.publisher_repository import PublisherRepository
 from src.engine.routers.mutation_models import (
     AddPublisherItem,
+    MergePublisherItem,
     RemovePublisherItem,
     UpdatePublisherEntityItem,
 )
@@ -17,7 +18,7 @@ class PublisherMutator:
     def apply_within(
         self,
         action: str,
-        item: Union[AddPublisherItem, RemovePublisherItem, UpdatePublisherEntityItem],
+        item: Union[AddPublisherItem, RemovePublisherItem, UpdatePublisherEntityItem, MergePublisherItem],
         conn: sqlite3.Connection,
     ) -> None:
         if action == "add":
@@ -26,6 +27,8 @@ class PublisherMutator:
             self._remove(item, conn)
         elif action == "update":
             self._update(item, conn)
+        elif action == "merge":
+            self._merge(item, conn)
         else:
             raise ValueError(f"PublisherMutator does not support action '{action}'")
 
@@ -47,17 +50,15 @@ class PublisherMutator:
         if removed == 0:
             raise LookupError(f"Publisher {item.id} not linked")
 
-    def merge_within(
-        self, source_id: int, target_id: int, conn: sqlite3.Connection
-    ) -> None:
-        source = self._repo.get_by_id(source_id, conn)
+    def _merge(self, item: MergePublisherItem, conn: sqlite3.Connection) -> None:
+        source = self._repo.get_by_id(item.source_id, conn)
         if source is None:
-            raise LookupError(f"Publisher {source_id} not found")
+            raise LookupError(f"Publisher {item.source_id} not found")
         if source.parent_id is not None:
-            raise ValueError(f"Publisher {source_id} has a parent — hierarchy merge not supported yet")
-        if self._repo.get_children(source_id, conn):
-            raise ValueError(f"Publisher {source_id} has children — hierarchy merge not supported yet")
-        self._repo.merge_into(source_id, target_id, conn)
+            raise ValueError(f"Publisher {item.source_id} has a parent — hierarchy merge not supported yet")
+        if self._repo.get_children(item.source_id, conn):
+            raise ValueError(f"Publisher {item.source_id} has children — hierarchy merge not supported yet")
+        self._repo.merge_into(item.source_id, item.target_id, conn)
 
     def _update(
         self, item: UpdatePublisherEntityItem, conn: sqlite3.Connection

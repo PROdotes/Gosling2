@@ -4,6 +4,7 @@ from typing import Union
 from src.data.tag_repository import TagRepository
 from src.engine.routers.mutation_models import (
     AddTagItem,
+    MergeTagItem,
     RemoveTagItem,
     UpdateTagEntityItem,
     UpdateSongTagItem,
@@ -18,7 +19,7 @@ class TagMutator:
     def apply_within(
         self,
         action: str,
-        item: Union[AddTagItem, RemoveTagItem, UpdateTagEntityItem, UpdateSongTagItem],
+        item: Union[AddTagItem, RemoveTagItem, UpdateTagEntityItem, UpdateSongTagItem, MergeTagItem],
         conn: sqlite3.Connection,
     ) -> None:
         if action == "add":
@@ -27,6 +28,8 @@ class TagMutator:
             self._remove(item, conn)
         elif action == "update":
             self._update(item, conn)
+        elif action == "merge":
+            self._merge(item, conn)
         else:
             raise ValueError(f"TagMutator does not support action '{action}'")
 
@@ -81,12 +84,10 @@ class TagMutator:
             if next_genre:
                 self._repo.set_primary_tag(item.song_id, next_genre.id, conn)
 
-    def merge_within(
-        self, source_id: int, target_id: int, conn: sqlite3.Connection
-    ) -> None:
-        if self._repo.get_by_id(source_id, conn) is None:
-            raise LookupError(f"Tag {source_id} not found")
-        self._repo.merge_into(source_id, target_id, conn)
+    def _merge(self, item: MergeTagItem, conn: sqlite3.Connection) -> None:
+        if self._repo.get_by_id(item.source_id, conn) is None:
+            raise LookupError(f"Tag {item.source_id} not found")
+        self._repo.merge_into(item.source_id, item.target_id, conn)
 
     def _update(
         self,

@@ -308,7 +308,7 @@ export function moveSongToLibrary(id) {
 }
 
 export function mergeIdentity(sourceNameId, targetNameId) {
-    return mutate({ update: [{ type: "identity_merge", source_name_id: sourceNameId, target_name_id: targetNameId }] });
+    return mutate({ merge: [{ type: "identity_merge", source_name_id: sourceNameId, target_name_id: targetNameId }] });
 }
 
 export function syncSongId3(id) {
@@ -324,7 +324,7 @@ export function updatePublisher(publisherId, name) {
 }
 
 export function mergePublisher(sourceId, targetId) {
-    return mutate({ update: [{ type: "publisher_merge", source_id: sourceId, target_id: targetId }] });
+    return mutate({ merge: [{ type: "publisher_merge", source_id: sourceId, target_id: targetId }] });
 }
 
 export function searchTags(query = "") {
@@ -351,7 +351,7 @@ export function updateTag(tagId, name, category) {
 }
 
 export function mergeTag(sourceId, targetId) {
-    return mutate({ update: [{ type: "tag_merge", source_id: sourceId, target_id: targetId }] });
+    return mutate({ merge: [{ type: "tag_merge", source_id: sourceId, target_id: targetId }] });
 }
 
 export function deleteTag(tagId) {

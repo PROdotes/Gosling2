@@ -300,10 +300,16 @@ UpdateItem = Annotated[
         UpdateAlbumEntityItem,
         UpdateCreditEntityItem,
         UpdatePublisherEntityItem,
+        UpdateIdentityItem,
+    ],
+    Field(discriminator="type"),
+]
+
+MergeItem = Annotated[
+    Union[
         MergeIdentityItem,
         MergePublisherItem,
         MergeTagItem,
-        UpdateIdentityItem,
     ],
     Field(discriminator="type"),
 ]
@@ -462,13 +468,14 @@ DeleteItem = Annotated[
 class MutationRequest(BaseModel):
     add: Optional[List[AddItem]] = None
     update: Optional[List[UpdateItem]] = None
+    merge: Optional[List[MergeItem]] = None
     remove: Optional[List[RemoveItem]] = None
     delete: Optional[List[DeleteItem]] = None
 
     @model_validator(mode="after")
     def at_least_one_change(self) -> "MutationRequest":
-        if not (self.add or self.update or self.remove or self.delete):
+        if not (self.add or self.update or self.merge or self.remove or self.delete):
             raise ValueError(
-                "request must contain at least one item in add, update, remove, or delete"
+                "request must contain at least one item in add, update, merge, remove, or delete"
             )
         return self
