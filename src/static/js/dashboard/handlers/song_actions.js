@@ -428,7 +428,23 @@ export class SongActionsHandler {
         actionTarget.textContent = "Organizing...";
 
         try {
-            await moveSongToLibrary(id);
+            const result = await moveSongToLibrary(id);
+
+            const fileMoveWarning = result?.warnings?.find(
+                (w) => w.kind === "file_move",
+            );
+            if (fileMoveWarning) {
+                actionTarget.disabled = false;
+                actionTarget.textContent = originalText;
+                showToast(
+                    `Organization failed: ${fileMoveWarning.error || "file move failed"}`,
+                    "error",
+                );
+                if (this.ctx.refreshActiveSongV2) {
+                    await this.ctx.refreshActiveSongV2(id);
+                }
+                return;
+            }
 
             // Check for original file cleanup reminder
             const state = this.ctx.getState();

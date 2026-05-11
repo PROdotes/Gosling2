@@ -123,7 +123,7 @@ export function closeSplitterModal() {
 // ---------------------------------------------------------------------------
 
 addBtn.addEventListener("click", async () => {
-    const raw = customInput.value.trim();
+    const raw = customInput.value;
     if (!raw || _separators.includes(raw)) return;
     _separators.push(raw);
     customInput.value = "";

@@ -238,19 +238,19 @@ class FilingService:
         if song.processing_status != ProcessingStatus.REVIEWED:
             return [], None
         source = Path(song.source_path)
-        target_relative = self.evaluate_routing(song)
-        target_absolute = library_root / target_relative
-        if source.exists() and target_absolute.exists():
-            try:
-                if source.resolve() == target_absolute.resolve() or source.samefile(
-                    target_absolute
-                ):
-                    return [], None
-            except Exception:
-                pass
         try:
+            target_relative = self.evaluate_routing(song)
+            target_absolute = library_root / target_relative
+            if source.exists() and target_absolute.exists():
+                try:
+                    if source.resolve() == target_absolute.resolve() or source.samefile(
+                        target_absolute
+                    ):
+                        return [], None
+                except Exception:
+                    pass
             new_path = self.copy_to_library(song, library_root)
             return [], str(new_path)
         except Exception as e:
-            logger.error(f"[FilingService] File copy failed for song {song.id}: {e}")
+            logger.error(f"[FilingService] File move failed for song {song.id}: {e}")
             return [{"song_id": song.id, "kind": "file_move", "error": str(e)}], None
