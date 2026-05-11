@@ -100,6 +100,13 @@ export function searchArtists(query = "", { excludeGroups = false } = {}) {
     return runSearch("artists", url);
 }
 
+export function searchArtistNames(query = "", { excludeGroups = false } = {}) {
+    if (!query) return Promise.resolve([]);
+    let url = `/api/v1/artist-names/search?q=${encodeURIComponent(query)}`;
+    if (excludeGroups) url += "&exclude_groups=true";
+    return runSearch("artist-names", url);
+}
+
 export function searchPublishers(query = "") {
     const url = query
         ? `/api/v1/publishers/search?q=${encodeURIComponent(query)}`

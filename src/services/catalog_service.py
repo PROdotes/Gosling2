@@ -177,6 +177,12 @@ class CatalogService:
             query, exclude_groups=exclude_groups
         )
 
+    def search_artist_names(self, query: str, exclude_groups: bool = False):
+        """Search ArtistNames for picker results (one row per name)."""
+        return self._identity_service.search_artist_names(
+            query, exclude_groups=exclude_groups
+        )
+
     def get_publisher_link_counts(self, publisher_ids: List[int]) -> dict:
         """Batch song+album counts for publishers."""
         return self._pub_repo.get_link_counts_batch(publisher_ids)

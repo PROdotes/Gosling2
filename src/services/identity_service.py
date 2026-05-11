@@ -1,6 +1,7 @@
 from typing import List, Optional
 from src.data.identity_repository import IdentityRepository
 from src.models.domain import Identity
+from src.models.view_models import ArtistChipView
 from src.services.logger import logger
 
 
@@ -124,6 +125,27 @@ class IdentityService:
         result = self._hydrate_identities(identities)
         logger.debug(
             f"[IdentityService] <- search_identities(q='{query}') count={len(result)}"
+        )
+        return result
+
+    def search_artist_names(
+        self, query: str, exclude_groups: bool = False
+    ) -> List[ArtistChipView]:
+        """Search ArtistNames (one row per name) for picker results."""
+        logger.debug(
+            f"[IdentityService] -> search_artist_names(q='{query}', exclude_groups={exclude_groups})"
+        )
+        rows = self._identity_repo.search_artist_names(query, exclude_groups=exclude_groups)
+        result = [
+            ArtistChipView(
+                name_id=r["NameID"],
+                display_name=r["DisplayName"],
+                owner_identity_id=r["OwnerIdentityID"],
+            )
+            for r in rows
+        ]
+        logger.debug(
+            f"[IdentityService] <- search_artist_names(q='{query}') count={len(result)}"
         )
         return result
 

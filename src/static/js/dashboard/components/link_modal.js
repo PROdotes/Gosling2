@@ -83,7 +83,7 @@ async function onSearchWrapper(q) {
         return !alreadyLinked;
     });
 
-    const options = filteredResults.map((r) => ({ id: r.id, label: r.label }));
+    const options = filteredResults.map((r) => ({ ...r, id: r.id, label: r.label }));
 
     // Add create-new option unless suppressed
     const exactMatch = results.some(

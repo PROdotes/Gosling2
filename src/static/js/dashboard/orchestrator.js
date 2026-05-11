@@ -5,6 +5,7 @@ import {
     addSongTag,
     removeSongTag,
     searchArtists,
+    searchArtistNames,
     addSongCredit,
     removeSongCredit,
     searchAlbums,
@@ -212,11 +213,12 @@ export function manageSongCredits(ctx, songId, role, currentCredits) {
             label: c.display_name,
         })),
         onSearch: async (q) => {
-            const results = await searchArtists(q);
+            const results = await searchArtistNames(q);
             if (results === ABORTED) return [];
             return (results || []).map((a) => ({
-                id: a.id,
-                label: a.resolved_name,
+                id: a.owner_identity_id,
+                name_id: a.name_id,
+                label: a.display_name,
             }));
         },
         onAdd: async (opt) => {
@@ -334,11 +336,12 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
         placeholder: "Search for artist name...",
         items: currentChips,
         onSearch: async (q) => {
-            const results = await searchArtists(q);
+            const results = await searchArtistNames(q);
             if (results === ABORTED) return [];
             return (results || []).map((a) => ({
-                id: a.id,
-                label: a.resolved_name,
+                id: a.owner_identity_id,
+                name_id: a.name_id,
+                label: a.display_name,
             }));
         },
         onAdd: async (opt) => {
@@ -413,15 +416,19 @@ export async function manageArtist(ctx, artistId, artistName) {
             items: otherAliases.map((a) => ({ id: a.id, label: a.display_name })),
             createLabel: (q) => `Add "${q}" as new alias`,
             onSearch: async (q) => {
-                const results = await searchArtists(q);
-                return (results || []).map((a) => ({ id: a.id, label: a.resolved_name }));
+                const results = await searchArtistNames(q);
+                return (results || []).map((a) => ({
+                    id: a.owner_identity_id,
+                    name_id: a.name_id,
+                    label: a.display_name,
+                }));
             },
             onAdd: async (opt) => {
                 const displayName = opt.rawInput || opt.label;
-                await addIdentityAlias(artistId, displayName, opt.id);
+                await addIdentityAlias(artistId, displayName, opt.name_id);
                 const fresh = await getArtistTree(artistId);
                 const added = (fresh.aliases || []).find((a) => a.display_name === displayName);
-                return added ? { id: added.id, label: added.display_name } : { id: opt.id, label: displayName };
+                return added ? { id: added.id, label: added.display_name } : { id: opt.name_id, label: displayName };
             },
             onRemove: async (item) => {
                 await removeIdentityAlias(artistId, item.id);
@@ -452,8 +459,12 @@ export async function manageArtist(ctx, artistId, artistName) {
             label: "Members",
             items: members.map((m) => ({ id: m.id, label: m.display_name })),
             onSearch: async (q) => {
-                const results = await searchArtists(q, { excludeGroups: true });
-                return (results || []).map((a) => ({ id: a.id, label: a.display_name || a.name }));
+                const results = await searchArtistNames(q, { excludeGroups: true });
+                return (results || []).map((a) => ({
+                    id: a.owner_identity_id,
+                    name_id: a.name_id,
+                    label: a.display_name,
+                }));
             },
             onAdd: async (opt) => {
                 await addIdentityMember(artistId, opt.id);

@@ -573,6 +573,20 @@ class PublisherView(BaseModel):
         return self.name
 
 
+class ArtistChipView(BaseModel):
+    """Lightweight view-model for picker results and chips.
+
+    One row per ArtistName. Carries the NameID, its display label, and the
+    IdentityID that currently owns it. Distinct from IdentityView so the
+    picker never sees identity-level fields and the wire ID is unambiguously
+    a NameID.
+    """
+
+    name_id: int
+    display_name: str
+    owner_identity_id: int
+
+
 class IdentityView(BaseModel):
     """View-model for the bidirectional artist tree."""
 

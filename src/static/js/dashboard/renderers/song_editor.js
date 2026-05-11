@@ -21,6 +21,7 @@ import {
     removeSongTag,
     searchAlbums,
     searchArtists,
+    searchArtistNames,
     searchPublishers,
     searchTags,
     updateAlbum,
@@ -285,9 +286,10 @@ function wireAlbumSubChips(song, refresh) {
                 container,
                 items: getItems(album),
                 onSearch: async (q) => {
-                    const r = await searchArtists(q);
+                    const r = await searchArtistNames(q);
                     return (r || []).map((i) => ({
-                        id: i.id,
+                        id: i.owner_identity_id,
+                        name_id: i.name_id,
                         label: i.display_name,
                     }));
                 },
@@ -597,11 +599,12 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
             container: wrap,
             items: getItems(song),
             onSearch: async (q) => {
-                const r = await searchArtists(q);
+                const r = await searchArtistNames(q);
                 if (r === ABORTED || !r) return [];
                 return r.map((a) => ({
-                    id: a.id,
-                    label: a.resolved_name,
+                    id: a.owner_identity_id,
+                    name_id: a.name_id,
+                    label: a.display_name,
                 }));
             },
             onAdd: async (opt) => {

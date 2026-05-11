@@ -8,6 +8,7 @@ from src.models.view_models import (
     TagView,
     PublisherView,
     IdentityView,
+    ArtistChipView,
     IngestionCheckRequest,
     IngestionReportView,
     AddAliasBody,
@@ -177,6 +178,15 @@ async def search_identities(q: str, exclude_groups: bool = False) -> List[Identi
     for v in views:
         v.song_count = counts.get(v.id, 0)
     return views
+
+
+@router.get("/artist-names/search", response_model=List[ArtistChipView])
+async def search_artist_names(q: str, exclude_groups: bool = False) -> List[ArtistChipView]:
+    """Search ArtistNames for picker results. One row per name."""
+    logger.debug(
+        f"[CatalogRouter] search_artist_names(q='{q}', exclude_groups={exclude_groups})"
+    )
+    return _get_service().search_artist_names(q, exclude_groups=exclude_groups)
 
 
 @router.post("/identities/{identity_id:int}/aliases")

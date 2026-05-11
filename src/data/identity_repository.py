@@ -131,6 +131,40 @@ class IdentityRepository(BaseRepository):
             )
             return result
 
+    def search_artist_names(
+        self,
+        query: str,
+        conn: Optional[sqlite3.Connection] = None,
+        exclude_groups: bool = False,
+    ) -> List[sqlite3.Row]:
+        """Find ArtistNames whose DisplayName matches the query.
+        One row per name. Returns (NameID, DisplayName, OwnerIdentityID).
+        """
+        logger.debug(
+            f"[IdentityRepository] -> search_artist_names(q='{query}', exclude_groups={exclude_groups})"
+        )
+        fmt_q = f"%{query}%"
+        type_filter = " AND i.IdentityType != 'group'" if exclude_groups else ""
+        query_sql = f"""
+            SELECT an.NameID, an.DisplayName, an.OwnerIdentityID
+            FROM ArtistNames an
+            JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+            WHERE an.IsDeleted = 0 AND i.IsDeleted = 0 AND an.DisplayName LIKE ?{type_filter}
+            ORDER BY an.DisplayName ASC
+        """
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            return conn.execute(query_sql, (fmt_q,)).fetchall()
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (fmt_q,)).fetchall()
+            logger.debug(
+                f"[IdentityRepository] <- search_artist_names(q='{query}') count={len(rows)}"
+            )
+            return rows
+
     def get_group_ids_for_members(
         self, member_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:

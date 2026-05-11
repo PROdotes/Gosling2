@@ -370,7 +370,7 @@ function attachChipListHandler(key, field) {
             const results = await field.onSearch(q);
             const linkedIds = new Set(field.items.map((i) => String(i.id)));
             const filtered = results.filter((r) => !linkedIds.has(String(r.id)));
-            const options = filtered.map((r) => ({ id: r.id, label: r.label }));
+            const options = filtered.map((r) => ({ ...r, id: r.id, label: r.label }));
             const exactMatch = results.some((r) => r.label.toLowerCase() === q.toLowerCase());
             if (!exactMatch && field.createLabel) {
                 options.unshift({ id: null, label: field.createLabel(q), isCreate: true, rawInput: q });
