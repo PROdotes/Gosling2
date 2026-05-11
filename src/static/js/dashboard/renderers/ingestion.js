@@ -1,5 +1,6 @@
 import {
     checkIngestion,
+    deleteOriginalByPath,
     deleteStagingOrphan,
     getAcceptedFormats,
     getDownloadsFolder,
@@ -184,6 +185,7 @@ export async function renderIngestionPanel(ctx) {
 
     setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions, ctx);
     setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID, ctx);
+    setupDuplicateDeleteHandler(RESULTS_LIST_ID);
     setupClearIngestedButton("ingest-clear-ingested-btn", RESULTS_LIST_ID, ctx);
     setupClearButton("ingest-clear-btn", RESULTS_LIST_ID, ctx);
     setupScanFolderButton(
@@ -435,6 +437,49 @@ function setupClearButton(btnId, resultsId, ctx) {
     });
 }
 
+function setupDuplicateDeleteHandler(resultsId) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+
+    list.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".dup-delete-original-btn");
+        if (!btn || btn.disabled) return;
+
+        const originalPath = btn.dataset.originalPath;
+        if (!originalPath) return;
+
+        if (!btn.classList.contains("confirming")) {
+            const originalText = btn.textContent;
+            btn.classList.add("confirming");
+            btn.textContent = "Confirm Delete?";
+            setTimeout(() => {
+                if (btn.classList.contains("confirming") && !btn.disabled) {
+                    btn.classList.remove("confirming");
+                    btn.textContent = originalText;
+                }
+            }, 3000);
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Deleting...";
+        try {
+            await deleteOriginalByPath(originalPath);
+            const card = btn.closest(".result-card");
+            const actionsRow = btn.closest(".ingest-actions-row");
+            if (card) card.classList.add("source-deleted");
+            if (actionsRow) {
+                actionsRow.innerHTML = `<span class="muted-note">Original deleted</span>`;
+            }
+        } catch (err) {
+            btn.disabled = false;
+            btn.classList.remove("confirming");
+            btn.textContent = "Delete Original";
+            showToast(`Failed: ${err.message}`, "error");
+        }
+    });
+}
+
 function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
     const btn = document.getElementById(btnId);
     const input = document.getElementById(inputId);
@@ -681,9 +726,18 @@ function createResultCard(result, path) {
                 status === "CONFLICT"
                     ? (() => {
                         const isRejected = result.notes && result.notes.startsWith("REJECTED");
+                        const rejectReason = isRejected
+                            ? (result.notes.split(":")[1] || "").trim() || "UNSPECIFIED"
+                            : null;
+                        const rejectedLabel = isRejected
+                            ? `Rejected Song (${rejectReason})`
+                            : "Existing Ghost Record (Soft-Deleted)";
+                        const rejectedHint = isRejected
+                            ? `This song was previously rejected as ${rejectReason}. Re-ingest only if you are sure.`
+                            : "This file matches a previously deleted record. Re-activate with new metadata.";
                         return `
                 <div class="pending-convert-box" data-ghost-box>
-                    <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: ${isRejected ? "var(--danger)" : "var(--accent-amber)"}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${isRejected ? "Rejected Song" : "Existing Ghost Record (Soft-Deleted)"}</div>
+                    <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: ${isRejected ? "var(--danger)" : "var(--accent-amber)"}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(rejectedLabel)}</div>
                     <div style="display: grid; grid-template-columns: 70px 1fr; gap: 4px 8px; font-size: 12px;">
                         <div class="muted-note">ID:</div>
                         <div class="mono">#${result.ghost_id}</div>
@@ -697,7 +751,7 @@ function createResultCard(result, path) {
                         <div class="mono">${result.isrc ? escapeHtml(result.isrc) : "(none)"}</div>
                     </div>
                     <div class="muted-note" style="font-size: 11px; margin-top: 8px; font-style: italic; color: ${isRejected ? "var(--danger)" : "inherit"};">
-                        ${isRejected ? "This song was previously rejected — it is not suitable for this station. Re-ingest only if you are sure." : "This file matches a previously deleted record. Re-activate with new metadata."}
+                        ${escapeHtml(rejectedHint)}
                     </div>
                     <div style="margin-top: 8px;">
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
@@ -731,6 +785,11 @@ function createResultCard(result, path) {
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
                     </button>
+                    ${
+                        status === "ALREADY_EXISTS"
+                            ? `<button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>`
+                            : ""
+                    }
                     <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>
                 </div>
             `

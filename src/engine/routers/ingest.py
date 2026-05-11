@@ -97,6 +97,11 @@ async def _stream_ingestion(service, work_items):
 
             completed = service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
+
+            if res.get("status") == "ALREADY_EXISTS" and original_path:
+                res["original_path"] = original_path
+                res["original_exists"] = os.path.isfile(original_path)
+
             report = (
                 IngestionReportView(**res)
                 if not isinstance(res, IngestionReportView)

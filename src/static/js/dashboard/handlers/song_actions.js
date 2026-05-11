@@ -98,6 +98,8 @@ export class SongActionsHandler {
             "toggle-active",
             "delete-song",
             "reject-song",
+            "reject-reason",
+            "reject-cancel",
             "close-spotify-modal",
             "close-splitter-modal",
             "close-filename-parser-modal",
@@ -226,29 +228,66 @@ export class SongActionsHandler {
 
     async handleRejectSong(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
+        if (!id) return;
 
-        if (!actionTarget.classList.contains("confirming")) {
-            const originalText = actionTarget.textContent;
-            actionTarget.classList.add("confirming");
-            actionTarget.textContent = "Confirm Reject?";
+        // Replace the single Reject button with an inline reason strip.
+        const parent = actionTarget.parentElement;
+        if (!parent) return;
 
-            setTimeout(() => {
-                if (
-                    actionTarget.classList.contains("confirming") &&
-                    !actionTarget.disabled
-                ) {
-                    actionTarget.classList.remove("confirming");
-                    actionTarget.textContent = originalText;
-                }
-            }, 3000);
-            return;
+        const strip = document.createElement("div");
+        strip.className = "reject-reason-strip";
+        strip.dataset.rejectStrip = "true";
+        strip.innerHTML = `
+            <button class="sidebar-btn sidebar-btn--warning reject-reason-btn" data-action="reject-reason" data-id="${id}" data-reason="BAD SONG">Bad Song</button>
+            <button class="sidebar-btn sidebar-btn--warning reject-reason-btn" data-action="reject-reason" data-id="${id}" data-reason="DUPLICATE">Duplicate</button>
+            <button class="sidebar-btn reject-cancel-btn" data-action="reject-cancel" data-id="${id}" title="Cancel">&times;</button>
+        `;
+
+        parent.replaceChild(strip, actionTarget);
+
+        // Auto-revert after 5 seconds of inactivity.
+        const timeoutId = setTimeout(() => {
+            this._collapseRejectStrip(strip, id);
+        }, 5000);
+        strip.dataset.timeoutId = String(timeoutId);
+    }
+
+    _collapseRejectStrip(strip, id) {
+        if (!strip || !strip.parentElement) return;
+        const timeoutId = Number(strip.dataset.timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
+
+        const btn = document.createElement("button");
+        btn.className = "sidebar-btn sidebar-btn--warning";
+        btn.dataset.action = "reject-song";
+        btn.dataset.id = id;
+        btn.textContent = "Reject Song";
+        strip.parentElement.replaceChild(btn, strip);
+    }
+
+    async handleRejectCancel(actionTarget) {
+        const strip = actionTarget.closest("[data-reject-strip]");
+        const id = actionTarget.dataset.id;
+        this._collapseRejectStrip(strip, id);
+    }
+
+    async handleRejectReason(actionTarget) {
+        const id = actionTarget.dataset.id;
+        const reason = actionTarget.dataset.reason;
+        if (!id || !reason) return;
+
+        const strip = actionTarget.closest("[data-reject-strip]");
+        if (strip) {
+            const timeoutId = Number(strip.dataset.timeoutId);
+            if (timeoutId) clearTimeout(timeoutId);
+            strip
+                .querySelectorAll("button")
+                .forEach((b) => (b.disabled = true));
         }
-
-        actionTarget.disabled = true;
         actionTarget.textContent = "Rejecting...";
 
         try {
-            await rejectSong(id);
+            await rejectSong(id, reason);
             if (
                 this.ctx.getState().currentMode === "songs" &&
                 this.ctx.clearSongEditorV2
@@ -264,9 +303,7 @@ export class SongActionsHandler {
                 this.ctx.performSearch();
             }
         } catch (err) {
-            actionTarget.disabled = false;
-            actionTarget.classList.remove("confirming");
-            actionTarget.textContent = "Reject Song";
+            if (strip) this._collapseRejectStrip(strip, id);
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
                     `Rejection failed: ${err.message}`,

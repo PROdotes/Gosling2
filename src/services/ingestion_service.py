@@ -189,6 +189,10 @@ class IngestionService:
                 "ghost_id": ghost_by_hash["id"],
                 "staged_path": file_path,
                 "title": ghost_by_hash.get("title", "Unknown"),
+                "duration_s": ghost_by_hash.get("duration_s"),
+                "year": ghost_by_hash.get("year"),
+                "isrc": ghost_by_hash.get("isrc"),
+                "notes": ghost_by_hash.get("notes"),
                 "ghost_song": ghost_by_hash,
                 "new_song": None,
             }

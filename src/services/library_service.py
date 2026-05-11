@@ -293,6 +293,10 @@ class LibraryService:
         logger.debug(f"[LibraryService] <- search_songs_slim count={len(rows)}")
         return rows
 
+    def find_duplicate_groups(self) -> List[List[int]]:
+        """Returns groups of song IDs sharing the same MediaName + performer identity set."""
+        return self._song_repo.find_duplicate_groups()
+
     def search_songs_deep_slim(self, query: str) -> List[dict]:
         """
         Deep slim search. Base matches + identity/publisher expansion, no hydration.

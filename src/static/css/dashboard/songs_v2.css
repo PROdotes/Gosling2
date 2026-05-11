@@ -825,6 +825,31 @@
     border-color: var(--warning);
 }
 
+#songs-workspace .reject-reason-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+
+#songs-workspace .reject-reason-strip .reject-reason-btn {
+    width: 100%;
+    white-space: nowrap;
+}
+
+#songs-workspace .reject-reason-strip .reject-cancel-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 4px;
+    z-index: 1;
+}
+
 #songs-workspace .sidebar-path {
     font-size: 10px;
     color: var(--text-mut);

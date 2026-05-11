@@ -282,6 +282,10 @@ class CatalogService:
         """Slim list-view search."""
         return self._library_service.search_songs_slim(query)
 
+    def find_duplicate_songs(self) -> List[List[int]]:
+        """Groups of song IDs sharing MediaName + performer identity set."""
+        return self._library_service.find_duplicate_groups()
+
     def search_songs_deep_slim(self, query: str) -> List[dict]:
         """Deep slim search."""
         return self._library_service.search_songs_deep_slim(query)

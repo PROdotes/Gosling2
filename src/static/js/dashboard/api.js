@@ -303,9 +303,9 @@ export function deleteSong(id, deleteFile = false) {
     return mutate({ delete: [{ type: "song", id: Number(id), delete_file: deleteFile }] });
 }
 
-export function rejectSong(id) {
+export function rejectSong(id, reason = "BAD SONG") {
     return mutate({
-        update: [{ type: "song", id: Number(id), notes: "REJECTED" }],
+        update: [{ type: "song", id: Number(id), notes: `REJECTED: ${reason}` }],
         delete: [{ type: "song", id: Number(id) }],
     });
 }
@@ -528,6 +528,14 @@ export function applyFilenameParsing(items, pattern) {
 
 export function cleanupOriginalFile(songId) {
     return mutate({ delete: [{ type: "original_file", song_id: songId }] });
+}
+
+export function deleteOriginalByPath(filePath) {
+    return fetchJson("/api/v1/ingest/cleanup-original", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_path: filePath }),
+    });
 }
 
 export function getPendingConvert() {

@@ -736,6 +736,10 @@ class IngestionReportView(BaseModel):
     notes: Optional[str] = None
     staged_path: Optional[str] = None
 
+    # Original source file (Populated on ALREADY_EXISTS from drop/scan paths)
+    original_path: Optional[str] = None
+    original_exists: Optional[bool] = None
+
     @computed_field
     @property
     def status_label(self) -> str:

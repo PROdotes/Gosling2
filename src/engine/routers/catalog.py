@@ -95,6 +95,20 @@ async def search_songs(
     return [SongSlimView.from_row(r) for r in rows]
 
 
+@router.get("/songs/duplicates", response_model=List[List[int]])
+async def get_duplicate_songs(
+    service: CatalogService = Depends(_get_service),
+) -> List[List[int]]:
+    """
+    Returns groups of song IDs that share the same MediaName (case-insensitive)
+    and the same set of Performer identity IDs. Each group has >= 2 song IDs.
+    Songs with no resolved performer identities are skipped.
+    """
+    groups = service.find_duplicate_songs()
+    logger.debug(f"[CatalogRouter] get_duplicate_songs groups={len(groups)}")
+    return groups
+
+
 @router.get("/songs/{song_id:int}", response_model=SongView)
 async def get_song(song_id: int) -> SongView:
     """Fetch a single song by ID and hydrate with UI-specific previews."""

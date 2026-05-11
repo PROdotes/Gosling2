@@ -533,6 +533,66 @@ class SongRepository(MediaSourceRepository):
         )
         return found_matches
 
+    def find_duplicate_groups(
+        self, conn: Optional[sqlite3.Connection] = None
+    ) -> List[List[int]]:
+        """
+        Find groups of songs sharing the same MediaName (UTF8_NOCASE) and the
+        same set of Performer OwnerIdentityIDs. Songs with zero resolved
+        performer identities are skipped. Returns a list of groups, each
+        containing >= 2 SourceIDs.
+        """
+        logger.debug("[SongRepository] -> find_duplicate_groups()")
+
+        query_sql = """
+            WITH performer_sigs AS (
+                SELECT
+                    sc.SourceID AS sid,
+                    GROUP_CONCAT(DISTINCT an.OwnerIdentityID) AS sig
+                FROM SongCredits sc
+                JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                JOIN Roles r ON sc.RoleID = r.RoleID
+                WHERE r.RoleName = 'Performer'
+                  AND an.IsDeleted = 0
+                  AND an.OwnerIdentityID IS NOT NULL
+                GROUP BY sc.SourceID
+            )
+            SELECT
+                m.SourceID AS sid,
+                LOWER(m.MediaName) AS name_key,
+                ps.sig AS sig
+            FROM MediaSources m
+            JOIN Songs s ON s.SourceID = m.SourceID
+            JOIN performer_sigs ps ON ps.sid = m.SourceID
+            WHERE m.IsDeleted = 0
+              AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
+            ORDER BY name_key, sig, sid
+        """
+
+        def _execute(connection: sqlite3.Connection) -> List[sqlite3.Row]:
+            connection.row_factory = sqlite3.Row
+            return connection.execute(query_sql).fetchall()
+
+        if conn:
+            rows = _execute(conn)
+        else:
+            with self._get_connection() as new_conn:
+                rows = _execute(new_conn)
+
+        # GROUP_CONCAT order is not deterministic; sort the identity sig per row.
+        groups: Dict[str, List[int]] = {}
+        for row in rows:
+            sig_raw = row["sig"] or ""
+            sig_sorted = ",".join(sorted(sig_raw.split(",")))
+            key = f"{row['name_key']}||{sig_sorted}"
+            groups.setdefault(key, []).append(row["sid"])
+
+        result = [ids for ids in groups.values() if len(ids) >= 2]
+        logger.debug(
+            f"[SongRepository] <- find_duplicate_groups() groups={len(result)}"
+        )
+        return result
+
     def get_filter_values(self, conn: Optional[sqlite3.Connection] = None) -> dict:
         """
         Returns all distinct values for each filter category.
