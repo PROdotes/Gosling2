@@ -11,6 +11,22 @@ class AlbumRepository(BaseRepository):
 
     _COLUMNS = "AlbumID, AlbumTitle, AlbumType, ReleaseYear"
 
+    _SLIM_SELECT_JOINS = """
+        SELECT
+            a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
+            GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+            MIN(p.PublisherName) AS DisplayPublisher,
+            (SELECT COUNT(*) FROM SongAlbums sa JOIN MediaSources ms ON sa.SourceID = ms.SourceID WHERE sa.AlbumID = a.AlbumID AND ms.IsDeleted = 0) AS SongCount
+        FROM Albums a
+        LEFT JOIN AlbumCredits ac ON a.AlbumID = ac.AlbumID
+        LEFT JOIN ArtistNames an ON ac.CreditedNameID = an.NameID AND an.IsDeleted = 0
+        LEFT JOIN Roles r ON ac.RoleID = r.RoleID
+        LEFT JOIN AlbumPublishers ap ON a.AlbumID = ap.AlbumID
+        LEFT JOIN Publishers p ON ap.PublisherID = p.PublisherID AND p.IsDeleted = 0
+    """
+
+    _SLIM_GROUP_ORDER = "GROUP BY a.AlbumID ORDER BY a.AlbumTitle COLLATE NOCASE ASC"
+
     def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Album]:
         """Fetch the full album directory."""
         logger.debug("[AlbumRepository] -> get_all()")
@@ -33,38 +49,50 @@ class AlbumRepository(BaseRepository):
     ) -> List[dict]:
         """Fast list-view query. Returns dicts for AlbumSlimView — no tracklist hydration."""
         logger.debug(f"[AlbumRepository] -> search_slim(q='{query}')")
-        sql = """
-            SELECT
-                a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
-                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
-                MIN(p.PublisherName) AS DisplayPublisher,
-                (SELECT COUNT(*) FROM SongAlbums sa JOIN MediaSources ms ON sa.SourceID = ms.SourceID WHERE sa.AlbumID = a.AlbumID AND ms.IsDeleted = 0) AS SongCount
-            FROM Albums a
-            LEFT JOIN AlbumCredits ac ON a.AlbumID = ac.AlbumID
-            LEFT JOIN ArtistNames an ON ac.CreditedNameID = an.NameID AND an.IsDeleted = 0
-            LEFT JOIN Roles r ON ac.RoleID = r.RoleID
-            LEFT JOIN AlbumPublishers ap ON a.AlbumID = ap.AlbumID
-            LEFT JOIN Publishers p ON ap.PublisherID = p.PublisherID AND p.IsDeleted = 0
+        where = """
             WHERE a.IsDeleted = 0
               AND (a.AlbumTitle LIKE ? OR EXISTS (
                 SELECT 1 FROM AlbumCredits ac2
                 JOIN ArtistNames an2 ON ac2.CreditedNameID = an2.NameID AND an2.IsDeleted = 0
                 WHERE ac2.AlbumID = a.AlbumID AND an2.DisplayName LIKE ?
               ))
-            GROUP BY a.AlbumID
-            ORDER BY a.AlbumTitle COLLATE NOCASE ASC
         """
+        sql = f"{self._SLIM_SELECT_JOINS} {where} {self._SLIM_GROUP_ORDER}"
+        params = (f"%{query}%", f"%{query}%")
         if conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(sql, (f"%{query}%", f"%{query}%")).fetchall()
+            rows = conn.execute(sql, params).fetchall()
             return [dict(row) for row in rows]
 
         with self._get_connection() as new_conn:
             new_conn.row_factory = sqlite3.Row
-            rows = new_conn.execute(sql, (f"%{query}%", f"%{query}%")).fetchall()
+            rows = new_conn.execute(sql, params).fetchall()
             result = [dict(row) for row in rows]
             logger.debug(
                 f"[AlbumRepository] <- search_slim(q='{query}') count={len(result)}"
+            )
+            return result
+
+    def get_slim_by_ids(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[dict]:
+        """Fetch slim list-view rows for a specific set of AlbumIDs. Same column shape as search_slim."""
+        if not album_ids:
+            return []
+        placeholders = ",".join(["?" for _ in album_ids])
+        where = f"WHERE a.IsDeleted = 0 AND a.AlbumID IN ({placeholders})"
+        sql = f"{self._SLIM_SELECT_JOINS} {where} {self._SLIM_GROUP_ORDER}"
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, album_ids).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(sql, album_ids).fetchall()
+            result = [dict(row) for row in rows]
+            logger.debug(
+                f"[AlbumRepository] <- get_slim_by_ids() count={len(result)}"
             )
             return result
 

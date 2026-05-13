@@ -477,12 +477,6 @@ The single source of truth for ID3 frame mapping.
 ### load_tag_categories(path: str = "json/id3_frames.json") -> List[str]
 Returns the live registry of known user-defined tag categories from `id3_frames.json`.
 
-### register_tag_category(category: str, path: str = "json/id3_frames.json") -> None
-Adds a category to the registry if not already present. Clears the lru_cache.
-
-### unregister_tag_category(category: str, path: str = "json/id3_frames.json") -> None
-Removes a category from the registry. Clears the lru_cache.
-
 ---
 
 ## Logger
@@ -501,3 +495,13 @@ Removes a category from the registry. Clears the lru_cache.
 
 ### convert_to_mp3(src_path: Path) -> Path
 Converts a WAV file to MP3 using FFmpeg.
+
+---
+
+## WaveformService
+*Location: `src/services/waveform_service.py`*
+
+**Responsibility**: Generates and caches normalized waveform peak data for songs (1000 RMS bars per song, normalized 0..1).
+
+### get_or_build_peaks(song_id: int, audio_path: Path) -> List[float]
+Returns 1000 normalized RMS peaks. Cache hit reads from `sqldb/waveform_cache/{song_id}.json`; miss invokes ffmpeg to decode the file as mono 8kHz s16le PCM, splits into 1000 chunks, computes RMS per chunk, normalizes against the loudest bar, and writes the cache.

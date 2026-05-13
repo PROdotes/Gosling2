@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     TypeID INTEGER NOT NULL,
     MediaName TEXT NOT NULL,
     SourceNotes TEXT,
-    SourcePath TEXT NOT NULL UNIQUE,
+    SourcePath TEXT UNIQUE,
     SourceDuration REAL,
     AudioHash TEXT UNIQUE,
     IsActive BOOLEAN DEFAULT 0,

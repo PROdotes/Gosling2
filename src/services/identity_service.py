@@ -32,12 +32,20 @@ class IdentityService:
         )
         return result
 
-    def get_all_identities(self) -> List[Identity]:
-        """Fetch a list of all active identities."""
-        logger.debug("[IdentityService] -> get_all_identities()")
-        identities = self._identity_repo.get_all_identities()
-        result = self._hydrate_identities(identities)
-        logger.debug(f"[IdentityService] <- get_all_identities() count={len(result)}")
+    def get_all_slim(self) -> List[dict]:
+        """Fetch slim list-view rows for all active identities (no hydration)."""
+        logger.debug("[IdentityService] -> get_all_slim()")
+        result = self._identity_repo.get_all_slim()
+        logger.debug(f"[IdentityService] <- get_all_slim() count={len(result)}")
+        return result
+
+    def search_slim(self, query: str, exclude_groups: bool = False) -> List[dict]:
+        """Slim list-view search (no hydration). Matches DisplayName, LegalName, or Alias."""
+        logger.debug(f"[IdentityService] -> search_slim(q='{query}')")
+        result = self._identity_repo.search_slim(query, exclude_groups=exclude_groups)
+        logger.debug(
+            f"[IdentityService] <- search_slim(q='{query}') count={len(result)}"
+        )
         return result
 
     def resolve_identity_by_name(self, display_name: str) -> Optional[int]:
@@ -114,20 +122,6 @@ class IdentityService:
                 )
                 raise
 
-    def search_identities(
-        self, query: str, exclude_groups: bool = False
-    ) -> List[Identity]:
-        """Search for identities by name or alias."""
-        logger.debug(f"[IdentityService] -> search_identities(q='{query}')")
-        identities = self._identity_repo.search_identities(
-            query, exclude_groups=exclude_groups
-        )
-        result = self._hydrate_identities(identities)
-        logger.debug(
-            f"[IdentityService] <- search_identities(q='{query}') count={len(result)}"
-        )
-        return result
-
     def search_artist_names(
         self, query: str, exclude_groups: bool = False
     ) -> List[ArtistChipView]:
@@ -148,10 +142,6 @@ class IdentityService:
             f"[IdentityService] <- search_artist_names(q='{query}') count={len(result)}"
         )
         return result
-
-    def get_identity_song_counts(self, identity_ids: List[int]) -> dict:
-        """Batch active song counts for identities (across all aliases). Returns {id: N}."""
-        return self._identity_repo.get_song_counts_batch(identity_ids)
 
     def merge_identity_into(self, source_name_id: int, target_name_id: int) -> None:
         """Merges a solo identity into an existing one. Delegates to IdentityRepository."""

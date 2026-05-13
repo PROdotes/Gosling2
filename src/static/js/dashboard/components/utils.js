@@ -106,6 +106,34 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
     `;
 }
 
+export function renderAlbumList(albums, emptyMessage = "No albums linked yet") {
+    const items = asArray(albums);
+    if (!items.length) {
+        return `<div class="muted-note">${escapeHtml(emptyMessage)}</div>`;
+    }
+
+    return `
+        <div class="song-sub-list">
+            ${items
+                .map(
+                    (album) => `
+                <div class="song-row" ${buildNavigateAttrs("albums", album.title)}>
+                    <div class="col-info">
+                        <div class="row-title">${escapeHtml(album.title || "Untitled Album")}<span class="row-id"> #${album.id}</span></div>
+                        <div class="row-artist">${escapeHtml(album.display_artist || "Unknown Artist")}${album.album_type ? ` · ${escapeHtml(album.album_type)}` : ""}</div>
+                    </div>
+                    <div class="col-meta">
+                        <div>${escapeHtml(album.release_year || "")}</div>
+                        ${album.display_publisher ? `<div>${escapeHtml(album.display_publisher)}</div>` : ""}
+                    </div>
+                </div>
+            `,
+                )
+                .join("")}
+        </div>
+    `;
+}
+
 export function isModalOpen() {
     const modals = [
         "edit-modal",

@@ -240,6 +240,7 @@ export class SongActionsHandler {
         strip.innerHTML = `
             <button class="sidebar-btn sidebar-btn--warning reject-reason-btn" data-action="reject-reason" data-id="${id}" data-reason="BAD SONG">Bad Song</button>
             <button class="sidebar-btn sidebar-btn--warning reject-reason-btn" data-action="reject-reason" data-id="${id}" data-reason="DUPLICATE">Duplicate</button>
+            <button class="sidebar-btn sidebar-btn--warning reject-reason-btn" data-action="reject-reason" data-id="${id}" data-reason="AI GENERATED">AI Generated</button>
             <button class="sidebar-btn reject-cancel-btn" data-action="reject-cancel" data-id="${id}" title="Cancel">&times;</button>
         `;
 
@@ -446,41 +447,9 @@ export class SongActionsHandler {
                 return;
             }
 
-            // Check for original file cleanup reminder
-            const state = this.ctx.getState();
-            const song = state.activeSong;
-            const hadOriginal = song && song.original_exists && song.id == id;
-
             showToast("Organized successfully!", "success");
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(id);
-            }
-
-            if (hadOriginal) {
-                // Fetch fresh song to see if it still exists (it should, move just copies in some cases or moves staged)
-                const fresh = this.ctx.getState().activeSong;
-                if (fresh && fresh.original_exists) {
-                    const cleanNow = await showConfirm(
-                        "Song organized! However, the original source file still exists in your Downloads folder.\n\nWould you like to delete the original copy now?",
-                        {
-                            title: "Cleanup Original File",
-                            okLabel: "Yes, Delete Original",
-                            cancelLabel: "Not Now",
-                        },
-                    );
-                    if (cleanNow) {
-                        try {
-                            await cleanupOriginalFile(id);
-                            showToast("Original file deleted.", "success");
-                            await this.ctx.refreshActiveSongV2(id);
-                        } catch (cleanErr) {
-                            showToast(
-                                `Cleanup failed: ${cleanErr.message}`,
-                                "error",
-                            );
-                        }
-                    }
-                }
             }
         } catch (err) {
             actionTarget.disabled = false;

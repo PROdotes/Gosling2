@@ -93,7 +93,7 @@ async function onSearchWrapper(q) {
         ? _config.shouldCreate(raw, results)
         : !exactMatch;
     if (raw && showCreate) {
-        options.unshift({
+        options.push({
             id: null,
             label: _config.createLabel(raw),
             isCreate: true,
@@ -162,7 +162,7 @@ _ac = createAutocomplete({
             onSearch: onSearchWrapper,
             onSelect: onSelectWrapper,
             renderItem,
-            allowCreate: true,
+            allowCreate: false,
             getCreateLabel: config.createLabel,
             debounceMs: 200,
             onEnterEmpty: closeLinkModal,

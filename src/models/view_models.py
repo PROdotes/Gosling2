@@ -184,11 +184,6 @@ class SongSlimView(BaseModel):
         entry = PROCESSING_STATUS_MAP.get(self.processing_status)
         return entry[1] if entry else "neutral"
 
-    @computed_field
-    @property
-    def file_exists(self) -> bool:
-        return bool(self.source_path and os.path.exists(self.source_path))
-
     @classmethod
     def from_domain(cls, song: "Song") -> "SongSlimView":
         performers = [c for c in song.credits if c.role_name == "Performer"]
@@ -587,6 +582,36 @@ class ArtistChipView(BaseModel):
     owner_identity_id: int
 
 
+class IdentitySlimView(BaseModel):
+    """Lightweight view-model for identity list/search results. No aliases/members/groups hydration."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: str
+    display_name: Optional[str] = None
+    legal_name: Optional[str] = None
+    song_count: int = 0
+    album_count: int = 0
+
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        """True if no songs or albums are linked to this identity."""
+        return self.song_count == 0 and self.album_count == 0
+
+    @classmethod
+    def from_row(cls, row: dict) -> "IdentitySlimView":
+        return cls(
+            id=row["IdentityID"],
+            type=row["IdentityType"],
+            display_name=row.get("DisplayName"),
+            legal_name=row.get("LegalName"),
+            song_count=row.get("SongCount", 0),
+            album_count=row.get("AlbumCount", 0),
+        )
+
+
 class IdentityView(BaseModel):
     """View-model for the bidirectional artist tree."""
 
@@ -598,6 +623,7 @@ class IdentityView(BaseModel):
     legal_name: Optional[str] = None
     aliases: List[ArtistName] = []  # Can reuse domain model here as it's simple
     song_count: int = 0
+    album_count: int = 0
 
     # Recursive connections
     members: List["IdentityView"] = []
@@ -606,8 +632,8 @@ class IdentityView(BaseModel):
     @computed_field
     @property
     def can_delete(self) -> bool:
-        """True if no songs are linked to this identity."""
-        return self.song_count == 0
+        """True if no songs or albums are linked to this identity."""
+        return self.song_count == 0 and self.album_count == 0
 
     @computed_field
     @property

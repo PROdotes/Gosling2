@@ -14,10 +14,25 @@ class IdentityRepository(BaseRepository):
     """
 
     _IDENTITY_COLUMNS = """
-        i.IdentityID, i.IdentityType, i.LegalName, 
+        i.IdentityID, i.IdentityType, i.LegalName,
         COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
     """
     _IDENTITY_JOIN = "LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0"
+
+    _SLIM_COUNT_COLUMNS = """
+        (SELECT COUNT(DISTINCT sc.SourceID)
+         FROM ArtistNames an2
+         JOIN SongCredits sc ON sc.CreditedNameID = an2.NameID
+         JOIN MediaSources ms ON sc.SourceID = ms.SourceID
+         WHERE an2.OwnerIdentityID = i.IdentityID AND an2.IsDeleted = 0 AND ms.IsDeleted = 0
+        ) AS SongCount,
+        (SELECT COUNT(DISTINCT ac.AlbumID)
+         FROM ArtistNames an3
+         JOIN AlbumCredits ac ON ac.CreditedNameID = an3.NameID
+         JOIN Albums a ON ac.AlbumID = a.AlbumID
+         WHERE an3.OwnerIdentityID = i.IdentityID AND an3.IsDeleted = 0 AND a.IsDeleted = 0
+        ) AS AlbumCount
+    """
 
     def get_by_id(
         self, identity_id: int, conn: Optional[sqlite3.Connection] = None
@@ -128,6 +143,64 @@ class IdentityRepository(BaseRepository):
             result = [self._row_to_identity(row) for row in rows]
             logger.debug(
                 f"[IdentityRepository] <- search_identities(q='{query}') count={len(result)}"
+            )
+            return result
+
+    def get_all_slim(
+        self, conn: Optional[sqlite3.Connection] = None
+    ) -> List[dict]:
+        """Fast list-view query. Returns dicts for IdentitySlimView with embedded counts."""
+        logger.debug("[IdentityRepository] -> get_all_slim()")
+        sql = f"""
+            SELECT {self._IDENTITY_COLUMNS}, {self._SLIM_COUNT_COLUMNS}
+            FROM Identities i
+            {self._IDENTITY_JOIN}
+            WHERE i.IsDeleted = 0
+            ORDER BY DisplayName COLLATE NOCASE ASC
+        """
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(sql).fetchall()
+            result = [dict(row) for row in rows]
+            logger.debug(f"[IdentityRepository] <- get_all_slim() count={len(result)}")
+            return result
+
+    def search_slim(
+        self,
+        query: str,
+        conn: Optional[sqlite3.Connection] = None,
+        exclude_groups: bool = False,
+    ) -> List[dict]:
+        """Fast list-view search. Matches DisplayName, LegalName, or Alias. Returns dicts with embedded counts."""
+        logger.debug(f"[IdentityRepository] -> search_slim(q='{query}')")
+        fmt_q = f"%{query}%"
+        type_filter = " AND i.IdentityType != 'group'" if exclude_groups else ""
+        sql = f"""
+            SELECT DISTINCT {self._IDENTITY_COLUMNS}, {self._SLIM_COUNT_COLUMNS}
+            FROM Identities i
+            {self._IDENTITY_JOIN}
+            WHERE i.IsDeleted = 0{type_filter} AND (i.IdentityID IN (
+                SELECT OwnerIdentityID FROM ArtistNames
+                WHERE DisplayName LIKE ? AND IsDeleted = 0
+            ) OR i.LegalName LIKE ?)
+            ORDER BY DisplayName ASC
+        """
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, (fmt_q, fmt_q)).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(sql, (fmt_q, fmt_q)).fetchall()
+            result = [dict(row) for row in rows]
+            logger.debug(
+                f"[IdentityRepository] <- search_slim(q='{query}') count={len(result)}"
             )
             return result
 
@@ -641,35 +714,6 @@ class IdentityRepository(BaseRepository):
                 return row[0]
             logger.debug("[IdentityRepository] <- find_identity_by_name() NOT_FOUND")
             return None
-
-    def get_song_counts_batch(
-        self, identity_ids: List[int], conn: Optional[sqlite3.Connection] = None
-    ) -> Dict[int, int]:
-        """Batch-fetch active song counts for a list of identities (across all aliases).
-        Returns {identity_id: song_count}."""
-        if not identity_ids:
-            return {}
-        placeholders = ",".join(["?" for _ in identity_ids])
-        query = f"""
-            SELECT an.OwnerIdentityID, COUNT(DISTINCT sc.SourceID)
-            FROM ArtistNames an
-            JOIN SongCredits sc ON sc.CreditedNameID = an.NameID
-            JOIN MediaSources ms ON sc.SourceID = ms.SourceID
-            WHERE an.OwnerIdentityID IN ({placeholders}) AND ms.IsDeleted = 0 AND an.IsDeleted = 0
-            GROUP BY an.OwnerIdentityID
-        """
-        result: Dict[int, int] = {iid: 0 for iid in identity_ids}
-
-        def _run(conn_: sqlite3.Connection) -> None:
-            for iid, count in conn_.execute(query, identity_ids).fetchall():
-                result[iid] = count
-
-        if conn:
-            _run(conn)
-            return result
-        with self._get_connection() as new_conn:
-            _run(new_conn)
-            return result
 
     def soft_delete(self, identity_id: int, conn: sqlite3.Connection) -> bool:
         """Soft-delete an Identity and all its ArtistNames. Returns True if the Identity row was updated."""

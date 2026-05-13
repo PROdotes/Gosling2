@@ -154,6 +154,10 @@ export function getArtistSongs(id, options = {}) {
     return fetchJson(`/api/v1/identities/${id}/songs`, options);
 }
 
+export function getArtistAlbums(id, options = {}) {
+    return fetchJson(`/api/v1/identities/${id}/albums`, options);
+}
+
 export function addIdentityAlias(identityId, displayName, nameId = null) {
     return mutate({ add: [{ type: "identity_alias", identity_id: identityId, display_name: displayName, name_id: nameId }] });
 }

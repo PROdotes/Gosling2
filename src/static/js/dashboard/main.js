@@ -7,6 +7,7 @@ import {
     fetchValidationRules,
     getAcceptedFormats,
     getAlbumDetail,
+    getArtistAlbums,
     getArtistSongs,
     getArtistTree,
     getCatalogSong,
@@ -603,14 +604,16 @@ async function openArtistDetail(artist) {
     const request = beginDetailRequest("artists", artist.id);
     renderArtistDetailLoading(ctx, artist);
 
-    const [treeResult, songsResult] = await Promise.allSettled([
+    const [treeResult, songsResult, albumsResult] = await Promise.allSettled([
         getArtistTree(artist.id, { signal: request.signal }),
         getArtistSongs(artist.id, { signal: request.signal }),
+        getArtistAlbums(artist.id, { signal: request.signal }),
     ]);
 
     if (
         (treeResult.status === "rejected" && isAbortError(treeResult.reason)) ||
-        (songsResult.status === "rejected" && isAbortError(songsResult.reason))
+        (songsResult.status === "rejected" && isAbortError(songsResult.reason)) ||
+        (albumsResult.status === "rejected" && isAbortError(albumsResult.reason))
     ) {
         return;
     }
@@ -625,7 +628,8 @@ async function openArtistDetail(artist) {
     }
 
     const tree = treeResult.status === "fulfilled" ? treeResult.value : artist;
-    renderArtistDetailComplete(ctx, tree, songsResult.value, []);
+    const albums = albumsResult.status === "fulfilled" ? albumsResult.value : [];
+    renderArtistDetailComplete(ctx, tree, songsResult.value, albums);
 }
 
 async function openPublisherDetail(publisher) {

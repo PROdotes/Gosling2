@@ -2,6 +2,7 @@ import {
     asArray,
     buildNavigateAttrs,
     escapeHtml,
+    renderAlbumList,
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
@@ -60,7 +61,7 @@ export function renderArtists(ctx, artists) {
             </div>
             <div class="entity-row-meta">
                 <span class="pill ${escapeHtml(artist.type || "")}">${escapeHtml(artist.type || "identity")}</span>
-                ${artist.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
+                ${artist.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span><span class="pill">${artist.album_count}</span>`}
             </div>
         </div>
     `,
@@ -80,11 +81,15 @@ export function renderArtistDetailLoading(ctx, artist) {
     );
 }
 
-export function renderArtistDetailComplete(ctx, tree, songs) {
+export function renderArtistDetailComplete(ctx, tree, songs, albums) {
     const aliases = renderAliasTags(tree.aliases);
     const members = renderIdentityTags(tree.members);
     const groups = renderIdentityTags(tree.groups);
+    const songList = asArray(songs);
+    const albumList = asArray(albums);
     const catalogHtml = renderSongList(songs, "No songs mapped yet");
+    const albumsHtml = renderAlbumList(albums, "No albums mapped yet");
+    const canDelete = songList.length === 0 && albumList.length === 0;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -95,15 +100,18 @@ export function renderArtistDetailComplete(ctx, tree, songs) {
             ${aliases ? `<div class="detail-section"><div class="section-title">Aliases</div>${aliases}</div>` : ""}
             ${members ? `<div class="detail-section"><div class="section-title">Members</div>${members}</div>` : ""}
             ${groups ? `<div class="detail-section"><div class="section-title">Member Of</div>${groups}</div>` : ""}
- 
+
             <div class="detail-section">
-                <div class="section-title">Full Catalog (${asArray(songs).length})</div>
+                <div class="section-title">Full Catalog (${songList.length})</div>
                 ${catalogHtml}
             </div>
 
+            <div class="detail-section">
+                <div class="section-title">Albums (${albumList.length})</div>
+                ${albumsHtml}
+            </div>
 
-
-            ${renderDeleteSection("delete-identity", tree.id, tree.can_delete, "Cannot delete — identity is linked to songs or albums")}
+            ${renderDeleteSection("delete-identity", tree.id, canDelete, "Cannot delete — identity is linked to songs or albums")}
         </div>
     `);
 }

@@ -378,6 +378,12 @@ Used by `update_identity_legal_name`.
 - Streams the audio file content for a song.
 - Returns a standard `FileResponse` with guessed mimetype.
 
+### async def get_song_waveform(song_id: int) -> dict
+**HTTP**: `GET /api/v1/songs/{song_id}/waveform`
+- Returns `{"peaks": [1000 floats]}` — normalized RMS waveform bars (0..1) for the song's working copy.
+- Cache-first; on miss, builds via ffmpeg (sync, ~1-3s for a typical song) and caches at `sqldb/waveform_cache/{song_id}.json`.
+- Wraps `WaveformService.get_or_build_peaks`.
+
 ---
 
 ## Tools Router

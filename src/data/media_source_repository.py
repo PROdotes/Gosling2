@@ -181,25 +181,35 @@ class MediaSourceRepository(BaseRepository):
         )
 
     def soft_delete(
-        self, source_id: int, conn: sqlite3.Connection, notes: str = None
+        self,
+        source_id: int,
+        conn: sqlite3.Connection,
+        notes: str = None,
+        clear_source_path: bool = False,
     ) -> bool:
         """
         Soft-delete a MediaSource by setting IsDeleted = 1.
+        When clear_source_path is True, also nulls SourcePath so the
+        UNIQUE constraint releases the path for re-ingest (used when
+        the underlying file is being physically deleted).
         Returns True if a record was updated, False if not found or already deleted.
         """
         logger.debug(f"[MediaSourceRepository] -> soft_delete(id={source_id})")
         cursor = conn.cursor()
 
+        set_clauses = ["IsDeleted = 1"]
+        params: list = []
         if notes is not None:
-            cursor.execute(
-                "UPDATE MediaSources SET IsDeleted = 1, SourceNotes = ? WHERE SourceID = ? AND IsDeleted = 0",
-                (notes, source_id),
-            )
-        else:
-            cursor.execute(
-                "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ? AND IsDeleted = 0",
-                (source_id,),
-            )
+            set_clauses.append("SourceNotes = ?")
+            params.append(notes)
+        if clear_source_path:
+            set_clauses.append("SourcePath = NULL")
+        params.append(source_id)
+
+        cursor.execute(
+            f"UPDATE MediaSources SET {', '.join(set_clauses)} WHERE SourceID = ? AND IsDeleted = 0",
+            params,
+        )
         count = cursor.rowcount
 
         if count > 0:

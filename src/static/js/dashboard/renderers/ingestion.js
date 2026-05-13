@@ -753,10 +753,11 @@ function createResultCard(result, path) {
                     <div class="muted-note" style="font-size: 11px; margin-top: 8px; font-style: italic; color: ${isRejected ? "var(--danger)" : "inherit"};">
                         ${escapeHtml(rejectedHint)}
                     </div>
-                    <div style="margin-top: 8px;">
+                    <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
                             Re-ingest & Activate
                         </button>
+                        <button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>
                     </div>
                 </div>`;
                     })()

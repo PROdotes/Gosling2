@@ -19,11 +19,6 @@ def _load_raw(path: str) -> dict:
         return json.load(f)
 
 
-def _save_raw(path: str, data: dict) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-
 @lru_cache(maxsize=1)
 def load_id3_frames(path: str = _FRAMES_PATH) -> ID3FrameMapping:
     """The single source of truth for ID3 frame mapping. Resolves paths to ensure cache hits."""
@@ -60,25 +55,3 @@ def _load_tag_categories_cached(path: str) -> List[str]:
     return raw_data.get("tag_categories", [])
 
 
-def register_tag_category(category: str, path: str = _FRAMES_PATH) -> None:
-    """Add a category to the registry if not already present. Clears the cache."""
-    raw_data = _load_raw(path)
-    categories = raw_data.get("tag_categories", [])
-    if category not in categories:
-        categories.append(category)
-        raw_data["tag_categories"] = sorted(categories)
-        _save_raw(path, raw_data)
-        _load_tag_categories_cached.cache_clear()
-        logger.info(f"[MetadataFramesReader] Registered tag category: '{category}'")
-
-
-def unregister_tag_category(category: str, path: str = _FRAMES_PATH) -> None:
-    """Remove a category from the registry. Clears the cache."""
-    raw_data = _load_raw(path)
-    categories = raw_data.get("tag_categories", [])
-    if category in categories:
-        categories.remove(category)
-        raw_data["tag_categories"] = categories
-        _save_raw(path, raw_data)
-        _load_tag_categories_cached.cache_clear()
-        logger.info(f"[MetadataFramesReader] Unregistered tag category: '{category}'")

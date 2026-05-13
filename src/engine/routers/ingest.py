@@ -21,6 +21,7 @@ from src.models.view_models import (
 from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
 from src.services.logger import logger
+from src.services.waveform_service import delete_cache as delete_waveform_cache
 from src.engine.config import (
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
@@ -98,7 +99,7 @@ async def _stream_ingestion(service, work_items):
             completed = service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
 
-            if res.get("status") == "ALREADY_EXISTS" and original_path:
+            if original_path:
                 res["original_path"] = original_path
                 res["original_exists"] = os.path.isfile(original_path)
 
@@ -331,6 +332,8 @@ async def delete_song(
     if not success:
         logger.warning(f"[IngestRouter] Delete failed: Song ID {song_id} not found.")
         raise HTTPException(status_code=404, detail=f"Song ID {song_id} not found.")
+
+    delete_waveform_cache(song_id)
 
     logger.info(f"[IngestRouter] <- delete_song(id={song_id}) SUCCESS")
     return {"status": "DELETED", "id": song_id}

@@ -8,6 +8,7 @@ from src.models.view_models import (
     TagView,
     PublisherView,
     IdentityView,
+    IdentitySlimView,
     ArtistChipView,
     IngestionCheckRequest,
     IngestionReportView,
@@ -162,36 +163,22 @@ async def get_identity(identity_id: int) -> IdentityView:
     return IdentityView.from_domain(identity)
 
 
-@router.get("/identities", response_model=List[IdentityView])
-async def get_all_identities() -> List[IdentityView]:
-    """Fetch a list of active artists/identities."""
+@router.get("/identities", response_model=List[IdentitySlimView])
+async def get_all_identities() -> List[IdentitySlimView]:
+    """Fetch slim list-view rows for all active artists/identities."""
     logger.debug("[CatalogRouter] get_all_identities()")
-    service = _get_service()
-    identities = service.get_all_identities()
-    counts = service.get_identity_song_counts(
-        [i.id for i in identities if i.id is not None]
-    )
-    views = [IdentityView.from_domain(i) for i in identities]
-    for v in views:
-        v.song_count = counts.get(v.id, 0)
-    return views
+    rows = _get_service().get_all_identities_slim()
+    return [IdentitySlimView.from_row(r) for r in rows]
 
 
-@router.get("/identities/search", response_model=List[IdentityView])
-async def search_identities(q: str, exclude_groups: bool = False) -> List[IdentityView]:
-    """Search for identities by name or alias."""
+@router.get("/identities/search", response_model=List[IdentitySlimView])
+async def search_identities(q: str, exclude_groups: bool = False) -> List[IdentitySlimView]:
+    """Slim list-view search by DisplayName, LegalName, or Alias."""
     logger.debug(
         f"[CatalogRouter] search_identities(q='{q}', exclude_groups={exclude_groups})"
     )
-    service = _get_service()
-    identities = service.search_identities(q, exclude_groups=exclude_groups)
-    counts = service.get_identity_song_counts(
-        [i.id for i in identities if i.id is not None]
-    )
-    views = [IdentityView.from_domain(i) for i in identities]
-    for v in views:
-        v.song_count = counts.get(v.id, 0)
-    return views
+    rows = _get_service().search_identities_slim(q, exclude_groups=exclude_groups)
+    return [IdentitySlimView.from_row(r) for r in rows]
 
 
 @router.get("/artist-names/search", response_model=List[ArtistChipView])
@@ -256,6 +243,24 @@ async def get_songs_by_identity(identity_id: int) -> List[SongSlimView]:
     return [SongSlimView.from_row(r) for r in rows]
 
 
+@router.get("/identities/{identity_id:int}/albums", response_model=List[AlbumSlimView])
+async def get_albums_by_identity(identity_id: int) -> List[AlbumSlimView]:
+    """Fetch slim album list for an identity (across aliases, members, and groups)."""
+    logger.debug(f"[CatalogRouter] get_albums_by_identity(id={identity_id})")
+
+    identity = _get_service().get_identity(identity_id)
+    if not identity:
+        logger.warning(
+            f"[CatalogRouter] VIOLATION: Identity ID {identity_id} not found"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Identity ID {identity_id} not found"
+        )
+
+    rows = _get_service().get_albums_slim_by_identity(identity_id)
+    return [AlbumSlimView.from_row(r) for r in rows]
+
+
 @router.delete("/identities/{identity_id:int}", status_code=204)
 async def delete_identity(identity_id: int) -> None:
     """Soft-delete a single identity. 404 if not found, 403 if linked to active songs or albums."""
@@ -282,9 +287,9 @@ async def bulk_delete_unlinked_identities(unlinked: bool = False) -> dict:
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
     service = _get_service()
-    all_identities = service.get_all_identities()
+    rows = service.get_all_identities_slim()
     deleted = service.delete_unlinked_identities(
-        [i.id for i in all_identities if i.id is not None]
+        [r["IdentityID"] for r in rows if r.get("IdentityID") is not None]
     )
     return {"deleted": deleted}
 

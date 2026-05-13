@@ -251,6 +251,43 @@ class LibraryService:
             )
             return rows
 
+    def get_albums_slim_by_identity(self, identity_id: int) -> List[dict]:
+        """Slim reverse album-credit lookup for an identity and its related aliases/members/groups."""
+        logger.debug(
+            f"[LibraryService] -> get_albums_slim_by_identity(id={identity_id})"
+        )
+        with self._identity_repo.get_connection() as conn:
+            identity = self._identity_repo.get_by_id(identity_id, conn=conn)
+            if not identity:
+                logger.warning(
+                    f"[LibraryService] Exit: Identity {identity_id} not found."
+                )
+                return []
+
+            related_ids = {identity.id}
+            members_by_id = self._identity_repo.get_members_batch(
+                [identity.id], conn=conn
+            )
+            groups_by_id = self._identity_repo.get_groups_batch(
+                [identity.id], conn=conn
+            )
+            for member in members_by_id.get(identity.id, []):
+                related_ids.add(member.id)
+            for group in groups_by_id.get(identity.id, []):
+                related_ids.add(group.id)
+
+            album_ids: set = set()
+            for rid in related_ids:
+                album_ids.update(
+                    self._identity_repo.get_album_ids_by_identity(rid, conn=conn)
+                )
+
+            rows = self._album_repo_dir.get_slim_by_ids(list(album_ids), conn=conn)
+            logger.debug(
+                f"[LibraryService] <- get_albums_slim_by_identity count={len(rows)}"
+            )
+            return rows
+
     def get_filter_values(self) -> dict:
         """Returns all distinct filter sidebar values."""
         return self._song_repo.get_filter_values()

@@ -53,7 +53,9 @@ class DeleteMutator:
 
     def _delete_song(self, item: DeleteSongItem, conn: sqlite3.Connection) -> None:
         self._media_repo.delete_song_links(item.id, conn)
-        deleted = self._media_repo.soft_delete(item.id, conn)
+        deleted = self._media_repo.soft_delete(
+            item.id, conn, clear_source_path=item.delete_file
+        )
         if not deleted:
             raise LookupError(f"Song {item.id} not found")
 

@@ -37,6 +37,7 @@ from src.services.filing_service import FilingService
 from src.services.logger import logger
 from src.services.library_service import LibraryService
 from src.services.metadata_writer import MetadataWriter
+from src.services.waveform_service import delete_cache as delete_waveform_cache
 
 from src.services.mutators.album_mutator import AlbumMutator
 from src.services.mutators.credit_mutator import CreditMutator
@@ -164,6 +165,7 @@ class MutationCoordinator:
                     self._filing.delete_physical_file(song)
                 else:
                     self._filing.delete_staging_file(song, Path(STAGING_DIR))
+                delete_waveform_cache(song.id)
 
             for old_path, new_path in copied_files:
                 old = Path(old_path)

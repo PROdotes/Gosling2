@@ -137,9 +137,9 @@ class CatalogService:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
         return self._identity_service.get_identity(identity_id)
 
-    def get_all_identities(self) -> List[Identity]:
-        """Fetch a list of all active identities."""
-        return self._identity_service.get_all_identities()
+    def get_all_identities_slim(self) -> List[dict]:
+        """Slim list-view rows for all active identities (no hydration)."""
+        return self._identity_service.get_all_slim()
 
     def resolve_identity_by_name(self, display_name: str) -> Optional[int]:
         """Return the IdentityID for an ArtistName (Truth-First resolution)."""
@@ -169,11 +169,11 @@ class CatalogService:
         """Return True if a Publisher with this exact name exists."""
         return self._pub_repo.find_by_name(name) is not None
 
-    def search_identities(
+    def search_identities_slim(
         self, query: str, exclude_groups: bool = False
-    ) -> List[Identity]:
-        """Search for identities by name or alias."""
-        return self._identity_service.search_identities(
+    ) -> List[dict]:
+        """Slim list-view search (no hydration)."""
+        return self._identity_service.search_slim(
             query, exclude_groups=exclude_groups
         )
 
@@ -186,10 +186,6 @@ class CatalogService:
     def get_publisher_link_counts(self, publisher_ids: List[int]) -> dict:
         """Batch song+album counts for publishers."""
         return self._pub_repo.get_link_counts_batch(publisher_ids)
-
-    def get_identity_song_counts(self, identity_ids: List[int]) -> dict:
-        """Batch active song counts for identities."""
-        return self._identity_service.get_identity_song_counts(identity_ids)
 
     def get_all_publishers(self) -> List[Publisher]:
         """Fetch the full directory of publishers."""
@@ -242,6 +238,10 @@ class CatalogService:
     def get_songs_slim_by_identity(self, identity_id: int) -> List[dict]:
         """Slim reversed credit lookup from identity."""
         return self._library_service.get_songs_slim_by_identity(identity_id)
+
+    def get_albums_slim_by_identity(self, identity_id: int) -> List[dict]:
+        """Slim reversed album-credit lookup from identity."""
+        return self._library_service.get_albums_slim_by_identity(identity_id)
 
     def get_filter_values(self) -> dict:
         """Returns all distinct filter sidebar values."""
