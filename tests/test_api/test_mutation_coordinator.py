@@ -696,6 +696,36 @@ class TestFileMoveOnApprove:
         coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
         assert source_file.exists()
 
+    def test_original_unlink_failure_keeps_destination_and_db_commit(self, populated_db, monkeypatch, tmp_path):
+        """Regression: if the post-commit unlink of the original (staging) file fails,
+        the destination copy and the DB commit must survive. Half-rollback would leave
+        the DB pointing at a path with no file (the bug we just fixed).
+        """
+        import sqlite3
+        coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
+
+        original_unlink = Path.unlink
+
+        def selective_unlink(self, *args, **kwargs):
+            if self.resolve() == source_file.resolve():
+                raise OSError(32, "The process cannot access the file because it is being used by another process")
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", selective_unlink)
+
+        result = coordinator.apply(MutationRequest.model_validate({"update": [{"type": "song", "id": 1}]}))
+
+        copied = list(library.rglob("*.mp3"))
+        assert len(copied) == 1, "Destination copy must survive when original unlink fails"
+        assert copied[0].read_bytes() == b"audio data"
+
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute("SELECT SourcePath FROM MediaSources WHERE SourceID = 1").fetchone()
+        conn.close()
+        assert Path(row[0]).resolve() == copied[0].resolve(), "DB source_path must point at the surviving destination"
+
+        assert "songs" in result, "Mutation must report success, not raise"
+
     def test_rollback_deletes_copy(self, populated_db, monkeypatch, tmp_path):
         coordinator, source_file, library = self._setup(populated_db, monkeypatch, tmp_path)
 

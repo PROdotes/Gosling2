@@ -171,10 +171,15 @@ class MutationCoordinator:
                 old = Path(old_path)
                 new = Path(new_path)
                 if old.exists() and old.resolve() != new.resolve():
-                    old.unlink()
-                    logger.debug(
-                        f"[MutationCoordinator] Deleted original after move: {old}"
-                    )
+                    try:
+                        old.unlink()
+                        logger.debug(
+                            f"[MutationCoordinator] Deleted original after move: {old}"
+                        )
+                    except OSError as e:
+                        logger.warning(
+                            f"[MutationCoordinator] Could not delete original after move (leaving in place): {old} ({e})"
+                        )
 
             return {"songs": [s.model_dump() for s in songs], "warnings": warnings}
 
