@@ -94,7 +94,7 @@ class TagRepository(BaseRepository):
     def search(
         self, query: str, conn: Optional[sqlite3.Connection] = None
     ) -> List[Tag]:
-        """Search tags by name."""
+        """Search tags by name or category."""
         logger.debug(f"[TagRepository] -> search(q='{query}')")
         sql = """
             SELECT t.TagID, t.TagName, t.TagCategory,
@@ -102,20 +102,22 @@ class TagRepository(BaseRepository):
             FROM Tags t
             LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
             LEFT JOIN MediaSources ms ON mst.SourceID = ms.SourceID AND ms.IsDeleted = 0
-            WHERE t.TagName LIKE ? COLLATE NOCASE AND t.IsDeleted = 0
+            WHERE (t.TagName LIKE ? COLLATE NOCASE OR t.TagCategory LIKE ? COLLATE NOCASE)
+              AND t.IsDeleted = 0
             GROUP BY t.TagID
             ORDER BY t.TagName COLLATE NOCASE
         """
+        like = f"%{query}%"
 
         if conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(sql, (f"%{query}%",)).fetchall()
+            rows = conn.execute(sql, (like, like)).fetchall()
             return [self._row_to_tag(row) for row in rows]
 
         try:
             with self._get_connection() as new_conn:
                 new_conn.row_factory = sqlite3.Row
-                rows = new_conn.execute(sql, (f"%{query}%",)).fetchall()
+                rows = new_conn.execute(sql, (like, like)).fetchall()
                 results = [self._row_to_tag(row) for row in rows]
                 logger.debug(
                     f"[TagRepository] <- search(q='{query}') count={len(results)}"

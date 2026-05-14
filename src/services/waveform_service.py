@@ -32,6 +32,9 @@ def _build_peaks(audio_path: Path) -> List[float]:
                 "-",
             ],
             capture_output=True,
+            stdin=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
         )
     except FileNotFoundError:
         logger.error(f"[Waveform] ffmpeg not found at '{FFMPEG_PATH}'")
