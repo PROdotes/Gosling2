@@ -31,9 +31,14 @@ class TestAddIdentityAliasApi:
         resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_alias", "identity_id": 2, "display_name": "Grohlton", "name_id": 11}]})
         assert resp.status_code == 200, resp.text
 
-    def test_add_alias_invalid_identity_returns_404(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_alias", "identity_id": 9999, "display_name": "Ghost"}]})
-        assert resp.status_code == 404, resp.text
+    def test_add_alias_invalid_identity_fails(self, api):
+        # 9999 is an impossible identity_id — UI only sends real IDs from dropdowns.
+        # If it ever arrives, the FK constraint on ArtistNames.OwnerIdentityID is the
+        # last line of defense. We pin that the DB rejects it (rather than silently
+        # inserting an orphan row).
+        import sqlite3
+        with pytest.raises(sqlite3.IntegrityError):
+            api.post("/api/v1/mutate", json={"add": [{"type": "identity_alias", "identity_id": 9999, "display_name": "Ghost"}]})
 
     def test_add_alias_steal_primary_with_siblings_returns_400(self, api):
         resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_alias", "identity_id": 2, "display_name": "Dave Grohl", "name_id": 10}]})
@@ -93,7 +98,7 @@ class TestUpdateCreditNameApi:
         assert resp.status_code == 409, resp.text
         body = resp.json()["detail"]
         assert body["code"] == "MERGE_REQUIRED"
-        assert "collision_name_id" in body
+        assert "collision_id" in body
 
     def test_collision_with_parent_returns_409_merge_required(self, api):
         resp = api.post("/api/v1/mutate", json={"update": [{"type": "credit", "id": 40, "display_name": "Dave Grohl"}]})
@@ -108,13 +113,13 @@ class TestUpdateCreditNameApi:
 
 class TestMergeIdentityApi:
     def test_merge_returns_200(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity_merge", "source_name_id": 40, "target_name_id": 10}]})
+        resp = api.post("/api/v1/mutate", json={"merge": [{"type": "identity_merge", "source_name_id": 40, "target_name_id": 10}]})
         assert resp.status_code == 200, resp.text
 
     def test_merge_source_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity_merge", "source_name_id": 9999, "target_name_id": 10}]})
+        resp = api.post("/api/v1/mutate", json={"merge": [{"type": "identity_merge", "source_name_id": 9999, "target_name_id": 10}]})
         assert resp.status_code == 404, resp.text
 
     def test_merge_non_orphan_source_returns_400(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity_merge", "source_name_id": 10, "target_name_id": 40}]})
+        resp = api.post("/api/v1/mutate", json={"merge": [{"type": "identity_merge", "source_name_id": 10, "target_name_id": 40}]})
         assert resp.status_code == 400, resp.text

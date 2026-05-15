@@ -626,6 +626,57 @@ class TestStagingFileCleanup:
         assert not staged_1.exists()
         assert not staged_2.exists()
 
+    def test_reviewed_song_still_in_staging_delete_file_true_only_removes_staging(
+        self, populated_db, monkeypatch, tmp_path
+    ):
+        """
+        Quantum state: song was marked done (status=REVIEWED) but the auto-move
+        failed (e.g. target already existed), so source_path still points into
+        staging. A pre-existing library file lives at the projected target path
+        but is NOT referenced by this song's source_path.
+
+        Delete with delete_file=True must:
+          - unlink the staging file (via delete_physical_file on source_path)
+          - leave the unrelated pre-existing library file untouched
+          - not raise (no double-delete: coordinator uses if/else, so
+            delete_staging_file does not also run)
+        """
+        import src.engine.config as config_mod
+        import src.services.mutation_coordinator as coord_mod
+
+        staging = tmp_path / "staging"
+        staging.mkdir(exist_ok=True)
+        monkeypatch.setattr(config_mod, "STAGING_DIR", staging)
+        monkeypatch.setattr(coord_mod, "STAGING_DIR", staging)
+
+        staged_file = staging / "quantum_song.mp3"
+        staged_file.write_bytes(b"fake staged audio")
+
+        library_file = tmp_path / "library" / "preexisting.mp3"
+        library_file.parent.mkdir()
+        library_file.write_bytes(b"fake library audio")
+        library_bytes_before = library_file.read_bytes()
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET SourcePath = ?, ProcessingStatus = 0 WHERE SourceID = 1",
+            (str(staged_file),),
+        )
+        conn.commit()
+        conn.close()
+
+        coordinator = MutationCoordinator(populated_db)
+        coordinator.apply(
+            MutationRequest.model_validate(
+                {"delete": [{"type": "song", "id": 1, "delete_file": True}]}
+            )
+        )
+
+        assert not staged_file.exists()
+        assert library_file.exists()
+        assert library_file.read_bytes() == library_bytes_before
+
 
 # ---------------------------------------------------------------------------
 # File move on approve: copy before commit, source_path updated, original deleted

@@ -236,7 +236,7 @@ class SongCreditRepository(BaseRepository):
         self, display_name: str, conn: sqlite3.Connection
     ) -> Optional[int]:
         row = conn.execute(
-            "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+            "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
             (display_name.strip(),),
         ).fetchone()
         return row[0] if row else None

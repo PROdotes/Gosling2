@@ -908,7 +908,7 @@ ${playBtn}
 
 <div class="sidebar-group-label">Research</div>
 ${searchSplitBtn}
-<button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
+<button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}"><img class="sidebar-btn__icon" src="/static/resources/Spotify_icon.svg" alt="">Spotify</button>
 
 <div class="sidebar-divider"></div>
 
@@ -923,7 +923,7 @@ ${targetPath}
 ${deleteOriginalBtn}
 <div style="margin-top:auto; display:flex; flex-direction:column; gap:6px;">
 <button class="sidebar-btn sidebar-btn--warning" data-action="reject-song" data-id="${song.id}">Reject Song</button>
-<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}" data-processing-status="${song.processing_status}">Delete Record</button>
+<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}" data-processing-status="${song.processing_status}" data-in-staging="${song.is_in_staging ? "1" : "0"}">Delete Record</button>
 </div>
 `;
 }

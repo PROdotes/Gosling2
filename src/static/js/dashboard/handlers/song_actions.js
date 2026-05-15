@@ -190,8 +190,9 @@ export class SongActionsHandler {
             actionTarget.dataset.processingStatus ?? "-1",
             10,
         );
+        const inStaging = actionTarget.dataset.inStaging === "1";
         const deleteFile =
-            processingStatus === 0
+            processingStatus === 0 && !inStaging
                 ? await showConfirm("Also delete the file from disk?", {
                       title: "Delete File",
                       okLabel: "Delete File",

@@ -774,6 +774,13 @@
     filter: none;
 }
 
+#songs-workspace .sidebar-btn__icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+    margin-right: 6px;
+}
+
 /* Secondary action: WRITE ID3 — soft accent outline */
 #songs-workspace .sidebar-btn--id3 {
     color: var(--accent);
