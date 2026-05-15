@@ -288,3 +288,48 @@ class TestMergeOrphanInto:
             cursor = conn.cursor()
             with pytest.raises(ValueError, match="not an orphan"):
                 repo.merge_orphan_into(10, 40, cursor)
+
+    def test_soft_deleted_target_is_resurrected(self, populated_db):
+        """
+        Merging into a soft-deleted target name must resurrect that name AND its
+        identity, otherwise credits get repointed to a hidden row and the song
+        loses its credit display.
+
+        Regression scenario (live, 2026-05-15): user added "Nika Turkovic" via
+        filename parser, then renamed to "Nika Turković". The č-version already
+        existed as a soft-deleted name from earlier work. UNIQUE constraint fix
+        made the merge fire correctly, but merge_orphan_into didn't undelete the
+        target → all credits pointed at a soft-deleted name → song showed no
+        performer.
+        """
+        repo = IdentityRepository(populated_db)
+        source_name_id = 40  # Taylor Hawkins (orphan identity 4)
+        target_name_id = 10  # Dave Grohl
+
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (target_name_id,))
+            cursor.execute(
+                "UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = (SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?)",
+                (target_name_id,),
+            )
+
+            repo.merge_orphan_into(source_name_id, target_name_id, cursor)
+            conn.commit()
+
+            name_row = cursor.execute(
+                "SELECT IsDeleted, OwnerIdentityID FROM ArtistNames WHERE NameID = ?",
+                (target_name_id,),
+            ).fetchone()
+            assert name_row[0] == 0, "Target ArtistName should be resurrected"
+
+            identity_row = cursor.execute(
+                "SELECT IsDeleted FROM Identities WHERE IdentityID = ?",
+                (name_row[1],),
+            ).fetchone()
+            assert identity_row[0] == 0, "Target Identity should be resurrected"
+
+            credit_row = cursor.execute(
+                "SELECT CreditedNameID FROM SongCredits WHERE SourceID = 3"
+            ).fetchone()
+            assert credit_row[0] == target_name_id

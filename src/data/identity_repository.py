@@ -662,6 +662,18 @@ class IdentityRepository(BaseRepository):
             (target_name_id, source_name_id),
         )
         cursor.execute(
+            "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (target_name_id,)
+        )
+        target_identity_row = cursor.execute(
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?",
+            (target_name_id,),
+        ).fetchone()
+        if target_identity_row:
+            cursor.execute(
+                "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
+                (target_identity_row[0],),
+            )
+        cursor.execute(
             "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (source_name_id,)
         )
         cursor.execute(
