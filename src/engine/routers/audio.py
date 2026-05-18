@@ -34,7 +34,7 @@ async def stream_song_audio(song_id: int):
 
 
 @router.get("/songs/{song_id}/waveform")
-async def get_song_waveform(song_id: int) -> dict:
+def get_song_waveform(song_id: int) -> dict:
     """Return 1000 normalized RMS peaks (0..1) for the song's working copy. Builds on first call, then cached."""
     service = _get_service()
     song = service.get_song(song_id)

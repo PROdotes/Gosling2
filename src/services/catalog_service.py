@@ -145,26 +145,6 @@ class CatalogService:
         """Return the IdentityID for an ArtistName (Truth-First resolution)."""
         return self._identity_service.resolve_identity_by_name(display_name)
 
-    def add_identity_alias(
-        self, identity_id: int, display_name: str, name_id: Optional[int] = None
-    ) -> int:
-        """Link a new or existing alias name to an identity (Truth-First mapping)."""
-        return self._identity_service.add_identity_alias(
-            identity_id, display_name, name_id
-        )
-
-    def remove_identity_alias(self, name_id: int) -> None:
-        """Remove an alias from an identity."""
-        return self._identity_service.remove_identity_alias(name_id)
-
-    def update_identity_legal_name(
-        self, identity_id: int, legal_name: Optional[str]
-    ) -> None:
-        """Update the LegalName on an Identity."""
-        return self._identity_service.update_identity_legal_name(
-            identity_id, legal_name
-        )
-
     def publisher_exists(self, name: str) -> bool:
         """Return True if a Publisher with this exact name exists."""
         return self._pub_repo.find_by_name(name) is not None
@@ -304,12 +284,6 @@ class CatalogService:
         """Update artist display name globally via EditService."""
         return self._edit_service.update_credit_name(name_id, new_name)
 
-    def merge_identity_into(self, source_name_id: int, target_name_id: int) -> None:
-        """Merges a solo identity via IdentityService."""
-        return self._identity_service.merge_identity_into(
-            source_name_id, target_name_id
-        )
-
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record via EditService."""
         return self._edit_service.update_album(album_id, album_data)
@@ -340,10 +314,6 @@ class CatalogService:
     def delete_unlinked_publishers(self, publisher_ids: List[int]) -> int:
         """Clean up unlinked publishers via EditService."""
         return self._edit_service.delete_unlinked_publishers(publisher_ids)
-
-    def delete_unlinked_identities(self, identity_ids: List[int]) -> int:
-        """Clean up unlinked identities via IdentityService."""
-        return self._identity_service.delete_unlinked_identities(identity_ids)
 
     def delete_unlinked_tags(self, tag_ids: List[int]) -> int:
         """Clean up unlinked tags via EditService."""

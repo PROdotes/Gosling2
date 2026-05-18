@@ -390,23 +390,40 @@ class IdentityRepository(BaseRepository):
         # If name_id is null, the name MUST be truly new OR already belong to this identity.
         if not name_id:
             collision = cursor.execute(
-                "SELECT NameID, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
+                "SELECT NameID, OwnerIdentityID, IsDeleted FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
                 (display_name,),
             ).fetchone()
 
             if collision:
-                if collision[1] == identity_id:
+                collision_name_id, collision_owner, collision_deleted = (
+                    collision[0],
+                    collision[1],
+                    bool(collision[2]),
+                )
+                if collision_owner == identity_id:
                     # Scenario A: Already belongs to this identity (Idempotent)
                     # Reactivate if it was soft-deleted
                     cursor.execute(
                         "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
-                        (collision[0],),
+                        (collision_name_id,),
                     )
-                    return collision[0]
+                    return collision_name_id
+                elif collision_deleted:
+                    # Scenario B: Name exists but is soft-deleted under another identity.
+                    # Re-parent the existing row instead of inserting a duplicate.
+                    cursor.execute(
+                        "UPDATE ArtistNames SET OwnerIdentityID = ?, IsPrimaryName = 0, IsDeleted = 0 WHERE NameID = ?",
+                        (identity_id, collision_name_id),
+                    )
+                    logger.info(
+                        f"[IdentityRepository] Reclaimed soft-deleted name '{display_name}' "
+                        f"(NameID={collision_name_id}) from identity {collision_owner} → {identity_id}"
+                    )
+                    return collision_name_id
                 else:
                     # Theft/Ambiguity: Blocked
                     logger.error(
-                        f"[IdentityRepository] Blocked: '{display_name}' already exists for identity {collision[1]}. Mandatory ID required for re-linking."
+                        f"[IdentityRepository] Blocked: '{display_name}' already exists for identity {collision_owner}. Mandatory ID required for re-linking."
                     )
                     raise ValueError(
                         f"Identity collision: '{display_name}' already exists in the database belonging to another identity. You must provide a specific NameID/IdentityID to re-parent this name."
@@ -569,6 +586,16 @@ class IdentityRepository(BaseRepository):
             "DELETE FROM GroupMemberships WHERE GroupIdentityID = ? AND MemberIdentityID = ?",
             (group_id, member_id),
         )
+
+    def get_owner_identity_id(
+        self, name_id: int, cursor: sqlite3.Cursor
+    ) -> Optional[int]:
+        """Return the OwnerIdentityID for a given NameID, or None if the name doesn't exist."""
+        row = cursor.execute(
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?",
+            (name_id,),
+        ).fetchone()
+        return row[0] if row else None
 
     def delete_alias(self, name_id: int, cursor: sqlite3.Cursor) -> None:
         """Detach an alias from its identity by re-homing it to a new Identity row."""

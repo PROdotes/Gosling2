@@ -847,18 +847,3 @@ BatchIngestReport.model_rebuild()
 IngestStatusModel.model_rebuild()
 
 
-class AddAliasBody(BaseModel):
-    display_name: str
-    name_id: Optional[int] = None
-
-
-class UpdateLegalNameBody(BaseModel):
-    legal_name: Optional[str] = None
-
-
-class SetIdentityTypeBody(BaseModel):
-    type: str
-
-
-class AddMemberBody(BaseModel):
-    member_id: int

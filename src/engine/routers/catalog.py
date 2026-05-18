@@ -12,8 +12,6 @@ from src.models.view_models import (
     ArtistChipView,
     IngestionCheckRequest,
     IngestionReportView,
-    AddAliasBody,
-    UpdateLegalNameBody,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -190,41 +188,6 @@ async def search_artist_names(q: str, exclude_groups: bool = False) -> List[Arti
     return _get_service().search_artist_names(q, exclude_groups=exclude_groups)
 
 
-@router.post("/identities/{identity_id:int}/aliases")
-async def add_identity_alias(identity_id: int, body: AddAliasBody) -> dict:
-    """Add or re-link an alias name to an identity."""
-    try:
-        # Pass the name_id from the body to the service for Truth-First re-linking
-        name_id = _get_service().add_identity_alias(
-            identity_id, body.display_name, name_id=body.name_id
-        )
-        return {"name_id": name_id, "display_name": body.display_name}
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-
-
-@router.delete("/identities/{identity_id:int}/aliases/{name_id:int}", status_code=204)
-async def remove_identity_alias(identity_id: int, name_id: int) -> None:  # noqa: ARG001
-    """Remove an alias from an identity."""
-    try:
-        _get_service().remove_identity_alias(name_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.patch("/identities/{identity_id:int}/legal-name", status_code=204)
-async def update_identity_legal_name(
-    identity_id: int, body: UpdateLegalNameBody
-) -> None:
-    """Update the legal name of an identity."""
-    try:
-        _get_service().update_identity_legal_name(identity_id, body.legal_name)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
 @router.get("/identities/{identity_id:int}/songs", response_model=List[SongSlimView])
 async def get_songs_by_identity(identity_id: int) -> List[SongSlimView]:
     """Fetch slim song list for a full universal identity tree."""
@@ -259,39 +222,6 @@ async def get_albums_by_identity(identity_id: int) -> List[AlbumSlimView]:
 
     rows = _get_service().get_albums_slim_by_identity(identity_id)
     return [AlbumSlimView.from_row(r) for r in rows]
-
-
-@router.delete("/identities/{identity_id:int}", status_code=204)
-async def delete_identity(identity_id: int) -> None:
-    """Soft-delete a single identity. 404 if not found, 403 if linked to active songs or albums."""
-    logger.debug(f"[CatalogRouter] delete_identity(id={identity_id})")
-    service = _get_service()
-    if not service.get_identity(identity_id):
-        raise HTTPException(status_code=404, detail=f"Identity {identity_id} not found")
-    deleted = service.delete_unlinked_identities([identity_id])
-    if deleted == 0:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Identity {identity_id} is linked to active songs or albums",
-        )
-
-
-@router.delete("/identities", response_model=dict)
-async def bulk_delete_unlinked_identities(unlinked: bool = False) -> dict:
-    """Soft-delete all unlinked identities. Requires ?unlinked=true as a safety flag."""
-    logger.debug(
-        f"[CatalogRouter] bulk_delete_unlinked_identities(unlinked={unlinked})"
-    )
-    if not unlinked:
-        raise HTTPException(
-            status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
-        )
-    service = _get_service()
-    rows = service.get_all_identities_slim()
-    deleted = service.delete_unlinked_identities(
-        [r["IdentityID"] for r in rows if r.get("IdentityID") is not None]
-    )
-    return {"deleted": deleted}
 
 
 @router.get("/publishers", response_model=List[PublisherView])

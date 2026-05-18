@@ -29,35 +29,11 @@ Fetch a list of all active identities.
 ### resolve_identity_by_name(display_name: str) -> Optional[int]
 Return the IdentityID for an ArtistName (Truth-First resolution).
 
-### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int] = None) -> int
-Link a new or existing alias name to an identity (Truth-First mapping).
-
-### remove_identity_alias(name_id: int) -> None
-Remove an alias from an identity. Raises ValueError if it is the primary name.
-
-### update_identity_legal_name(identity_id: int, legal_name: Optional[str]) -> None
-Update the LegalName on an Identity.
-
 ### search_identities(query: str) -> List[Identity]
 Search for identities by name or alias.
 
 ### get_identity_song_counts(identity_ids: List[int]) -> dict
 Batch active song counts for identities (across all aliases). Returns {id: N}.
-
-### merge_identity_into(source_name_id: int, target_name_id: int) -> None
-Merges a solo identity into an existing one.
-
-### set_identity_type(identity_id: int, type_: str) -> None
-Convert an identity between person and group.
-
-### add_identity_member(group_id: int, member_id: int) -> None
-Add a person identity as a member of a group.
-
-### remove_identity_member(group_id: int, member_id: int) -> None
-Remove a member from a group. Noop if not linked.
-
-### delete_unlinked_identities(identity_ids: List[int]) -> int
-Soft-delete identities that have zero active songs/albums across ALL aliases.
 
 ## IngestionService
 *Location: `src/services/ingestion_service.py`*
@@ -228,13 +204,8 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration.
 ### remove_album_credit(album_id: int, artist_name_id: int)
 ### add_album_publisher(album_id: int, publisher_name: str)
 ### remove_album_publisher(album_id: int, publisher_id: int)
-### merge_identity_into(source_name_id: int, target_name_id: int)
-### set_identity_type(identity_id: int, type_: str)
-### add_identity_member(group_id: int, member_id: int)
-### remove_identity_member(group_id: int, member_id: int)
 ### delete_unlinked_albums(album_ids: list)
 ### delete_unlinked_publishers(publisher_ids: list)
-### delete_unlinked_identities(identity_ids: list)
 ### delete_unlinked_tags(tag_ids: list)
 ### import_credits_bulk(song_id: int, credits: list, publishers: list)
 ### quick_create_album_for_song(song_id: int, title: str)
@@ -247,9 +218,6 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration.
 ### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
 ### get_songs_slim_by_tag(tag_id: int) -> List[dict]
 ### get_songs_slim_by_identity(identity_id: int) -> List[dict]
-### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int]) -> int
-### update_identity_legal_name(identity_id: int, legal_name: Optional[str])
-### remove_identity_alias(name_id: int)
 ### create_and_link_album(song_id: int, album_data: dict)
 
 ---

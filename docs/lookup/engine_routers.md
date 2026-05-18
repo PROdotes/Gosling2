@@ -132,16 +132,6 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns `{"deleted": N}`.
 - Wraps `CatalogService.get_all_tags` + `CatalogService.delete_unlinked_tags`.
 
-### async def delete_identity(identity_id: int) -> None
-**HTTP**: `DELETE /api/v1/identities/{identity_id}`
-- Soft-delete a single identity. 404 if not found, 403 if linked to active songs or albums.
-- Wraps `CatalogService.get_identity` + `CatalogService.delete_unlinked_identities`.
-
-### async def bulk_delete_unlinked_identities(unlinked: bool = False) -> dict
-**HTTP**: `DELETE /api/v1/identities?unlinked=true`
-- Soft-delete all unlinked identities in one transaction. Requires `?unlinked=true` as a safety flag.
-- Wraps `CatalogService.get_all_identities` + `CatalogService.delete_unlinked_identities`.
-
 ### async def delete_publisher(publisher_id: int) -> None
 **HTTP**: `DELETE /api/v1/publishers/{publisher_id}`
 - Soft-delete a single publisher. 404 if not found, 403 if linked to active songs or albums.
@@ -168,16 +158,6 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns `{"url": "... "}`.
 - Wraps `SearchService.get_search_url`.
 
-### async def add_identity_alias(identity_id: int, body: AddAliasBody) -> dict
-**HTTP**: `POST /api/v1/identities/{identity_id}/aliases`
-- Add or re-link an alias name to an identity.
-- Wraps `CatalogService.add_identity_alias`.
-
-### async def remove_identity_alias(identity_id: int, name_id: int) -> None
-**HTTP**: `DELETE /api/v1/identities/{identity_id}/aliases/{name_id}`
-- Remove an alias from an identity.
-- Wraps `CatalogService.remove_identity_alias`.
-
 ### async def get_tag_categories() -> List[str]
 **HTTP**: `GET /api/v1/tags/categories`
 - Returns all distinct tag categories from the database.
@@ -188,19 +168,6 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Performs a dry-run ingestion collision check.
 - Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 - Wraps `CatalogService.check_ingestion`.
-
-### AddAliasBody *(see src/models/view_models.py)*
-`{ display_name: str, name_id: int|null }`
-Used by `add_identity_alias`.
-
-### UpdateLegalNameBody *(see src/models/view_models.py)*
-`{ legal_name: str|null }`
-Used by `update_identity_legal_name`.
-
-### async def update_identity_legal_name(identity_id: int, body: UpdateLegalNameBody) -> None
-**HTTP**: `PATCH /api/v1/identities/{identity_id}/legal-name`
-- Update the LegalName on an Identity globally.
-- Wraps `CatalogService.update_identity_legal_name`.
 
 ### def get_validation_rules() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/validation-rules`

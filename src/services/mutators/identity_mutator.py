@@ -52,6 +52,11 @@ class IdentityMutator:
     def _remove(self, item: Union[RemoveIdentityAliasItem, RemoveIdentityMemberItem], conn: sqlite3.Connection) -> None:
         cursor = conn.cursor()
         if isinstance(item, RemoveIdentityAliasItem):
+            owner = self._repo.get_owner_identity_id(item.name_id, cursor)
+            if owner is not None and owner != item.identity_id:
+                raise ValueError(
+                    f"Alias {item.name_id} belongs to identity {owner}, not {item.identity_id}"
+                )
             self._repo.delete_alias(item.name_id, cursor)
         elif isinstance(item, RemoveIdentityMemberItem):
             self._repo.remove_member(item.group_id, item.member_id, cursor)

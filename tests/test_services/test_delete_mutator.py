@@ -165,3 +165,60 @@ class TestDeleteIdentity:
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
             mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=9999), conn)
+
+    def test_linked_via_secondary_alias_rejected(self, mutator, conn):
+        # Dave (id=1) is credited on song 4 via Grohlton alias (NameID=11),
+        # not via his primary name. The check must follow aliases.
+        with pytest.raises(ValueError, match="still linked"):
+            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=1), conn)
+
+    def test_delete_soft_deletes_all_aliases(self, mutator, conn):
+        # Build an orphan identity with two names attached, delete it, and
+        # confirm both alias rows are soft-deleted.
+        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
+        conn.execute(
+            "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (9001, 999, 'Orphan Primary', 1)"
+        )
+        conn.execute(
+            "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (9002, 999, 'Orphan Alias', 0)"
+        )
+        conn.commit()
+        mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=999), conn)
+        conn.commit()
+        live = conn.execute(
+            "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = 999 AND IsDeleted = 0"
+        ).fetchone()[0]
+        assert live == 0
+
+
+# ---------------------------------------------------------------------------
+# Identity delete — unlinked (bulk) mode
+# ---------------------------------------------------------------------------
+
+class TestDeleteIdentityUnlinked:
+    def test_bulk_deletes_orphan_identities(self, mutator, conn):
+        # Insert two truly orphan identities (no credits, no album credits).
+        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (997, 'person')")
+        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (998, 'person')")
+        conn.commit()
+        mutator.apply_within(
+            "delete",
+            DeleteIdentityItem(type="identity", id=0, unlinked=True),
+            conn,
+        )
+        conn.commit()
+        assert _is_deleted(conn, "Identities", "IdentityID", 997)
+        assert _is_deleted(conn, "Identities", "IdentityID", 998)
+
+    def test_bulk_skips_linked_identities(self, mutator, conn):
+        # Insert an orphan alongside Nirvana (id=2, linked to song 1 via NameID 20).
+        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
+        conn.commit()
+        mutator.apply_within(
+            "delete",
+            DeleteIdentityItem(type="identity", id=0, unlinked=True),
+            conn,
+        )
+        conn.commit()
+        assert _is_deleted(conn, "Identities", "IdentityID", 999)
+        assert not _is_deleted(conn, "Identities", "IdentityID", 2)
