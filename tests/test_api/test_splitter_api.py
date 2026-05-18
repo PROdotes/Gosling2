@@ -134,14 +134,23 @@ class TestPreview:
 class TestConfirm:
     def test_split_credits(self, api_db):
         add = api_db.post(
-            "/api/v1/songs/2/credits",
+            "/api/v1/mutate",
             json={
-                "display_name": "Dave Grohl & Taylor Hawkins",
-                "role_name": "Composer",
+                "add": [
+                    {
+                        "type": "credit",
+                        "song_id": 2,
+                        "name": "Dave Grohl & Taylor Hawkins",
+                        "role": "Composer",
+                    }
+                ]
             },
         )
         assert add.status_code == 200, f"Setup failed: {add.status_code} {add.text}"
-        credit_id = add.json()["credit_id"]
+        song = add.json()["songs"][0]
+        matching = [c for c in song["credits"] if c["display_name"] == "Dave Grohl & Taylor Hawkins"]
+        assert matching, f"Could not find added credit in: {song['credits']}"
+        credit_id = matching[0]["credit_id"]
 
         r = api_db.post(
             "/api/v1/tools/splitter/confirm",
@@ -159,6 +168,9 @@ class TestConfirm:
         )
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
 
+        mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
+        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
+
         song = api_db.get("/api/v1/songs/2").json()
         credit_names = [c["display_name"] for c in song["credits"]]
         assert "Dave Grohl & Taylor Hawkins" not in credit_names
@@ -167,11 +179,23 @@ class TestConfirm:
 
     def test_split_credits_with_ignored_sep(self, api_db):
         add = api_db.post(
-            "/api/v1/songs/2/credits",
-            json={"display_name": "Earth, Wind & Fire & ABBA", "role_name": "Composer"},
+            "/api/v1/mutate",
+            json={
+                "add": [
+                    {
+                        "type": "credit",
+                        "song_id": 2,
+                        "name": "Earth, Wind & Fire & ABBA",
+                        "role": "Composer",
+                    }
+                ]
+            },
         )
         assert add.status_code == 200, f"Setup failed: {add.status_code} {add.text}"
-        credit_id = add.json()["credit_id"]
+        song = add.json()["songs"][0]
+        matching = [c for c in song["credits"] if c["display_name"] == "Earth, Wind & Fire & ABBA"]
+        assert matching, f"Could not find added credit in: {song['credits']}"
+        credit_id = matching[0]["credit_id"]
 
         r = api_db.post(
             "/api/v1/tools/splitter/confirm",
@@ -193,6 +217,9 @@ class TestConfirm:
         )
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
 
+        mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
+        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
+
         song = api_db.get("/api/v1/songs/2").json()
         credit_names = [c["display_name"] for c in song["credits"]]
         assert "Earth, Wind & Fire" in credit_names
@@ -201,10 +228,22 @@ class TestConfirm:
 
     def test_split_publishers(self, api_db):
         add = api_db.post(
-            "/api/v1/songs/2/publishers", json={"publisher_name": "Universal & Sub Pop"}
+            "/api/v1/mutate",
+            json={
+                "add": [
+                    {
+                        "type": "publisher",
+                        "song_id": 2,
+                        "name": "Universal & Sub Pop",
+                    }
+                ]
+            },
         )
         assert add.status_code == 200, f"Setup failed: {add.status_code} {add.text}"
-        publisher_id = add.json()["id"]
+        song = add.json()["songs"][0]
+        matching = [p for p in song["publishers"] if p["name"] == "Universal & Sub Pop"]
+        assert matching, f"Could not find added publisher in: {song['publishers']}"
+        publisher_id = matching[0]["id"]
 
         r = api_db.post(
             "/api/v1/tools/splitter/confirm",
@@ -221,6 +260,9 @@ class TestConfirm:
             },
         )
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
+
+        mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
+        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
 
         song = api_db.get("/api/v1/songs/2").json()
         pub_names = [p["name"] for p in song["publishers"]]

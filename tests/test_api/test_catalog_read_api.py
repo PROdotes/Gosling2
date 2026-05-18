@@ -127,10 +127,10 @@ class TestGetTagById:
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
 
-    def test_invalid_id_returns_405(self, api):
-        # `:int` path constraint causes FastAPI to return 405 (no matching route) for non-int IDs
+    def test_invalid_id_returns_404(self, api):
+        # `:int` path constraint causes FastAPI to return 404 (no matching route) for non-int IDs
         resp = api.get("/api/v1/tags/not_an_int")
-        assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
 
 
 class TestGetTagCategories:
@@ -282,10 +282,10 @@ class TestGetPublisherById:
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
 
-    def test_invalid_id_returns_405(self, api):
-        # `:int` path constraint causes FastAPI to return 405 (no matching route) for non-int IDs
+    def test_invalid_id_returns_404(self, api):
+        # `:int` path constraint causes FastAPI to return 404 (no matching route) for non-int IDs
         resp = api.get("/api/v1/publishers/not_an_int")
-        assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
 
 
 # ---------------------------------------------------------------------------

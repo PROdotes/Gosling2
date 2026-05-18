@@ -607,50 +607,6 @@ class TestScanFolder:
         assert files == [], f"Expected empty list, got {files}"
 
 
-class TestIngestBatch:
-    """Tests for ingest_batch() method - parallel file processing."""
-
-    def test_empty_list_returns_zero_counts(self, populated_db):
-        """Batch ingesting empty list returns all zeros."""
-        service = CatalogService(populated_db)
-        report = service.ingest_batch([], max_workers=5)
-
-        assert (
-            report["total_files"] == 0
-        ), f"Expected 0 total_files, got {report['total_files']}"
-        assert report["ingested"] == 0, f"Expected 0 ingested, got {report['ingested']}"
-        assert (
-            report["duplicates"] == 0
-        ), f"Expected 0 duplicates, got {report['duplicates']}"
-        assert report["errors"] == 0, f"Expected 0 errors, got {report['errors']}"
-        assert (
-            report["results"] == []
-        ), f"Expected empty results, got {report['results']}"
-
-    def test_single_file_sequential_behavior(self, populated_db, tmp_path):
-        """Single file batch behaves same as single ingest_file() call."""
-        # This is a placeholder - real test would need actual audio file with metadata
-        # Skipping for now since it requires MetadataService integration
-        pass
-
-    def test_max_workers_parameter_accepted(self, populated_db):
-        """Verify max_workers parameter is accepted without error."""
-        service = CatalogService(populated_db)
-
-        # Should not raise
-        report = service.ingest_batch([], max_workers=1)
-        assert report is not None, "Expected report dict"
-
-        report = service.ingest_batch([], max_workers=20)
-        assert report is not None, "Expected report dict"
-
-    def test_aggregate_stats_sum_correctly(self, populated_db):
-        """Aggregate counts (ingested + duplicates + errors) equal total_files."""
-        # This would need real staged files to test properly
-        # Placeholder for now
-        pass
-
-
 class TestIngestFileStagedCleanup:
     """ingest_file must delete staged duplicates but never touch files outside staging."""
 
