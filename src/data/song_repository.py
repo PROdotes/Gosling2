@@ -275,15 +275,15 @@ class SongRepository(MediaSourceRepository):
             LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
             WHERE m.SourceID IN (
                 SELECT m2.SourceID FROM MediaSources m2
-                    WHERE m2.MediaName LIKE ? AND m2.IsDeleted = 0
+                    WHERE m2.MediaName_Search LIKE ? AND m2.IsDeleted = 0
                 UNION
                 SELECT sa.SourceID FROM SongAlbums sa
                     JOIN Albums a ON sa.AlbumID = a.AlbumID
-                    WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
+                    WHERE a.AlbumTitle_Search LIKE ? AND a.IsDeleted = 0
                 UNION
                 SELECT sc2.SourceID FROM SongCredits sc2
                     JOIN ArtistNames an2 ON sc2.CreditedNameID = an2.NameID
-                    WHERE an2.DisplayName LIKE ? AND an2.IsDeleted = 0
+                    WHERE an2.DisplayName_Search LIKE ? AND an2.IsDeleted = 0
                 UNION
                 SELECT sc3.SourceID FROM SongCredits sc3
                     JOIN ArtistNames an3 ON sc3.CreditedNameID = an3.NameID

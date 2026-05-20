@@ -22,6 +22,7 @@ from src.models.domain import (
 from src.services.logger import logger
 from src.services.filing_service import FilingService
 from src.engine import config
+from src.utils.text import normalize_for_search
 
 
 class LibraryService:
@@ -113,7 +114,7 @@ class LibraryService:
     def search_albums_slim(self, query: str) -> List[dict]:
         """Slim list-view album search. No tracklist hydration."""
         logger.debug(f"[LibraryService] -> search_albums_slim(q='{query}')")
-        rows = self._album_repo_dir.search_slim(query)
+        rows = self._album_repo_dir.search_slim(normalize_for_search(query))
         logger.debug(f"[LibraryService] <- search_albums_slim count={len(rows)}")
         return rows
 
@@ -326,7 +327,7 @@ class LibraryService:
     def search_songs_slim(self, query: str) -> List[dict]:
         """Slim list-view search. Returns raw dicts for SongSlimView — no hydration."""
         logger.debug(f"[LibraryService] -> search_songs_slim(q='{query}')")
-        rows = self._song_repo.search_slim(query)
+        rows = self._song_repo.search_slim(normalize_for_search(query))
         logger.debug(f"[LibraryService] <- search_songs_slim count={len(rows)}")
         return rows
 
@@ -339,11 +340,12 @@ class LibraryService:
         Deep slim search. Base matches + identity/publisher expansion, no hydration.
         """
         logger.debug(f"[LibraryService] -> search_songs_deep_slim(q='{query}')")
-        base_rows = self._song_repo.search_slim(query)
+        normalized = normalize_for_search(query)
+        base_rows = self._song_repo.search_slim(normalized)
         seen_ids = {r["SourceID"] for r in base_rows}
 
         # Identity expansion (Mel B → Spice Girls)
-        seeds = self._identity_repo.search_identities(query)
+        seeds = self._identity_repo.search_identities(normalized)
         if seeds:
             identity_ids = {s.id for s in seeds}
             group_ids = self._identity_repo.get_group_ids_for_members(

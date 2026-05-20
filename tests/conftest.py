@@ -26,6 +26,27 @@ from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
 # from src.services.audit_service import AuditService  # REMOVED
 from src.engine import config  # noqa: E402
+from src.utils.text import normalize_for_search  # noqa: E402
+
+
+def _backfill_search_shadows(cursor: sqlite3.Cursor) -> None:
+    """Populate _Search columns for any rows that have NULL shadows. Matches
+    what tools/backfill_search_columns.py does on the live DB, so test fixtures
+    behave the same as production after migration."""
+    for table, name_col, search_col, id_col in (
+        ("ArtistNames", "DisplayName", "DisplayName_Search", "NameID"),
+        ("MediaSources", "MediaName", "MediaName_Search", "SourceID"),
+        ("Albums", "AlbumTitle", "AlbumTitle_Search", "AlbumID"),
+    ):
+        rows = cursor.execute(
+            f"SELECT {id_col}, {name_col} FROM {table} "
+            f"WHERE {search_col} IS NULL AND {name_col} IS NOT NULL"
+        ).fetchall()
+        for row in rows:
+            cursor.execute(
+                f"UPDATE {table} SET {search_col} = ? WHERE {id_col} = ?",
+                (normalize_for_search(row[1]), row[0]),
+            )
 
 
 @pytest.fixture(autouse=True)
@@ -403,6 +424,7 @@ def _populate_db_data(db_path):
         )
 
     # --- Finalize ---
+    _backfill_search_shadows(cursor)
     conn.commit()
     conn.close()
 
@@ -495,6 +517,7 @@ def _populate_edge_case_data(db_path):
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (105, 300, 1)"
     )
 
+    _backfill_search_shadows(cursor)
     conn.commit()
     conn.close()
 

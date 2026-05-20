@@ -126,8 +126,8 @@ class IdentityRepository(BaseRepository):
             FROM Identities i
             {self._IDENTITY_JOIN}
             WHERE i.IsDeleted = 0{type_filter} AND (i.IdentityID IN (
-                SELECT OwnerIdentityID FROM ArtistNames 
-                WHERE DisplayName LIKE ? AND IsDeleted = 0
+                SELECT OwnerIdentityID FROM ArtistNames
+                WHERE DisplayName_Search LIKE ? AND IsDeleted = 0
             ) OR i.LegalName LIKE ?)
             ORDER BY DisplayName ASC
         """
@@ -186,7 +186,7 @@ class IdentityRepository(BaseRepository):
             {self._IDENTITY_JOIN}
             WHERE i.IsDeleted = 0{type_filter} AND (i.IdentityID IN (
                 SELECT OwnerIdentityID FROM ArtistNames
-                WHERE DisplayName LIKE ? AND IsDeleted = 0
+                WHERE DisplayName_Search LIKE ? AND IsDeleted = 0
             ) OR i.LegalName LIKE ?)
             ORDER BY DisplayName ASC
         """
@@ -222,7 +222,7 @@ class IdentityRepository(BaseRepository):
             SELECT an.NameID, an.DisplayName, an.OwnerIdentityID
             FROM ArtistNames an
             JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
-            WHERE an.IsDeleted = 0 AND i.IsDeleted = 0 AND an.DisplayName LIKE ?{type_filter}
+            WHERE an.IsDeleted = 0 AND i.IsDeleted = 0 AND an.DisplayName_Search LIKE ?{type_filter}
             ORDER BY an.DisplayName ASC
         """
 

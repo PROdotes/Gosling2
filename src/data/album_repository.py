@@ -51,10 +51,10 @@ class AlbumRepository(BaseRepository):
         logger.debug(f"[AlbumRepository] -> search_slim(q='{query}')")
         where = """
             WHERE a.IsDeleted = 0
-              AND (a.AlbumTitle LIKE ? OR EXISTS (
+              AND (a.AlbumTitle_Search LIKE ? OR EXISTS (
                 SELECT 1 FROM AlbumCredits ac2
                 JOIN ArtistNames an2 ON ac2.CreditedNameID = an2.NameID AND an2.IsDeleted = 0
-                WHERE ac2.AlbumID = a.AlbumID AND an2.DisplayName LIKE ?
+                WHERE ac2.AlbumID = a.AlbumID AND an2.DisplayName_Search LIKE ?
               ))
         """
         sql = f"{self._SLIM_SELECT_JOINS} {where} {self._SLIM_GROUP_ORDER}"

@@ -3,6 +3,7 @@ from src.data.identity_repository import IdentityRepository
 from src.models.domain import Identity
 from src.models.view_models import ArtistChipView
 from src.services.logger import logger
+from src.utils.text import normalize_for_search
 
 
 class IdentityService:
@@ -42,7 +43,9 @@ class IdentityService:
     def search_slim(self, query: str, exclude_groups: bool = False) -> List[dict]:
         """Slim list-view search (no hydration). Matches DisplayName, LegalName, or Alias."""
         logger.debug(f"[IdentityService] -> search_slim(q='{query}')")
-        result = self._identity_repo.search_slim(query, exclude_groups=exclude_groups)
+        result = self._identity_repo.search_slim(
+            normalize_for_search(query), exclude_groups=exclude_groups
+        )
         logger.debug(
             f"[IdentityService] <- search_slim(q='{query}') count={len(result)}"
         )
@@ -59,7 +62,9 @@ class IdentityService:
         logger.debug(
             f"[IdentityService] -> search_artist_names(q='{query}', exclude_groups={exclude_groups})"
         )
-        rows = self._identity_repo.search_artist_names(query, exclude_groups=exclude_groups)
+        rows = self._identity_repo.search_artist_names(
+            normalize_for_search(query), exclude_groups=exclude_groups
+        )
         result = [
             ArtistChipView(
                 name_id=r["NameID"],
