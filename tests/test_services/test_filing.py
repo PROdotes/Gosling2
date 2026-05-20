@@ -46,6 +46,48 @@ def test_evaluate_routing_basic(filing_service):
     assert str(target).isascii()
 
 
+def _make_routed_song(media_name: str, performer: str, genre: str = "Pop") -> Song:
+    """Minimal Song for routing-only tests (no filesystem ops)."""
+    return Song(
+        id=1,
+        media_name=media_name,
+        source_path="temp/staging/test.mp3",
+        duration_s=180.0,
+        year=2024,
+        processing_status=0,
+        credits=[
+            SongCredit(
+                credit_id=1,
+                source_id=1,
+                name_id=1,
+                role_id=1,
+                role_name="Performer",
+                display_name=performer,
+                is_primary=True,
+            )
+        ],
+        tags=[Tag(id=10, name=genre, category="Genre", is_primary=True)],
+    )
+
+
+def test_evaluate_routing_eszett_to_ss(filing_service):
+    """German ß is atomic and would be dropped by NFKD alone — the shared
+    transliteration map must save it at the path layer too."""
+    song = _make_routed_song(media_name="Straßenkind", performer="Künstler")
+    target = filing_service.evaluate_routing(song)
+    assert "Strassenkind" in str(target)
+    assert str(target).isascii()
+
+
+def test_evaluate_routing_ligatures(filing_service):
+    """Æ and Œ ligatures must transliterate at the path layer (new coverage)."""
+    song = _make_routed_song(media_name="Æther", performer="Œuvre")
+    target = filing_service.evaluate_routing(song)
+    assert "Aether" in str(target)
+    assert "Oeuvre" in str(target)
+    assert str(target).isascii()
+
+
 def test_evaluate_routing_missing_metadata_fails(filing_service):
     # This scenario technically shouldn't happen for status 0, but verified anyway
     song_no_artist = Song(

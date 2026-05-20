@@ -1,10 +1,10 @@
-import unicodedata
 import json
 import re
 import shutil
 from pathlib import Path
 from src.models.domain import Song
 from src.services.logger import logger
+from src.utils.text import strip_diacritics
 
 
 class FilingService:
@@ -121,39 +121,12 @@ class FilingService:
         return final_path
 
     def _sanitize_for_filesystem(self, path_str: str) -> str:
-        """
-        Transliterates UTF-8 characters to ASCII and replaces illegal filesystem characters.
-        Preserves path delimiters (slashes) to maintain directory structure.
-        """
-        # 1. Manual Transliteration for Slavic chars that NFKD doesn't handle as combinations
-        # Đ -> Dj, đ -> dj, Ć -> C, ć -> c, etc.
-        mapping = {
-            "Đ": "Dj",
-            "đ": "dj",
-            "Ć": "C",
-            "ć": "c",
-            "Č": "C",
-            "č": "c",
-            "Š": "S",
-            "š": "s",
-            "Ž": "Z",
-            "ž": "z",
-        }
-        for char, replacement in mapping.items():
-            path_str = path_str.replace(char, replacement)
-
-        # 2. Transliterate (Normalize NFKD to decompose, then encode ascii 'ignore')
-        # This handles accented chars like 'ö', 'à'
-        normalized = unicodedata.normalize("NFKD", path_str)
-        ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
-
-        # 3. Path-Illegal Character Cleanup
-        # We replace slashes, colons, and illegal characters with _
-        safe = re.sub(r'[\\/*?"<>|:]', "_", ascii_only)
-
-        # 4. Collapse multiple spaces
+        """ASCII-reduce via the shared text utility, then apply path-only cleanup
+        (illegal-char replacement + space collapse). Path delimiters are preserved
+        because strip_diacritics never touches '/'."""
+        safe = strip_diacritics(path_str)
+        safe = re.sub(r'[\\/*?"<>|:]', "_", safe)
         safe = re.sub(r"  +", " ", safe)
-
         return safe.strip(". ")
 
     def copy_to_library(self, song: Song, library_root: Path) -> Path:
