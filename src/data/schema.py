@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourceID INTEGER PRIMARY KEY,
     TypeID INTEGER NOT NULL,
     MediaName TEXT NOT NULL,
+    MediaName_Search TEXT,
     SourceNotes TEXT,
     SourcePath TEXT UNIQUE,
     SourceDuration REAL,
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS ArtistNames (
     NameID INTEGER PRIMARY KEY,
     OwnerIdentityID INTEGER,
     DisplayName TEXT NOT NULL,
+    DisplayName_Search TEXT,
     IsPrimaryName BOOLEAN DEFAULT 0,
     IsDeleted BOOLEAN DEFAULT 0,
     FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID),
@@ -74,6 +76,7 @@ CREATE TABLE IF NOT EXISTS SongCredits (
 CREATE TABLE IF NOT EXISTS Albums (
     AlbumID INTEGER PRIMARY KEY,
     AlbumTitle TEXT NOT NULL,
+    AlbumTitle_Search TEXT,
     AlbumType TEXT,
     ReleaseYear INTEGER,
     IsDeleted BOOLEAN DEFAULT 0

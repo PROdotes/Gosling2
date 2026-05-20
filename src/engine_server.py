@@ -22,6 +22,23 @@ from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
 
 
+_SEARCH_SHADOW_COLUMNS = [
+    ("ArtistNames", "DisplayName_Search"),
+    ("MediaSources", "MediaName_Search"),
+    ("Albums", "AlbumTitle_Search"),
+]
+
+
+def _migrate_search_columns(conn: sqlite3.Connection) -> None:
+    """Idempotent: add the diacritic-stripped shadow columns to pre-existing DBs.
+    Fresh DBs already have them via SCHEMA_SQL; this only fires on legacy schemas."""
+    for table, col in _SEARCH_SHADOW_COLUMNS:
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if col not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+            logger.info(f"[EngineServer] Migrated: added {table}.{col}")
+
+
 def _ensure_db():
     db_path = get_db_path()
     abs_path = db_path.resolve()
@@ -34,6 +51,7 @@ def _ensure_db():
         lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
     )
     conn.executescript(SCHEMA_SQL)
+    _migrate_search_columns(conn)
     conn.execute("INSERT OR IGNORE INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
     conn.commit()
     conn.close()
