@@ -62,9 +62,12 @@ class AlbumCreditRepository(BaseRepository):
         role_name: str,
         conn: sqlite3.Connection,
         identity_id: Optional[int] = None,
+        display_name_search: Optional[str] = None,
     ) -> int:
         """
         Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+        display_name_search is the diacritic-stripped lowercase shadow for the search index;
+        consumed only when this call inserts a brand-new ArtistNames row.
         Returns the name_id of the credited artist.
         """
         logger.debug(
@@ -76,7 +79,7 @@ class AlbumCreditRepository(BaseRepository):
         cursor = conn.cursor()
         role_id = credit_repo.get_or_create_role(role_name, cursor)
         name_id = credit_repo.get_or_create_credit_name(
-            display_name, cursor, identity_id
+            display_name, cursor, identity_id, display_name_search=display_name_search
         )
         cursor.execute(
             "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",

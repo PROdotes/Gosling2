@@ -123,3 +123,31 @@ class TestSongMutatorUpdate:
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 100})
         with pytest.raises(ValueError):
             mutator.apply_within("add", item, conn)
+
+    def test_update_media_name_populates_shadow(self, mutator, conn):
+        item = UpdateSongItem.model_validate(
+            {"type": "song", "id": 1, "media_name": "Šima, unučad i praunučad"}
+        )
+        mutator.apply_within("update", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT MediaName, MediaName_Search FROM MediaSources WHERE SourceID = 1"
+        ).fetchone()
+        assert row["MediaName"] == "Šima, unučad i praunučad"
+        assert row["MediaName_Search"] == "sima, unucad i praunucad"
+
+    def test_update_without_media_name_leaves_shadow_alone(self, mutator, conn):
+        # Seed a known shadow on song 1, then update an unrelated field.
+        conn.execute(
+            "UPDATE MediaSources SET MediaName = ?, MediaName_Search = ? WHERE SourceID = 1",
+            ("Šima", "sima"),
+        )
+        conn.commit()
+        item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 123})
+        mutator.apply_within("update", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT MediaName, MediaName_Search FROM MediaSources WHERE SourceID = 1"
+        ).fetchone()
+        assert row["MediaName"] == "Šima"
+        assert row["MediaName_Search"] == "sima"

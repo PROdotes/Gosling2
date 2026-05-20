@@ -161,6 +161,7 @@ class SongRepository(MediaSourceRepository):
             if k
             in (
                 "media_name",
+                "media_name_search",
                 "is_active",
                 "processing_status",
                 "source_path",
@@ -172,6 +173,7 @@ class SongRepository(MediaSourceRepository):
 
         col_map = {
             "media_name": "MediaName",
+            "media_name_search": "MediaName_Search",
             "is_active": "IsActive",
             "processing_status": "ProcessingStatus",
             "source_path": "SourcePath",

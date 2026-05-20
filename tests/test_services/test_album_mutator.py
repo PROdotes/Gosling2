@@ -286,3 +286,43 @@ class TestAlbumMutatorUpdateSongAlbum:
         )
         with pytest.raises(LookupError):
             mutator.apply_within("update", item, conn)
+
+
+# ---------------------------------------------------------------------------
+# search-shadow columns (phase 3.1 unit C.1)
+# ---------------------------------------------------------------------------
+
+
+class TestAlbumMutatorSearchShadow:
+    def test_add_new_album_populates_shadow(self, mutator, conn):
+        item = AddAlbumItem.model_validate(
+            {
+                "type": "album",
+                "song_id": 3,
+                "name": "Šešir Profesora Koste Vujića",
+                "track_number": 1,
+                "disc_number": 1,
+            }
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT AlbumTitle, AlbumTitle_Search FROM Albums "
+            "WHERE AlbumTitle = ? COLLATE UTF8_NOCASE",
+            ("Šešir Profesora Koste Vujića",),
+        ).fetchone()
+        assert row is not None
+        assert row["AlbumTitle"] == "Šešir Profesora Koste Vujića"
+        assert row["AlbumTitle_Search"] == "sesir profesora koste vujica"
+
+    def test_update_title_updates_shadow(self, mutator, conn):
+        item = UpdateAlbumEntityItem.model_validate(
+            {"type": "album", "id": 100, "title": "Nëvërmïnd"}
+        )
+        mutator.apply_within("update", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT AlbumTitle, AlbumTitle_Search FROM Albums WHERE AlbumID = 100"
+        ).fetchone()
+        assert row["AlbumTitle"] == "Nëvërmïnd"
+        assert row["AlbumTitle_Search"] == "nevermind"

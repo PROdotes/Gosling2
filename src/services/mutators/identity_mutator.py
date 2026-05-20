@@ -10,6 +10,7 @@ from src.engine.routers.mutation_models import (
     RemoveIdentityMemberItem,
     UpdateIdentityItem,
 )
+from src.utils.text import normalize_for_search
 
 
 class IdentityMutator:
@@ -43,7 +44,14 @@ class IdentityMutator:
     def _add(self, item: Union[AddIdentityAliasItem, AddIdentityMemberItem], conn: sqlite3.Connection) -> None:
         cursor = conn.cursor()
         if isinstance(item, AddIdentityAliasItem):
-            self._repo.add_alias(item.identity_id, item.display_name or "", cursor, name_id=item.name_id)
+            display_name = item.display_name or ""
+            self._repo.add_alias(
+                item.identity_id,
+                display_name,
+                cursor,
+                name_id=item.name_id,
+                display_name_search=normalize_for_search(display_name) if display_name else None,
+            )
         elif isinstance(item, AddIdentityMemberItem):
             self._repo.add_member(item.group_id, item.member_id, cursor)
         else:

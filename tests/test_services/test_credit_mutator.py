@@ -201,3 +201,52 @@ class TestCreditMutatorUpdate:
         )
         with pytest.raises(LookupError):
             mutator.apply_within("update", item, conn)
+
+
+# ---------------------------------------------------------------------------
+# search-shadow columns (phase 3.1 unit C.1)
+# ---------------------------------------------------------------------------
+
+
+def _get_name_search(conn: sqlite3.Connection, name: str) -> tuple[str, str | None]:
+    row = conn.execute(
+        "SELECT DisplayName, DisplayName_Search FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
+        (name,),
+    ).fetchone()
+    assert row is not None, f"ArtistName not found: {name}"
+    return row["DisplayName"], row["DisplayName_Search"]
+
+
+class TestCreditMutatorSearchShadow:
+    def test_song_add_credit_populates_shadow(self, mutator, conn):
+        item = AddCreditItem.model_validate(
+            {"type": "credit", "song_id": 7, "name": "Šima", "role": "Performer"}
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+        display, shadow = _get_name_search(conn, "Šima")
+        assert display == "Šima"
+        assert shadow == "sima"
+
+    def test_album_add_credit_populates_shadow(self, mutator, conn):
+        item = AddCreditItem.model_validate(
+            {"type": "credit", "album_id": 100, "name": "Måneskin", "role": "Performer"}
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+        display, shadow = _get_name_search(conn, "Måneskin")
+        assert display == "Måneskin"
+        assert shadow == "maneskin"
+
+    def test_rename_updates_shadow(self, mutator, conn):
+        # NameID=10 is "Dave Grohl"; rename to a diacritic form and confirm shadow updates too.
+        item = UpdateCreditEntityItem.model_validate(
+            {"type": "credit", "id": 10, "display_name": "Dävé"}
+        )
+        mutator.apply_within("update", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT DisplayName, DisplayName_Search FROM ArtistNames WHERE NameID = 10"
+        ).fetchone()
+        assert row["DisplayName"] == "Dävé"
+        assert row["DisplayName_Search"] == "dave"

@@ -379,8 +379,11 @@ class IdentityRepository(BaseRepository):
         display_name: str,
         cursor: sqlite3.Cursor,
         name_id: Optional[int] = None,
+        display_name_search: Optional[str] = None,
     ) -> int:
-        """Link a name to an identity. ID-First: If name_id is provided, prioritize it."""
+        """Link a name to an identity. ID-First: If name_id is provided, prioritize it.
+        display_name_search is the diacritic-stripped lowercase shadow used by the search index;
+        only consumed when this call ends up INSERTing a brand-new ArtistNames row."""
         logger.debug(
             f"[IdentityRepository] -> add_alias(id={identity_id}, name='{display_name}', name_id={name_id})"
         )
@@ -498,8 +501,8 @@ class IdentityRepository(BaseRepository):
 
         # 2. Truly new name (or name_id was provided but not found, which shouldn't happen)
         cursor.execute(
-            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 0)",
-            (identity_id, display_name),
+            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 0)",
+            (identity_id, display_name, display_name_search),
         )
         return cursor.lastrowid
 

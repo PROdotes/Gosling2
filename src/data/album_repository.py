@@ -174,9 +174,12 @@ class AlbumRepository(BaseRepository):
         album_type: Optional[str],
         release_year: Optional[int],
         conn: sqlite3.Connection,
+        title_search: Optional[str] = None,
     ) -> int:
         """
         Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id. Does NOT commit.
+        title_search is the diacritic-stripped lowercase shadow for the search index;
+        consumed only when this call inserts a brand-new Albums row.
         """
         logger.debug(
             f"[AlbumRepository] -> create_album(title='{title}', year={release_year})"
@@ -197,8 +200,8 @@ class AlbumRepository(BaseRepository):
             )
             return album_id
         cursor.execute(
-            "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
-            (title, album_type, release_year),
+            "INSERT INTO Albums (AlbumTitle, AlbumTitle_Search, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
+            (title, title_search, album_type, release_year),
         )
         album_id = cursor.lastrowid
         logger.debug(f"[AlbumRepository] <- create_album() created album_id={album_id}")
@@ -216,6 +219,7 @@ class AlbumRepository(BaseRepository):
         )
         col_map = {
             "title": "AlbumTitle",
+            "title_search": "AlbumTitle_Search",
             "album_type": "AlbumType",
             "release_year": "ReleaseYear",
         }

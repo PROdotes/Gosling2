@@ -2,6 +2,7 @@ import sqlite3
 
 from src.data.song_repository import SongRepository
 from src.engine.routers.mutation_models import UpdateSongItem
+from src.utils.text import normalize_for_search
 
 
 class SongMutator:
@@ -17,6 +18,12 @@ class SongMutator:
         fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
         if not fields:
             return
+
+        if "media_name" in fields:
+            raw = fields["media_name"]
+            fields["media_name_search"] = (
+                normalize_for_search(raw) if raw is not None else None
+            )
 
         updated = self._repo.update_scalars(item.id, fields, conn)
         if updated == 0:

@@ -10,6 +10,7 @@ from src.engine.routers.mutation_models import (
     UpdateAlbumEntityItem,
     UpdateSongAlbumItem,
 )
+from src.utils.text import normalize_for_search
 
 
 class AlbumMutator:
@@ -40,7 +41,11 @@ class AlbumMutator:
         else:
             album_type = item.album_type or ALBUM_DEFAULT_TYPE
             album_id = self._album_repo.create_album(
-                item.name, album_type, item.release_year, conn
+                item.name,
+                album_type,
+                item.release_year,
+                conn,
+                title_search=normalize_for_search(item.name),
             )
 
         has_primary = self._song_album_repo.has_primary(item.song_id, conn)
@@ -82,6 +87,11 @@ class AlbumMutator:
         fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
         if not fields:
             return
+        if "title" in fields:
+            raw = fields["title"]
+            fields["title_search"] = (
+                normalize_for_search(raw) if raw is not None else None
+            )
         updated = self._album_repo.update_album(item.id, fields, conn)
         if updated == 0:
             raise LookupError(f"Album {item.id} not found")

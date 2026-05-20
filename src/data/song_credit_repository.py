@@ -90,11 +90,17 @@ class SongCreditRepository(BaseRepository):
         return cursor.lastrowid
 
     def get_or_create_credit_name(
-        self, display_name: str, cursor, identity_id: Optional[int] = None
+        self,
+        display_name: str,
+        cursor,
+        identity_id: Optional[int] = None,
+        display_name_search: Optional[str] = None,
     ) -> int:
         """
         Get-or-create an ArtistName by display name, with optional explicit identity linking.
         Returns name_id. Reactivates soft-deleted records.
+        display_name_search is the diacritic-stripped lowercase shadow; written when
+        this call inserts a brand-new ArtistNames row.
         """
         logger.debug(
             f"[SongCreditRepository] get_or_create_credit_name('{display_name}', identity_id={identity_id})"
@@ -126,8 +132,8 @@ class SongCreditRepository(BaseRepository):
                 f"[SongCreditRepository] inserting ArtistName '{display_name}' under identity_id={identity_id}"
             )
             cursor.execute(
-                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 0)",
-                (identity_id, display_name),
+                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 0)",
+                (identity_id, display_name, display_name_search),
             )
             return cursor.lastrowid
 
@@ -181,8 +187,8 @@ class SongCreditRepository(BaseRepository):
             f"[SongCreditRepository] inserting ArtistName '{display_name}' under identity_id={owner_identity_id}"
         )
         cursor.execute(
-            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 1)",
-            (owner_identity_id, display_name),
+            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 1)",
+            (owner_identity_id, display_name, display_name_search),
         )
         return cursor.lastrowid
 
@@ -193,10 +199,13 @@ class SongCreditRepository(BaseRepository):
         role_name: str,
         conn: sqlite3.Connection,
         identity_id: Optional[int] = None,
+        display_name_search: Optional[str] = None,
     ) -> SongCredit:
         """
         Add a single artist credit to a song. Get-or-creates ArtistName and Role.
         Supports explicit identity_id for Truth-First linking.
+        display_name_search is the diacritic-stripped lowercase shadow for the search index;
+        consumed only when this call inserts a brand-new ArtistNames row.
         Returns the new SongCredit. Does NOT commit.
         """
         logger.debug(
@@ -205,7 +214,9 @@ class SongCreditRepository(BaseRepository):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         role_id = self.get_or_create_role(role_name, cursor)
-        name_id = self.get_or_create_credit_name(display_name, cursor, identity_id)
+        name_id = self.get_or_create_credit_name(
+            display_name, cursor, identity_id, display_name_search=display_name_search
+        )
         cursor.execute(
             "INSERT OR IGNORE INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
             (source_id, name_id, role_id),
@@ -242,10 +253,15 @@ class SongCreditRepository(BaseRepository):
         return row[0] if row else None
 
     def update_credit_name(
-        self, name_id: int, new_name: str, conn: sqlite3.Connection
+        self,
+        name_id: int,
+        new_name: str,
+        conn: sqlite3.Connection,
+        new_name_search: Optional[str] = None,
     ) -> int:
         """
         Update an ArtistName's DisplayName globally. Affects all songs linked to this name.
+        new_name_search is the diacritic-stripped lowercase shadow written alongside DisplayName.
         Returns rowcount. Does NOT commit.
         """
         logger.debug(
@@ -253,8 +269,8 @@ class SongCreditRepository(BaseRepository):
         )
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?",
-            (new_name, name_id),
+            "UPDATE ArtistNames SET DisplayName = ?, DisplayName_Search = ? WHERE NameID = ?",
+            (new_name, new_name_search, name_id),
         )
         logger.debug("[SongCreditRepository] <- update_credit_name() done")
         return cursor.rowcount

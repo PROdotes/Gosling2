@@ -175,6 +175,21 @@ class TestIdentityMutatorAddAlias:
         with pytest.raises(ValueError):
             AddIdentityAliasItem.model_validate({"type": "identity_alias", "identity_id": 1})
 
+    def test_add_new_alias_populates_search_shadow(self, mutator, conn):
+        # Diacritics in the display name must produce a lowercase ASCII shadow.
+        item = AddIdentityAliasItem.model_validate(
+            {"type": "identity_alias", "identity_id": 1, "display_name": "Noëp"}
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT DisplayName, DisplayName_Search FROM ArtistNames "
+            "WHERE OwnerIdentityID = 1 AND DisplayName = 'Noëp'"
+        ).fetchone()
+        assert row is not None
+        assert row["DisplayName"] == "Noëp"
+        assert row["DisplayName_Search"] == "noep"
+
 
 # ---------------------------------------------------------------------------
 # remove alias

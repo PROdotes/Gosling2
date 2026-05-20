@@ -9,6 +9,7 @@ from src.engine.routers.mutation_models import (
     UpdateCreditEntityItem,
 )
 from src.models.exceptions import MergeRequiredError
+from src.utils.text import normalize_for_search
 
 
 class CreditMutator:
@@ -32,13 +33,24 @@ class CreditMutator:
             raise ValueError(f"CreditMutator does not support action '{action}'")
 
     def _add(self, item: AddCreditItem, conn: sqlite3.Connection) -> None:
+        display_name_search = normalize_for_search(item.name)
         if item.song_id is not None:
             self._song_repo.add_credit(
-                item.song_id, item.name, item.role, conn, identity_id=item.id
+                item.song_id,
+                item.name,
+                item.role,
+                conn,
+                identity_id=item.id,
+                display_name_search=display_name_search,
             )
         else:
             self._album_repo.add_credit(
-                item.album_id, item.name, item.role, conn, identity_id=item.id
+                item.album_id,
+                item.name,
+                item.role,
+                conn,
+                identity_id=item.id,
+                display_name_search=display_name_search,
             )
 
     def _remove(self, item: RemoveCreditItem, conn: sqlite3.Connection) -> None:
@@ -57,6 +69,11 @@ class CreditMutator:
         )
         if existing_id is not None and existing_id != item.id:
             raise MergeRequiredError("credit", existing_id)
-        updated = self._song_repo.update_credit_name(item.id, item.display_name, conn)
+        updated = self._song_repo.update_credit_name(
+            item.id,
+            item.display_name,
+            conn,
+            new_name_search=normalize_for_search(item.display_name),
+        )
         if updated == 0:
             raise LookupError(f"ArtistName {item.id} not found")
