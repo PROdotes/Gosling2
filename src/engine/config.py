@@ -95,6 +95,7 @@ DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = Path("json/rules.json")
 PARSER_PRESETS_PATH = Path("json/parser_presets.json")
 ID3_FRAMES_PATH = Path("json/id3_frames.json")
+TRANSLITERATIONS_PATH = Path("json/transliterations.json")
 SCRUBBER_AUTO_PLAY = True
 
 # Scalar fields allowed in PATCH /songs/{id}
