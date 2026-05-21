@@ -557,8 +557,11 @@ export function deleteStagingOrphan(filePath) {
     );
 }
 
-export function getFilterValues() {
-    return fetchJson("/api/v1/songs/filter-values");
+export function getFilterValues(q = "") {
+    const url = q
+        ? `/api/v1/songs/filter-values?q=${encodeURIComponent(q)}`
+        : "/api/v1/songs/filter-values";
+    return runSearch("filter-values", url);
 }
 
 export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal = false) {

@@ -133,8 +133,8 @@ Fetch slim list-view rows for all songs linked to a tag.
 ### get_songs_slim_by_identity(identity_id: int) -> List[dict]
 Slim reverse credit lookup — resolves aliases/members/groups, returns slim rows.
 
-### get_filter_values() -> dict
-Returns all distinct filter sidebar values.
+### get_filter_values(q: str = "") -> dict
+Returns all distinct filter sidebar values. When `q` is non-empty, normalizes it (via `normalize_for_search`) and delegates both forms to the repo for server-side filtering per category.
 
 ### filter_songs_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode) -> List[dict]
 Filter songs by sidebar criteria. Returns slim list-view rows.
@@ -171,7 +171,7 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration. Que
 ### get_all_roles() -> List[str]
 
 ### filter_songs_slim(...) -> List[dict]
-### get_filter_values() -> dict
+### get_filter_values(q: str = "") -> dict
 ### get_tag_categories() -> List[str]
 ### get_id3_frames_config() -> Dict[str, Any]
 

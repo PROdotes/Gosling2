@@ -102,9 +102,9 @@ Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `s
 
 Slim list-view rows for songs credited to any of the given identity IDs. Same column set as `search_slim_by_ids` but filters by identity subquery instead of explicit IDs.
 
-### get_filter_values(conn: Optional[sqlite3.Connection] = None) -> dict
+### get_filter_values(q_search: Optional[str] = None, q_raw: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> dict
 
-Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags, statuses). Used to populate the filter sidebar.
+Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags). When `q_search`/`q_raw` are provided, each category is filtered server-side: shadow columns (`DisplayName_Search`, `AlbumTitle_Search`) use `q_search`; raw columns (tag names, publisher names) use `LOWER(col) LIKE q_raw`; years/decades use `CAST AS TEXT LIKE q_raw`. Pass both as `None` to return all values. Service layer normalizes the raw query string and passes both forms.
 
 ### filter_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode, conn) -> List[dict]
 

@@ -1,10 +1,10 @@
 /**
  * GOSLING FILTER SIDEBAR HANDLER
  * Manages filter sidebar state, rendering, and song filtering.
+ * Filter values are fetched from the server on every search — no client-side text normalization.
  */
 
-import { getFilterValues, filterSongs } from "../api.js";
-import { normalizeForSearch } from "../utils/text.js";
+import { ABORTED, getFilterValues, filterSongs } from "../api.js";
 
 const FILTER_STORAGE_KEY = "gosling_filter_state";
 
@@ -63,21 +63,19 @@ export class FilterSidebarHandler {
             if (sidebar) sidebar.style.display = "flex";
         }
         this._collapsed = {}; // { sectionKey: bool }
-        this._searchText = ""; // driven by main search bar
-    }
-
-    setSearchText(text) {
-        this._searchText = normalizeForSearch(text);
-        this._render();
     }
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
 
-    async load() {
+    async load(query = "") {
         try {
-            this._filterValues = await getFilterValues();
+            const result = await getFilterValues(query);
+            if (result === ABORTED) {
+                return;
+            }
+            this._filterValues = result;
             this._render();
-            if (this.hasActiveFilters()) {
+            if (!query && this.hasActiveFilters()) {
                 this._applyFilters();
             }
         } catch (err) {
@@ -335,29 +333,21 @@ export class FilterSidebarHandler {
         const sidebar = document.getElementById("filter-sidebar");
         if (!sidebar) return;
 
-        const q = this._searchText;
-
-        const matchesSearch = (val) =>
-            !q || normalizeForSearch(String(val)).includes(q);
-
         const renderSection = (key, label, values, renderValue) => {
-            const filtered = values.filter((v) =>
-                matchesSearch(renderValue(v)),
-            );
-            if (q && filtered.length === 0) return "";
+            if (values.length === 0) return "";
             const isCollapsed = this._collapsed[key];
             return `
                 <div class="filter-section" data-filter-section="${key}">
                     <div class="filter-section-header">
                         <span class="filter-section-label">${label}</span>
-                        <span class="filter-section-toggle">${isCollapsed ? "▶" : "▼"}</span>
+                        <span class="filter-section-toggle">${isCollapsed ? "&#9654;" : "&#9660;"}</span>
                     </div>
                     ${
                         isCollapsed
                             ? ""
                             : `
                     <div class="filter-section-body">
-                        ${filtered
+                        ${values
                             .map((v) => {
                                 const display = renderValue(v);
                                 const active = this._isActive(key, String(v));
@@ -375,41 +365,32 @@ export class FilterSidebarHandler {
 
         let sectionsHtml = "";
 
-        // Status (always shown, no DB values needed)
-        const statusFiltered = STATUS_FILTERS.filter((s) =>
-            matchesSearch(s.label),
-        );
-        const liveMatches = !q || "live only".includes(q.toLowerCase());
-        if (!q || statusFiltered.length || liveMatches) {
-            const isCollapsed = this._collapsed["statuses"];
-            sectionsHtml += `
-                <div class="filter-section" data-filter-section="statuses">
-                    <div class="filter-section-header">
-                        <span class="filter-section-label">Status</span>
-                        <span class="filter-section-toggle">${isCollapsed ? "▶" : "▼"}</span>
-                    </div>
-                    ${
-                        isCollapsed
-                            ? ""
-                            : `
-                    <div class="filter-section-body">
-                        ${statusFiltered
-                            .map((s) => {
-                                const active = this._isActive(
-                                    "statuses",
-                                    s.key,
-                                );
-                                return `<button class="filter-value${active ? " active" : ""}"
-                                data-filter-key="statuses"
-                                data-filter-value="${s.key}">${s.label}</button>`;
-                            })
-                            .join("")}
-                        ${liveMatches ? `<button id="filter-live-toggle" class="filter-value${this._liveOnly ? " active" : ""}" data-filter-key="live">Live Only</button>` : ""}
-                        <button id="filter-has-original-toggle" class="filter-value${this._hasOriginal ? " active" : ""}" data-filter-key="has_original">Has Original</button>
-                    </div>`
-                    }
-                </div>`;
-        }
+        // Status section — always shown in full (static values, no server filtering)
+        const isCollapsed = this._collapsed["statuses"];
+        sectionsHtml += `
+            <div class="filter-section" data-filter-section="statuses">
+                <div class="filter-section-header">
+                    <span class="filter-section-label">Status</span>
+                    <span class="filter-section-toggle">${isCollapsed ? "&#9654;" : "&#9660;"}</span>
+                </div>
+                ${
+                    isCollapsed
+                        ? ""
+                        : `
+                <div class="filter-section-body">
+                    ${STATUS_FILTERS
+                        .map((s) => {
+                            const active = this._isActive("statuses", s.key);
+                            return `<button class="filter-value${active ? " active" : ""}"
+                            data-filter-key="statuses"
+                            data-filter-value="${s.key}">${s.label}</button>`;
+                        })
+                        .join("")}
+                    <button id="filter-live-toggle" class="filter-value${this._liveOnly ? " active" : ""}" data-filter-key="live">Live Only</button>
+                    <button id="filter-has-original-toggle" class="filter-value${this._hasOriginal ? " active" : ""}" data-filter-key="has_original">Has Original</button>
+                </div>`
+                }
+            </div>`;
 
         sectionsHtml += renderSection(
             "artists",
@@ -455,22 +436,21 @@ export class FilterSidebarHandler {
         );
 
         for (const [cat, vals] of Object.entries(fv.tag_categories || {})) {
+            if (vals.length === 0) continue;
             const sectionKey = `tag_cat_${cat}`;
-            const filtered = vals.filter((v) => matchesSearch(v));
-            if (q && filtered.length === 0) continue;
-            const isCollapsed = this._collapsed[sectionKey];
+            const isCatCollapsed = this._collapsed[sectionKey];
             sectionsHtml += `
                 <div class="filter-section" data-filter-section="${sectionKey}">
                     <div class="filter-section-header">
                         <span class="filter-section-label">${cat}</span>
-                        <span class="filter-section-toggle">${isCollapsed ? "▶" : "▼"}</span>
+                        <span class="filter-section-toggle">${isCatCollapsed ? "&#9654;" : "&#9660;"}</span>
                     </div>
                     ${
-                        isCollapsed
+                        isCatCollapsed
                             ? ""
                             : `
                     <div class="filter-section-body">
-                        ${filtered
+                        ${vals
                             .map((v) => {
                                 const active = this._isActive(
                                     "tag_categories",
@@ -493,7 +473,7 @@ export class FilterSidebarHandler {
         const addChips = (key, arr, label = (v) => v) => {
             for (const v of arr) {
                 chips.push(
-                    `<span class="filter-chip" data-filter-key="${key}" data-filter-value="${v}">${label(v)} <button class="filter-chip-remove" data-filter-key="${key}" data-filter-value="${v}">✕</button></span>`,
+                    `<span class="filter-chip" data-filter-key="${key}" data-filter-value="${v}">${label(v)} <button class="filter-chip-remove" data-filter-key="${key}" data-filter-value="${v}">&#x2715;</button></span>`,
                 );
             }
         };
@@ -512,25 +492,25 @@ export class FilterSidebarHandler {
         for (const [cat, vals] of Object.entries(this._active.tag_categories)) {
             for (const v of vals) {
                 chips.push(
-                    `<span class="filter-chip" data-filter-key="tag_categories" data-filter-value="${v}" data-filter-cat="${cat}">${v} <button class="filter-chip-remove" data-filter-key="tag_categories" data-filter-value="${v}" data-filter-cat="${cat}">✕</button></span>`,
+                    `<span class="filter-chip" data-filter-key="tag_categories" data-filter-value="${v}" data-filter-cat="${cat}">${v} <button class="filter-chip-remove" data-filter-key="tag_categories" data-filter-value="${v}" data-filter-cat="${cat}">&#x2715;</button></span>`,
                 );
             }
         }
         if (this._liveOnly) {
             chips.push(
-                `<span class="filter-chip" data-filter-key="live">Live Only <button class="filter-chip-remove" data-filter-key="live">✕</button></span>`,
+                `<span class="filter-chip" data-filter-key="live">Live Only <button class="filter-chip-remove" data-filter-key="live">&#x2715;</button></span>`,
             );
         }
         if (this._hasOriginal) {
             chips.push(
-                `<span class="filter-chip" data-filter-key="has_original">Has Original <button class="filter-chip-remove" data-filter-key="has_original">✕</button></span>`,
+                `<span class="filter-chip" data-filter-key="has_original">Has Original <button class="filter-chip-remove" data-filter-key="has_original">&#x2715;</button></span>`,
             );
         }
 
         sidebar.innerHTML = `
             <div class="filter-header">
                 <button id="filter-expand-all" class="filter-ctrl-btn" title="Expand all">ALL +</button>
-                <button id="filter-collapse-all" class="filter-ctrl-btn" title="Collapse all">ALL −</button>
+                <button id="filter-collapse-all" class="filter-ctrl-btn" title="Collapse all">ALL &#8722;</button>
                 <button id="filter-mode-all" class="filter-ctrl-btn${this._mode === "ALL" ? " active" : ""}" title="AND logic">ALL</button>
                 <button id="filter-mode-any" class="filter-ctrl-btn${this._mode === "ANY" ? " active" : ""}" title="OR logic">ANY</button>
             </div>

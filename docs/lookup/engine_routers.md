@@ -46,11 +46,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Raises `HTTPException(404)` if the identity is not found.
 - Wraps `CatalogService.get_songs_slim_by_identity`.
 
-### async def get_filter_values() -> dict
-**HTTP**: `GET /api/v1/songs/filter-values`
-- Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags, statuses).
-- Used to populate the filter sidebar on load.
-- Wraps `CatalogService.get_filter_values`.
+### async def get_filter_values(q: str = "") -> dict
+**HTTP**: `GET /api/v1/songs/filter-values?q=...`
+- Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags).
+- Optional `q` param: filters each category server-side. Empty `q` returns all values (existing behavior).
+- Wraps `CatalogService.get_filter_values(q)`.
 
 ### async def filter_songs() -> List[SongSlimView]
 **HTTP**: `GET /api/v1/songs/filter?artists=...&years=...&genres=...&mode=ALL`

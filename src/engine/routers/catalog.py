@@ -37,9 +37,12 @@ def _get_service() -> CatalogService:
 
 
 @router.get("/songs/filter-values")
-async def get_filter_values(service: CatalogService = Depends(_get_service)) -> dict:
-    """Returns all distinct values for the filter sidebar."""
-    return service.get_filter_values()
+async def get_filter_values(
+    q: str = "",
+    service: CatalogService = Depends(_get_service),
+) -> dict:
+    """Returns all distinct values for the filter sidebar, optionally filtered by search query."""
+    return service.get_filter_values(q=q)
 
 
 @router.get("/songs/filter", response_model=List[SongSlimView])

@@ -289,8 +289,12 @@ class LibraryService:
             )
             return rows
 
-    def get_filter_values(self) -> dict:
-        """Returns all distinct filter sidebar values."""
+    def get_filter_values(self, q: str = "") -> dict:
+        """Returns all distinct filter sidebar values, optionally filtered by query."""
+        if q:
+            q_search = normalize_for_search(q)
+            q_raw = q.lower()
+            return self._song_repo.get_filter_values(q_search=q_search, q_raw=q_raw)
         return self._song_repo.get_filter_values()
 
     def filter_songs_slim(

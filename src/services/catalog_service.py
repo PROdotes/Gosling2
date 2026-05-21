@@ -223,9 +223,9 @@ class CatalogService:
         """Slim reversed album-credit lookup from identity."""
         return self._library_service.get_albums_slim_by_identity(identity_id)
 
-    def get_filter_values(self) -> dict:
-        """Returns all distinct filter sidebar values."""
-        return self._library_service.get_filter_values()
+    def get_filter_values(self, q: str = "") -> dict:
+        """Returns all distinct filter sidebar values, optionally filtered by query."""
+        return self._library_service.get_filter_values(q=q)
 
     def filter_songs_slim(
         self,

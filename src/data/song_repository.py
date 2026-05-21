@@ -595,86 +595,225 @@ class SongRepository(MediaSourceRepository):
         )
         return result
 
-    def get_filter_values(self, conn: Optional[sqlite3.Connection] = None) -> dict:
+    def get_filter_values(
+        self,
+        q_search: Optional[str] = None,
+        q_raw: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> dict:
         """
         Returns all distinct values for each filter category.
         Used to populate the filter sidebar on app load or after a DB write.
+
+        q_search: normalized (lowercase ASCII) query — used with _Search shadow columns.
+        q_raw:    raw lowercase query — used as LOWER(col) fallback where no shadow exists.
+        Both are None when returning all values (no filtering).
         """
-        queries = {
-            "artists": """
-                SELECT DISTINCT an.DisplayName AS val
-                FROM ArtistNames an
-                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
-                JOIN Roles r ON sc.RoleID = r.RoleID
-                JOIN MediaSources m ON sc.SourceID = m.SourceID
-                WHERE r.RoleName = 'Performer' AND an.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY an.DisplayName
-            """,
-            "contributors": """
-                SELECT DISTINCT an.DisplayName AS val
-                FROM ArtistNames an
-                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
-                JOIN MediaSources m ON sc.SourceID = m.SourceID
-                WHERE an.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY an.DisplayName
-            """,
-            "years": """
-                SELECT DISTINCT s.RecordingYear AS val
-                FROM Songs s
-                JOIN MediaSources m ON s.SourceID = m.SourceID
-                WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
-                ORDER BY s.RecordingYear DESC
-            """,
-            "decades": """
-                SELECT DISTINCT (s.RecordingYear / 10) * 10 AS val
-                FROM Songs s
-                JOIN MediaSources m ON s.SourceID = m.SourceID
-                WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
-                ORDER BY val DESC
-            """,
-            "genres": """
-                SELECT DISTINCT t.TagName AS val
-                FROM Tags t
-                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
-                JOIN MediaSources m ON mst.SourceID = m.SourceID
-                WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY t.TagName
-            """,
-            "albums": """
-                SELECT DISTINCT a.AlbumTitle AS val
-                FROM Albums a
-                JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
-                JOIN MediaSources m ON sa.SourceID = m.SourceID
-                WHERE a.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY a.AlbumTitle
-            """,
-            "publishers": """
-                SELECT DISTINCT p.PublisherName AS val
-                FROM Publishers p
-                JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
-                JOIN MediaSources m ON rp.SourceID = m.SourceID
-                WHERE p.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY p.PublisherName
-            """,
-        }
+        filtering = bool(q_search)
+        sq = f"%{q_search}%" if q_search else None
+        rq = f"%{q_raw}%" if q_raw else None
 
         def _run(c):
             c.row_factory = sqlite3.Row
+
+            def fetch(sql, params=()):
+                return [row["val"] for row in c.execute(sql, params).fetchall()]
+
+            if filtering:
+                artists = fetch(
+                    """
+                    SELECT DISTINCT an.DisplayName AS val
+                    FROM ArtistNames an
+                    JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                    JOIN Roles r ON sc.RoleID = r.RoleID
+                    JOIN MediaSources m ON sc.SourceID = m.SourceID
+                    WHERE r.RoleName = 'Performer' AND an.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND an.DisplayName_Search LIKE ?
+                    ORDER BY an.DisplayName
+                    """,
+                    (sq,),
+                )
+                contributors = fetch(
+                    """
+                    SELECT DISTINCT an.DisplayName AS val
+                    FROM ArtistNames an
+                    JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                    JOIN MediaSources m ON sc.SourceID = m.SourceID
+                    WHERE an.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND an.DisplayName_Search LIKE ?
+                    ORDER BY an.DisplayName
+                    """,
+                    (sq,),
+                )
+                years = fetch(
+                    """
+                    SELECT DISTINCT s.RecordingYear AS val
+                    FROM Songs s
+                    JOIN MediaSources m ON s.SourceID = m.SourceID
+                    WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                      AND CAST(s.RecordingYear AS TEXT) LIKE ?
+                    ORDER BY s.RecordingYear DESC
+                    """,
+                    (rq,),
+                )
+                decades = fetch(
+                    """
+                    SELECT DISTINCT (s.RecordingYear / 10) * 10 AS val
+                    FROM Songs s
+                    JOIN MediaSources m ON s.SourceID = m.SourceID
+                    WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                      AND CAST((s.RecordingYear / 10) * 10 AS TEXT) LIKE ?
+                    ORDER BY val DESC
+                    """,
+                    (rq,),
+                )
+                genres = fetch(
+                    """
+                    SELECT DISTINCT t.TagName AS val
+                    FROM Tags t
+                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                    JOIN MediaSources m ON mst.SourceID = m.SourceID
+                    WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND LOWER(t.TagName) LIKE ?
+                    ORDER BY t.TagName
+                    """,
+                    (rq,),
+                )
+                albums = fetch(
+                    """
+                    SELECT DISTINCT a.AlbumTitle AS val
+                    FROM Albums a
+                    JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
+                    JOIN MediaSources m ON sa.SourceID = m.SourceID
+                    WHERE a.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND a.AlbumTitle_Search LIKE ?
+                    ORDER BY a.AlbumTitle
+                    """,
+                    (sq,),
+                )
+                publishers = fetch(
+                    """
+                    SELECT DISTINCT p.PublisherName AS val
+                    FROM Publishers p
+                    JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
+                    JOIN MediaSources m ON rp.SourceID = m.SourceID
+                    WHERE p.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND LOWER(p.PublisherName) LIKE ?
+                    ORDER BY p.PublisherName
+                    """,
+                    (rq,),
+                )
+            else:
+                artists = fetch(
+                    """
+                    SELECT DISTINCT an.DisplayName AS val
+                    FROM ArtistNames an
+                    JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                    JOIN Roles r ON sc.RoleID = r.RoleID
+                    JOIN MediaSources m ON sc.SourceID = m.SourceID
+                    WHERE r.RoleName = 'Performer' AND an.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY an.DisplayName
+                    """
+                )
+                contributors = fetch(
+                    """
+                    SELECT DISTINCT an.DisplayName AS val
+                    FROM ArtistNames an
+                    JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                    JOIN MediaSources m ON sc.SourceID = m.SourceID
+                    WHERE an.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY an.DisplayName
+                    """
+                )
+                years = fetch(
+                    """
+                    SELECT DISTINCT s.RecordingYear AS val
+                    FROM Songs s
+                    JOIN MediaSources m ON s.SourceID = m.SourceID
+                    WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                    ORDER BY s.RecordingYear DESC
+                    """
+                )
+                decades = fetch(
+                    """
+                    SELECT DISTINCT (s.RecordingYear / 10) * 10 AS val
+                    FROM Songs s
+                    JOIN MediaSources m ON s.SourceID = m.SourceID
+                    WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                    ORDER BY val DESC
+                    """
+                )
+                genres = fetch(
+                    """
+                    SELECT DISTINCT t.TagName AS val
+                    FROM Tags t
+                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                    JOIN MediaSources m ON mst.SourceID = m.SourceID
+                    WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY t.TagName
+                    """
+                )
+                albums = fetch(
+                    """
+                    SELECT DISTINCT a.AlbumTitle AS val
+                    FROM Albums a
+                    JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
+                    JOIN MediaSources m ON sa.SourceID = m.SourceID
+                    WHERE a.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY a.AlbumTitle
+                    """
+                )
+                publishers = fetch(
+                    """
+                    SELECT DISTINCT p.PublisherName AS val
+                    FROM Publishers p
+                    JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
+                    JOIN MediaSources m ON rp.SourceID = m.SourceID
+                    WHERE p.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY p.PublisherName
+                    """
+                )
+
             result = {
-                key: [row["val"] for row in c.execute(sql).fetchall()]
-                for key, sql in queries.items()
+                "artists": artists,
+                "contributors": contributors,
+                "years": years,
+                "decades": decades,
+                "genres": genres,
+                "albums": albums,
+                "publishers": publishers,
             }
+
             # Dynamic tag categories (all except Genre, which is promoted above)
-            other_tags_rows = c.execute("""
-                SELECT DISTINCT t.TagCategory AS cat, t.TagName AS val
-                FROM Tags t
-                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
-                JOIN MediaSources m ON mst.SourceID = m.SourceID
-                WHERE t.TagCategory IS NOT NULL
-                  AND LOWER(t.TagCategory) != 'genre'
-                  AND t.IsDeleted = 0 AND m.IsDeleted = 0
-                ORDER BY t.TagCategory, t.TagName
-            """).fetchall()
+            if filtering:
+                other_tags_rows = c.execute(
+                    """
+                    SELECT DISTINCT t.TagCategory AS cat, t.TagName AS val
+                    FROM Tags t
+                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                    JOIN MediaSources m ON mst.SourceID = m.SourceID
+                    WHERE t.TagCategory IS NOT NULL
+                      AND LOWER(t.TagCategory) != 'genre'
+                      AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                      AND (LOWER(t.TagName) LIKE ? OR LOWER(t.TagCategory) LIKE ?)
+                    ORDER BY t.TagCategory, t.TagName
+                    """,
+                    (rq, rq),
+                ).fetchall()
+            else:
+                other_tags_rows = c.execute(
+                    """
+                    SELECT DISTINCT t.TagCategory AS cat, t.TagName AS val
+                    FROM Tags t
+                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                    JOIN MediaSources m ON mst.SourceID = m.SourceID
+                    WHERE t.TagCategory IS NOT NULL
+                      AND LOWER(t.TagCategory) != 'genre'
+                      AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                    ORDER BY t.TagCategory, t.TagName
+                    """
+                ).fetchall()
+
             tag_categories: Dict[str, List[str]] = {}
             for row in other_tags_rows:
                 tag_categories.setdefault(row["cat"], []).append(row["val"])

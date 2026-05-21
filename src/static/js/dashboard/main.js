@@ -297,7 +297,7 @@ const ctx = {
             performSearch(query);
         }
     },
-    reloadFilters: () => filterSidebar.load(),
+    reloadFilters: () => filterSidebar.load(state.currentQuery),
     syncIngestBadges: async () => {
         try {
             const status = await getIngestStatus();
@@ -552,9 +552,9 @@ async function switchMode(mode) {
     state.selectedIndex = -1;
 
     elements.searchInput.value = "";
-    filterSidebar.setSearchText("");
     syncModeUi();
     ctx.hideDetailPanel();
+    filterSidebar.load("");
     if (mode === "songs" && filterSidebar.hasActiveFilters()) {
         filterSidebar.reapply();
     } else {
@@ -1129,7 +1129,6 @@ document.addEventListener("click", async (event) => {
 elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
-    filterSidebar.setSearchText(state.currentQuery);
     if (
         state.currentMode === "songs" &&
         filterSidebar.hasActiveFilters() &&
@@ -1141,10 +1140,12 @@ elements.searchInput.addEventListener("input", (event) => {
         );
         setActiveCache("songs", visible);
         renderSongs(ctx, visible);
+        filterSidebar.load(state.currentQuery);
         return;
     }
     state.debounceTimer = setTimeout(() => {
         performSearch(state.currentQuery);
+        filterSidebar.load(state.currentQuery);
     }, 250);
 });
 
