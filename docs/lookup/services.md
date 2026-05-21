@@ -29,8 +29,14 @@ Fetch a list of all active identities.
 ### resolve_identity_by_name(display_name: str) -> Optional[int]
 Return the IdentityID for an ArtistName (Truth-First resolution).
 
+### search_slim(query: str, exclude_groups: bool = False) -> List[dict]
+Slim list-view identity search. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
+
+### search_artist_names(query: str, exclude_groups: bool = False) -> List[ArtistChipView]
+Fuzzy search artist names (aliases). Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
+
 ### search_identities(query: str) -> List[Identity]
-Search for identities by name or alias.
+Search for identities by name or alias. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
 
 ### get_identity_song_counts(identity_ids: List[int]) -> dict
 Batch active song counts for identities (across all aliases). Returns {id: N}.
@@ -92,7 +98,7 @@ Fetch the full directory of albums with hydrated publishers, credits, and songs.
 Centralized batch hydration for songs and their relations (Credits, Albums, Publishers, Tags, Staging Origins). Handles Desired State Sync (physical organization).
 
 ### search_albums_slim(query: str) -> List[dict]
-Slim list-view album search. No tracklist hydration.
+Slim list-view album search. No tracklist hydration. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
 
 ### get_album(album_id: int) -> Optional[Album]
 Fetch a single album and all its tracks/credits by ID.
@@ -134,10 +140,10 @@ Returns all distinct filter sidebar values.
 Filter songs by sidebar criteria. Returns slim list-view rows.
 
 ### search_songs_slim(query: str) -> List[dict]
-Slim list-view search. Returns raw dicts for SongSlimView — no hydration.
+Slim list-view search. Returns raw dicts for SongSlimView — no hydration. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
 
 ### search_songs_deep_slim(query: str) -> List[dict]
-Deep slim search. Base matches + identity/publisher expansion, no hydration.
+Deep slim search. Base matches + identity/publisher expansion, no hydration. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
 
 ---
 
@@ -280,7 +286,7 @@ The single entry point for all mutations (Add, Remove, Update, Delete).
 **Responsibility**: Handles scalar updates for the `Songs` and `MediaSources` tables.
 
 ### apply_within(action: str, item: UpdateSongItem, conn: sqlite3.Connection) -> None
-Performs the low-level SQL update within an existing transaction.
+Performs the low-level SQL update within an existing transaction. When media_name is patched, computes media_name_search shadow (Phase 3.1) via `normalize_for_search()`.
 
 ---
 
@@ -289,7 +295,7 @@ Performs the low-level SQL update within an existing transaction.
 **Responsibility**: Handles adding and removing artist credits.
 
 ### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
-Performs the low-level SQL operations for credit links.
+Performs the low-level SQL operations for credit links. When adding or updating credits, computes display_name_search shadow (Phase 3.1) via `normalize_for_search()`.
 
 ---
 
@@ -316,7 +322,7 @@ Performs the low-level SQL operations for publisher links and publisher records.
 **Responsibility**: Handles adding, removing, and updating album links.
 
 ### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
-Performs the low-level SQL operations for album links and album records.
+Performs the low-level SQL operations for album links and album records. When adding or updating albums, computes title_search shadow (Phase 3.1) via `normalize_for_search()`.
 
 ---
 
@@ -349,7 +355,7 @@ Converts text to Sentence Case (First letter capitalized, the rest lowercase).
 *Location: `src/services/filing_service.py`*
 
 ### evaluate_routing(song: Song) -> Path
-Calculates the target relative path based on rules.
+Calculates the target relative path based on rules. Internally calls `_sanitize_for_filesystem()` which uses shared `strip_diacritics()` from utils/text.py (Phase 3.1).
 
 ### copy_to_library(song: Song, library_root: Path) -> Path
 Copies physical file to library. Handles same-file bypass logic.

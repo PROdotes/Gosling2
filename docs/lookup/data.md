@@ -71,7 +71,7 @@ Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSo
 
 ### update_scalars(song_id: int, fields: dict, conn: sqlite3.Connection) -> None
 
-Update editable scalar fields for a song. Partial updates — only send changed fields. Splits between MediaSources (media_name, is_active) and Songs (bpm, year, isrc). Does NOT commit.
+Update editable scalar fields for a song. Partial updates — only send changed fields. Splits between MediaSources (media_name, media_name_search, is_active) and Songs (bpm, year, isrc). Does NOT commit. Supports optional `media_name_search` (diacritic-stripped lowercase form for search index).
 
 ### get_by_id(song_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]
 
@@ -90,7 +90,8 @@ Finds songs by case-insensitive title match (LIKE '%query%'). Supports optional 
 
 Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated). Supports optional shared connection.
 
-- Matches: Title, Performer (DisplayName + LegalName), Album, Publisher, Tag, Year, and ISRC via UNION subquery.
+- Matches: Title (via MediaName_Search), Performer (DisplayName_Search + LegalName), Album (AlbumTitle_Search), Publisher, Tag, Year, and ISRC via UNION subquery.
+- Query is normalized by the service layer to diacritic-stripped lowercase for matching against shadows.
 - No hydration. Used by the list-view endpoint.
 
 ### search_slim_by_ids(ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[dict]
@@ -174,21 +175,21 @@ Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or
 ### get_name_id_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 Alternative accessor for find_by_display_name.
 
-### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None) -> int
+### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> int
 
-Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
+Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Optionally populates the DisplayName_Search shadow column (diacritic-stripped lowercase) when inserting new rows. Returns name_id.
 
-### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None) -> SongCredit
+### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> SongCredit
 
-Add a single credit to a song. Get-or-creates ArtistName and Role. Supports explicit identity_id for Truth-First linking. Returns the SongCredit. Does NOT commit.
+Add a single credit to a song. Get-or-creates ArtistName and Role. Supports explicit identity_id for Truth-First linking. Optionally accepts display_name_search (diacritic-stripped lowercase) to populate the search shadow when inserting new ArtistNames. Returns the SongCredit. Does NOT commit.
 
 ### remove_credit(credit_id: int, conn: sqlite3.Connection) -> None
 
 Remove a single SongCredits link by CreditID. Keeps ArtistName record. Does NOT commit.
 
-### update_credit_name(name_id: int, new_name: str, conn: sqlite3.Connection) -> None
+### update_credit_name(name_id: int, new_name: str, conn: sqlite3.Connection, new_name_search: Optional[str] = None) -> int
 
-Update an ArtistName's DisplayName globally. Affects all songs linked to this name. Does NOT commit.
+Update an ArtistName's DisplayName globally. Affects all songs linked to this name. Optionally accepts new_name_search (diacritic-stripped lowercase) to update the search shadow column. Returns rowcount. Does NOT commit.
 
 ### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
 
@@ -268,6 +269,9 @@ Fetch the full directory of active (non-deleted) albums, ordered by title. Suppo
 
 Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (aggregated label string), SongCount. No tracklist hydration. Pass empty string to get all albums. Supports optional shared connection.
 
+- Matches: AlbumTitle (via AlbumTitle_Search) or credited artist (DisplayName_Search).
+- Query is normalized by the service layer to diacritic-stripped lowercase for matching against shadows.
+
 ### get_by_id(album_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Album]
 
 Fetch a single album by its ID. Supports optional shared connection.
@@ -280,13 +284,13 @@ Fetch all song IDs linked to a specific album, ordered by disc, track, and sourc
 
 Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID]. Supports optional shared connection.
 
-### create_album(title: str, album_type: str, release_year: int, conn: sqlite3.Connection) -> int
+### create_album(title: str, album_type: str, release_year: int, conn: sqlite3.Connection, title_search: Optional[str] = None) -> int
 
-Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id. Does NOT commit.
+Get-or-create an Album by title+year. Reactivates soft-deleted. Optionally accepts title_search (diacritic-stripped lowercase) to populate the search shadow when inserting new albums. Returns album_id. Does NOT commit.
 
-### update_album(album_id: int, fields: dict, conn: sqlite3.Connection) -> None
+### update_album(album_id: int, fields: dict, conn: sqlite3.Connection) -> int
 
-Update editable Album fields (title, album_type, release_year). Partial updates. Does NOT commit.
+Update editable Album fields (title, title_search, album_type, release_year). Partial updates. When title is updated, title_search shadow should be provided (computed by mutator layer). Returns rowcount. Does NOT commit.
 
 ### soft_delete(album_id: int, conn: sqlite3.Connection) -> bool
 
@@ -486,9 +490,9 @@ Batch-fetches credits for multiple albums in a single query. Supports optional s
 - Returns a flat list of `AlbumCredit` entities.
 - Joins with `ArtistNames` and `Roles` tables to resolve human-readable names.
 
-### add_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None) -> int
+### add_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> int
 
-Add a credit to an album. Get-or-creates ArtistName and Role. Returns name_id. Does NOT commit.
+Add a credit to an album. Get-or-creates ArtistName and Role. Optionally accepts display_name_search (diacritic-stripped lowercase) to populate the search shadow when inserting new ArtistNames. Returns name_id. Does NOT commit.
 
 ### remove_credit(album_id: int, name_id: int, conn: sqlite3.Connection) -> None
 
@@ -529,9 +533,9 @@ Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs. Supports optiona
 
 Return the IdentityID for an exact (case-insensitive) ArtistName match, or None. Supports optional shared connection.
 
-### add_alias(identity_id: int, display_name: str, cursor: sqlite3.Cursor, name_id: Optional[int] = None) -> int
+### add_alias(identity_id: int, display_name: str, cursor: sqlite3.Cursor, name_id: Optional[int] = None, display_name_search: Optional[str] = None) -> int
 
-Link a name to an identity. ID-First: If `name_id` is provided, prioritize it. Handles collision checks and potential identity merges. Returns the `NameID`.
+Link a name to an identity. ID-First: If `name_id` is provided, prioritize it. Handles collision checks and potential identity merges. Optionally accepts display_name_search (diacritic-stripped lowercase) to populate the search shadow when inserting new ArtistNames. Returns the `NameID`.
 
 ### delete_alias(name_id: int, cursor: sqlite3.Cursor) -> None
 

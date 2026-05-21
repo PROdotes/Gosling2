@@ -118,8 +118,8 @@ class SongCreditRepository(BaseRepository):
                 name_id = row[0]
                 if row[1]:  # Reactivate
                     cursor.execute(
-                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
-                        (name_id,),
+                        "UPDATE ArtistNames SET IsDeleted = 0, DisplayName_Search = COALESCE(DisplayName_Search, ?) WHERE NameID = ?",
+                        (display_name_search, name_id),
                     )
                 return name_id
 
@@ -150,7 +150,8 @@ class SongCreditRepository(BaseRepository):
             name_id = row[0]
             if row[1]:  # IsDeleted — wake it up
                 cursor.execute(
-                    "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (name_id,)
+                    "UPDATE ArtistNames SET IsDeleted = 0, DisplayName_Search = COALESCE(DisplayName_Search, ?) WHERE NameID = ?",
+                    (display_name_search, name_id),
                 )
                 cursor.execute(
                     "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
@@ -268,10 +269,16 @@ class SongCreditRepository(BaseRepository):
             f"[SongCreditRepository] -> update_credit_name(name_id={name_id}, new_name='{new_name}')"
         )
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE ArtistNames SET DisplayName = ?, DisplayName_Search = ? WHERE NameID = ?",
-            (new_name, new_name_search, name_id),
-        )
+        if new_name_search is not None:
+            cursor.execute(
+                "UPDATE ArtistNames SET DisplayName = ?, DisplayName_Search = ? WHERE NameID = ?",
+                (new_name, new_name_search, name_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?",
+                (new_name, name_id),
+            )
         logger.debug("[SongCreditRepository] <- update_credit_name() done")
         return cursor.rowcount
 

@@ -4,24 +4,9 @@
  */
 
 import { getFilterValues, filterSongs } from "../api.js";
+import { normalizeForSearch } from "../utils/text.js";
 
 const FILTER_STORAGE_KEY = "gosling_filter_state";
-
-// Mirrors json/transliterations.json + src/utils/text.py::normalize_for_search.
-// Keep in sync if the JSON map changes.
-const TRANSLITERATIONS = {
-    "Đ": "Dj", "đ": "dj", "Ć": "C", "ć": "c", "Č": "C", "č": "c",
-    "Š": "S", "š": "s", "Ž": "Z", "ž": "z", "ß": "ss",
-    "Æ": "Ae", "æ": "ae", "Œ": "Oe", "œ": "oe",
-};
-
-function normalizeForSearch(text) {
-    let out = String(text);
-    for (const [ch, repl] of Object.entries(TRANSLITERATIONS)) {
-        if (out.includes(ch)) out = out.split(ch).join(repl);
-    }
-    return out.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
 
 function loadSavedFilterState() {
     try {
