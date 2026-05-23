@@ -27,9 +27,8 @@ from src.models.metadata_frames import ID3FrameConfig
 class MetadataService:
     """Service for extracting high-fidelity metadata from audio files."""
 
-    def __init__(self, json_path: str = "json/id3_frames.json"):
-        """Initializes the pure reading service with frame configuration."""
-        self.config = load_id3_frames(json_path)
+    def __init__(self):
+        self.config = load_id3_frames()
 
     def extract_metadata(self, file_path: str) -> Dict[str, List[str]]:
         """Reads an audio file and returns a raw dictionary of all found tags."""

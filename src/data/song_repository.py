@@ -839,6 +839,7 @@ class SongRepository(MediaSourceRepository):
         live_only: bool = False,
         has_original: bool = False,
         mode: str = "ALL",
+        q: Optional[str] = None,
         conn: Optional[sqlite3.Connection] = None,
     ) -> List[dict]:
         """
@@ -950,6 +951,35 @@ class SongRepository(MediaSourceRepository):
             id_filter = "m.SourceID IN (" + " UNION ".join(subqueries) + ")"
         else:  # ALL (default)
             id_filter = " AND ".join([f"m.SourceID IN ({sq})" for sq in subqueries])
+
+        if q:
+            fmt_q = f"%{q}%"
+            text_sq = """
+                SELECT m2.SourceID FROM MediaSources m2
+                    WHERE m2.MediaName_Search LIKE ? AND m2.IsDeleted = 0
+                UNION
+                SELECT sa.SourceID FROM SongAlbums sa
+                    JOIN Albums a ON sa.AlbumID = a.AlbumID
+                    WHERE a.AlbumTitle_Search LIKE ? AND a.IsDeleted = 0
+                UNION
+                SELECT sc2.SourceID FROM SongCredits sc2
+                    JOIN ArtistNames an2 ON sc2.CreditedNameID = an2.NameID
+                    WHERE an2.DisplayName_Search LIKE ? AND an2.IsDeleted = 0
+                UNION
+                SELECT rp.SourceID FROM RecordingPublishers rp
+                    JOIN Publishers p ON rp.PublisherID = p.PublisherID
+                    WHERE p.PublisherName LIKE ? AND p.IsDeleted = 0
+                UNION
+                SELECT mst2.SourceID FROM MediaSourceTags mst2
+                    JOIN Tags t2 ON mst2.TagID = t2.TagID
+                    WHERE t2.TagName LIKE ? AND t2.IsDeleted = 0
+                UNION
+                SELECT s2.SourceID FROM Songs s2
+                    WHERE CAST(s2.RecordingYear AS TEXT) LIKE ?
+                       OR s2.ISRC LIKE ?
+            """
+            id_filter = f"({id_filter}) AND m.SourceID IN ({text_sq})"
+            params.extend([fmt_q] * 7)
 
         live_clause = "AND m.IsActive = 1" if live_only else ""
         original_clause = "AND EXISTS (SELECT 1 FROM StagingOrigins so WHERE so.SourceID = m.SourceID)" if has_original else ""

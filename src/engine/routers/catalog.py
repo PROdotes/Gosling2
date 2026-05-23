@@ -24,6 +24,7 @@ from src.engine.config import (
     DEFAULT_CREDIT_SEPARATORS,
     SCRUBBER_AUTO_PLAY,
     BLUR_SAVES_SCALARS,
+    ID3_FRAMES_PATH,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
@@ -59,6 +60,7 @@ async def filter_songs(
     live_only: bool = False,
     has_original: bool = False,
     mode: str = "ALL",
+    q: Optional[str] = None,
     service: CatalogService = Depends(_get_service),
 ) -> List[SongSlimView]:
     """Filter songs by sidebar criteria. Returns slim list-view models."""
@@ -75,6 +77,7 @@ async def filter_songs(
         live_only=live_only,
         has_original=has_original,
         mode=mode,
+        q=q,
     )
     return [SongSlimView.from_row(r) for r in rows]
 
@@ -506,11 +509,9 @@ def get_config():
 
 def _load_tag_category_colors() -> dict:
     import json
-    import os
 
-    path = os.path.join(os.path.dirname(__file__), "../../../json/id3_frames.json")
     try:
-        with open(os.path.normpath(path)) as f:
+        with open(ID3_FRAMES_PATH) as f:
             frames = json.load(f)
         colors = {}
         for v in frames.values():

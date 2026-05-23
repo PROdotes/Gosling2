@@ -19,10 +19,10 @@ import {
     getTagSongs,
     isAbortError,
     resetIngestStatus,
+    filterSongs,
     searchAlbums,
     searchArtists,
     searchPublishers,
-    searchSongs,
     searchTags,
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
@@ -118,7 +118,7 @@ const modeConfig = {
     songs: {
         placeholder: "Search songs, artists, albums...",
         noun: "song",
-        fetcher: searchSongs,
+        fetcher: null,
         renderer: renderSongs,
     },
     albums: {
@@ -172,7 +172,7 @@ const ctx = {
             state.totalLibraryCount = count;
         } else if (state.totalLibraryCount === 0) {
             // Filters active on load — fetch unfiltered total in background
-            searchSongs("")
+            filterSongs({}, "ALL", false, false, "")
                 .then((items) => {
                     if (Array.isArray(items)) {
                         state.totalLibraryCount = items.length;
@@ -373,41 +373,22 @@ navigationHandler.setupKeyboardHandler(songActions);
 const webSearchHandler = new WebSearchHandler(ctx);
 webSearchHandler.setupListeners();
 
-let lastFilteredItems = null;
-
-function applySearchToFilteredItems(items, query) {
-    if (!query) return items;
-    const q = query.toLowerCase();
-    return items.filter(
-        (s) =>
-            (s.display_title || s.media_name || "").toLowerCase().includes(q) ||
-            (s.display_artist || "").toLowerCase().includes(q) ||
-            (s.primary_genre || "").toLowerCase().includes(q),
-    );
+async function doSongSearch() {
+    const { filters, mode, liveOnly, hasOriginal } = filterSidebar.getState();
+    const result = filterSongs(filters, mode, liveOnly, hasOriginal, state.currentQuery);
+    try {
+        const items = await result;
+        if (items === ABORTED) return;
+        setActiveCache("songs", items);
+        renderSongs(ctx, items);
+    } catch (err) {
+        elements.resultsContainer.innerHTML = renderEmptyState(`Error: ${err.message}`);
+    }
 }
 
 const filterSidebar = new FilterSidebarHandler({
     ...ctx,
-    onFilterResults: async (resultPromise) => {
-        try {
-            const items = await resultPromise;
-            lastFilteredItems = items;
-            const visible = applySearchToFilteredItems(
-                items,
-                state.currentQuery,
-            );
-            setActiveCache("songs", visible);
-            renderSongs(ctx, visible);
-        } catch (err) {
-            elements.resultsContainer.innerHTML = renderEmptyState(
-                `Filter error: ${err.message}`,
-            );
-        }
-    },
-    onFilterCleared: () => {
-        lastFilteredItems = null;
-        performSearch(state.currentQuery);
-    },
+    onSearch: () => doSongSearch(),
 });
 filterSidebar.setupListeners();
 const filterLoadPromise = filterSidebar.load();
@@ -555,8 +536,8 @@ async function switchMode(mode) {
     syncModeUi();
     ctx.hideDetailPanel();
     filterSidebar.load("");
-    if (mode === "songs" && filterSidebar.hasActiveFilters()) {
-        filterSidebar.reapply();
+    if (mode === "songs") {
+        doSongSearch();
     } else {
         performSearch("");
     }
@@ -1129,29 +1110,23 @@ document.addEventListener("click", async (event) => {
 elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
-    if (
-        state.currentMode === "songs" &&
-        filterSidebar.hasActiveFilters() &&
-        lastFilteredItems !== null
-    ) {
-        const visible = applySearchToFilteredItems(
-            lastFilteredItems,
-            state.currentQuery,
-        );
-        setActiveCache("songs", visible);
-        renderSongs(ctx, visible);
-        filterSidebar.load(state.currentQuery);
-        return;
-    }
     state.debounceTimer = setTimeout(() => {
-        performSearch(state.currentQuery);
+        if (state.currentMode === "songs") {
+            doSongSearch();
+        } else {
+            performSearch(state.currentQuery);
+        }
         filterSidebar.load(state.currentQuery);
     }, 250);
 });
 
 elements.deepSearchToggle.addEventListener("change", (event) => {
     state.isDeep = event.target.checked;
-    performSearch(state.currentQuery);
+    if (state.currentMode === "songs") {
+        doSongSearch();
+    } else {
+        performSearch(state.currentQuery);
+    }
 });
 
 syncModeUi();
@@ -1175,7 +1150,7 @@ Promise.all([
 setupHeaderDropZone();
 setupSongsWorkspaceDropZone();
 filterLoadPromise.then(() => {
-    if (!filterSidebar.hasActiveFilters()) performSearch("");
+    doSongSearch();
 });
 
 // Restore in-progress badges on page reload

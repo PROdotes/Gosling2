@@ -16,8 +16,11 @@ class ProcessingStatus(IntEnum):
 
 
 # Database Path
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
 def get_db_path() -> Path:
-    return Path(os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db"))
+    return Path(os.getenv("GOSLING_DB_PATH", _PROJECT_ROOT / "sqldb/gosling2.db"))
 
 
 DB_PATH = get_db_path()
@@ -38,10 +41,10 @@ def get_downloads_folder() -> Optional[str]:
 
 
 # Staging Area (Uploaded but un-indexed files)
-STAGING_DIR = Path("temp/library/staging")
+STAGING_DIR = _PROJECT_ROOT / "temp/library/staging"
 
 # Media Directory (Permanent storage for ingested files)
-MEDIA_DIR = Path("temp/library/media")
+MEDIA_DIR = _PROJECT_ROOT / "temp/library/media"
 
 # Accepted file extensions for ingestion
 ACCEPTED_EXTENSIONS = [".mp3", ".wav"]
@@ -84,7 +87,7 @@ SCALAR_VALIDATION = {
 BLUR_SAVES_SCALARS = True
 
 # FFmpeg
-FFMPEG_PATH = Path("ffmpeg/ffmpeg.exe")
+FFMPEG_PATH = _PROJECT_ROOT / "ffmpeg/ffmpeg.exe"
 WAV_AUTO_CONVERT = True
 
 # Song Approval Pipeline
@@ -92,10 +95,10 @@ AUTO_MOVE_ON_APPROVE = True
 PROMPT_BEFORE_MOVE = True
 AUTO_SAVE_ID3 = True
 DEFAULT_SEARCH_ENGINE = "spotify"
-RENAME_RULES_PATH = Path("json/rules.json")
-PARSER_PRESETS_PATH = Path("json/parser_presets.json")
-ID3_FRAMES_PATH = Path("json/id3_frames.json")
-TRANSLITERATIONS_PATH = Path("json/transliterations.json")
+RENAME_RULES_PATH = _PROJECT_ROOT / "json/rules.json"
+PARSER_PRESETS_PATH = _PROJECT_ROOT / "json/parser_presets.json"
+ID3_FRAMES_PATH = _PROJECT_ROOT / "json/id3_frames.json"
+TRANSLITERATIONS_PATH = _PROJECT_ROOT / "json/transliterations.json"
 SCRUBBER_AUTO_PLAY = True
 
 # Scalar fields allowed in PATCH /songs/{id}

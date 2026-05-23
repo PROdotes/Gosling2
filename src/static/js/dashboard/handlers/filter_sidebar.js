@@ -110,9 +110,26 @@ export class FilterSidebarHandler {
     }
 
     reapply() {
-        if (this.hasActiveFilters()) {
-            this._applyFilters();
+        this.ctx.onSearch?.();
+    }
+
+    getState() {
+        const filters = {};
+        const add = (key, arr) => { if (arr.length) filters[key] = arr; };
+        add("artists", this._active.artists);
+        add("contributors", this._active.contributors);
+        add("years", this._active.years);
+        add("decades", this._active.decades);
+        add("genres", this._active.genres);
+        add("albums", this._active.albums);
+        add("publishers", this._active.publishers);
+        add("statuses", this._active.statuses);
+        const tagPairs = [];
+        for (const [cat, vals] of Object.entries(this._active.tag_categories)) {
+            for (const v of vals) tagPairs.push(`${cat}:${v}`);
         }
+        if (tagPairs.length) filters["tags"] = tagPairs;
+        return { filters, mode: this._mode, liveOnly: this._liveOnly, hasOriginal: this._hasOriginal };
     }
 
     hasActiveFilters() {
@@ -160,13 +177,13 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-mode-all")) {
             this._mode = "ALL";
             this._render();
-            if (this.hasActiveFilters()) this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
         if (target.closest("#filter-mode-any")) {
             this._mode = "ANY";
             this._render();
-            if (this.hasActiveFilters()) this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
 
@@ -194,7 +211,7 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-live-toggle")) {
             this._liveOnly = !this._liveOnly;
             this._render();
-            this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
 
@@ -202,7 +219,7 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-has-original-toggle")) {
             this._hasOriginal = !this._hasOriginal;
             this._render();
-            this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
 
@@ -229,7 +246,7 @@ export class FilterSidebarHandler {
                 this._toggleValue(key, value, cat);
             }
             this._render();
-            this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
 
@@ -241,7 +258,7 @@ export class FilterSidebarHandler {
             const cat = item.dataset.filterCat;
             this._toggleValue(key, value, cat);
             this._render();
-            this._applyFilters();
+            this.ctx.onSearch?.();
             return;
         }
     }
@@ -278,32 +295,7 @@ export class FilterSidebarHandler {
             this._mode,
             this._sidebarVisible,
         );
-        if (!this.hasActiveFilters()) {
-            // No filters — hand back to normal search
-            this.ctx.onFilterCleared?.();
-            return;
-        }
-
-        const filters = {};
-        const add = (key, arr) => {
-            if (arr.length) filters[key] = arr;
-        };
-        add("artists", this._active.artists);
-        add("contributors", this._active.contributors);
-        add("years", this._active.years);
-        add("decades", this._active.decades);
-        add("genres", this._active.genres);
-        add("albums", this._active.albums);
-        add("publishers", this._active.publishers);
-        add("statuses", this._active.statuses);
-        const tagPairs = [];
-        for (const [cat, vals] of Object.entries(this._active.tag_categories)) {
-            for (const v of vals) tagPairs.push(`${cat}:${v}`);
-        }
-        if (tagPairs.length) filters["tags"] = tagPairs;
-
-        const result = filterSongs(filters, this._mode, this._liveOnly, this._hasOriginal);
-        this.ctx.onFilterResults?.(result);
+        this.ctx.onSearch?.();
     }
 
     // ─── RENDER ───────────────────────────────────────────────────────────────

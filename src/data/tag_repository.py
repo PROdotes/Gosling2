@@ -105,19 +105,20 @@ class TagRepository(BaseRepository):
             WHERE (t.TagName LIKE ? COLLATE NOCASE OR t.TagCategory LIKE ? COLLATE NOCASE)
               AND t.IsDeleted = 0
             GROUP BY t.TagID
-            ORDER BY t.TagName COLLATE NOCASE
+            ORDER BY CASE WHEN LOWER(t.TagName) = LOWER(?) THEN 0 ELSE 1 END,
+                     t.TagName COLLATE NOCASE
         """
         like = f"%{query}%"
 
         if conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(sql, (like, like)).fetchall()
+            rows = conn.execute(sql, (like, like, query)).fetchall()
             return [self._row_to_tag(row) for row in rows]
 
         try:
             with self._get_connection() as new_conn:
                 new_conn.row_factory = sqlite3.Row
-                rows = new_conn.execute(sql, (like, like)).fetchall()
+                rows = new_conn.execute(sql, (like, like, query)).fetchall()
                 results = [self._row_to_tag(row) for row in rows]
                 logger.debug(
                     f"[TagRepository] <- search(q='{query}') count={len(results)}"

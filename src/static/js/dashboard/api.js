@@ -564,11 +564,12 @@ export function getFilterValues(q = "") {
     return runSearch("filter-values", url);
 }
 
-export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal = false) {
+export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal = false, q = "") {
     const params = new URLSearchParams();
     params.set("mode", mode);
     if (liveOnly) params.set("live_only", "true");
     if (hasOriginal) params.set("has_original", "true");
+    if (q) params.set("q", q);
     for (const [key, values] of Object.entries(filters)) {
         for (const v of values) {
             params.append(key, v);

@@ -99,9 +99,9 @@ async def _stream_ingestion(service, work_items):
             completed = service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
 
-            if original_path:
-                res["original_path"] = original_path
-                res["original_exists"] = os.path.isfile(original_path)
+            effective_original = original_path or staged_path
+            res["original_path"] = effective_original
+            res["original_exists"] = os.path.isfile(effective_original)
 
             report = (
                 IngestionReportView(**res)
@@ -342,14 +342,9 @@ async def delete_song(
 @router.post("/cleanup-original")
 async def cleanup_original_file(request: CleanupOriginalRequest):
     """
-    Physical deletion of the original source file (e.g. from Downloads).
-    Safety: Path must be within the user's Downloads folder.
+    Physical deletion of the original source file after a duplicate is detected.
+    Safety: Path must not be the active source_path of any library record.
     """
-    downloads = get_downloads_folder()
-    if not downloads:
-        raise HTTPException(
-            status_code=500, detail="Downloads folder not identified on this platform."
-        )
 
     try:
         service = _get_service()
@@ -375,18 +370,16 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
                 status_code=400, detail="Either file_path or song_id must be provided."
             )
 
-        # Legacy direct path cleanup (still used by some UI parts)
-        # Security: Ensure the path is within the Downloads folder
-        real_downloads = Path(downloads).resolve()
         real_target = Path(file_path).resolve()
 
-        if not real_target.is_relative_to(real_downloads):
+        filed_song = service._song_repo.get_by_path(str(real_target))
+        if filed_song is not None:
             logger.warning(
-                f"[IngestRouter] Security: Blocked deletion of file outside Downloads: {file_path}"
+                f"[IngestRouter] Security: Blocked deletion of filed library copy: {file_path}"
             )
             raise HTTPException(
                 status_code=403,
-                detail="Deletion is restricted to the Downloads folder for safety.",
+                detail="Cannot delete a file that is the active source of a library record.",
             )
 
         if not os.path.exists(real_target):

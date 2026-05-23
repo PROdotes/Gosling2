@@ -8,7 +8,7 @@ from typing import List
 from src.engine.config import FFMPEG_PATH
 from src.services.logger import logger
 
-WAVEFORM_CACHE_DIR = Path("sqldb/waveform_cache")
+WAVEFORM_CACHE_DIR = Path(__file__).parent.parent.parent / "sqldb/waveform_cache"
 PEAK_COUNT = 1000
 SAMPLE_RATE = 8000
 

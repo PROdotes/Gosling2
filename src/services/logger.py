@@ -2,6 +2,7 @@ import datetime
 import os
 import sys
 import contextvars
+from pathlib import Path
 
 request_id_var = contextvars.ContextVar("request_id", default="")
 
@@ -81,7 +82,11 @@ class Logger:
         "CRITICAL": 50,
     }
 
-    def __init__(self, log_file="gosling.log"):
+    _PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+    def __init__(self, log_file=None):
+        if log_file is None:
+            log_file = str(self._PROJECT_ROOT / "gosling.log")
         self.log_file = log_file
         env_level = os.getenv("GOSLING_LOG_LEVEL", "DEBUG").upper()
         self.current_level = self.LEVELS.get(env_level, 20)

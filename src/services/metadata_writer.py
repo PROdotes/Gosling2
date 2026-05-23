@@ -14,9 +14,8 @@ from src.models.metadata_frames import ID3FrameConfig
 class MetadataWriter:
     """Stateless service for writing Domain Model metadata back to physical ID3 tags."""
 
-    def __init__(self, json_path: str = "json/id3_frames.json"):
-        """Initializes the writer with the frame mapping configuration."""
-        self.config = load_id3_frames(json_path)
+    def __init__(self):
+        self.config = load_id3_frames()
 
         # Pre-process for config-driven inverse lookup
         self.field_to_tag = {}

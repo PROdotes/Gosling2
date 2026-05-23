@@ -241,6 +241,7 @@ class CatalogService:
         live_only: bool = False,
         has_original: bool = False,
         mode: str = "ALL",
+        q: Optional[str] = None,
     ) -> List[dict]:
         """Filter songs by sidebar criteria."""
         return self._library_service.filter_songs_slim(
@@ -256,6 +257,7 @@ class CatalogService:
             live_only=live_only,
             has_original=has_original,
             mode=mode,
+            q=q,
         )
 
     def search_songs_slim(self, query: str) -> List[dict]:
