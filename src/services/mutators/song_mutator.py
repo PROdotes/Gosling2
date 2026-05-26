@@ -1,6 +1,7 @@
 import sqlite3
 
 from src.data.song_repository import SongRepository
+from src.engine.config import ProcessingStatus
 from src.engine.routers.mutation_models import UpdateSongItem
 from src.utils.text import normalize_for_search
 
@@ -18,6 +19,15 @@ class SongMutator:
         fields = item.model_dump(exclude={"type", "id"}, exclude_unset=True)
         if not fields:
             return
+
+        if fields.get("is_active") is True:
+            current = self._repo.get_by_id(item.id, conn)
+            if current is None:
+                raise LookupError(f"Song {item.id} not found")
+            if current.processing_status != ProcessingStatus.REVIEWED:
+                raise ValueError(
+                    "Cannot activate song unless processing_status is 0 (Reviewed)"
+                )
 
         if "media_name" in fields:
             raw = fields["media_name"]

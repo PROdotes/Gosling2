@@ -31,6 +31,13 @@ The main payload for `POST /api/v1/mutate`.
 ### AddAlbumItem
 `{ type: "album", song_id: int, id: int|None, name: str|None, album_type: str|None, release_year: int|None, track_number: int|None, disc_number: int|None }`
 
+### AddIdentityMemberItem
+`{ type: "identity_member", group_id: int, member_id: int }`
+
+### AddIdentityAliasItem
+`{ type: "identity_alias", identity_id: int, display_name: str|None, name_id: int|None }`
+- Either `display_name` or `name_id` must be present.
+
 ---
 
 ## Update Items
@@ -56,6 +63,10 @@ The main payload for `POST /api/v1/mutate`.
 ### UpdatePublisherEntityItem
 `{ type: "publisher_entity", id: int, name: str|None, parent_id: int|None }`
 
+### UpdateIdentityItem
+`{ type: "identity", id: int, identity_type: str|None }`
+- `identity_type` must be `"person"` or `"group"` if provided.
+
 ---
 
 ## Remove Items
@@ -71,6 +82,12 @@ The main payload for `POST /api/v1/mutate`.
 
 ### RemoveAlbumItem
 `{ type: "album", song_id: int, id: int }`
+
+### RemoveIdentityMemberItem
+`{ type: "identity_member", group_id: int, member_id: int }`
+
+### RemoveIdentityAliasItem
+`{ type: "identity_alias", identity_id: int, name_id: int }`
 
 ---
 
@@ -128,9 +145,21 @@ Ensures a request isn't empty.
 ### media_name_not_empty(v)
 Specific validator for Song media name.
 
+### name_or_id(v)
+Ensures either `display_name` or `name_id` is provided for `AddIdentityAliasItem`.
+
+### valid_type(v)
+Ensures `identity_type` is `"person"` or `"group"` for `UpdateIdentityItem`.
+
 ---
 
 ## Merge Items
 
 ### MergeIdentityItem
 `{ type: "merge_identity", source_id: int, target_id: int }`
+
+### MergePublisherItem
+`{ type: "publisher_merge", source_id: int, target_id: int }`
+
+### MergeTagItem
+`{ type: "tag_merge", source_id: int, target_id: int }`

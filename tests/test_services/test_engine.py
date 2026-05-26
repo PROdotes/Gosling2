@@ -331,10 +331,9 @@ class TestGetAllIdentities:
         ], f"Expected exact identity names, got {names}"
 
     def test_dave_has_aliases(self, client):
-        """Dave Grohl (ID 1) has aliases including primary name + non-primary aliases."""
-        data = client.get("/api/v1/identities").json()
-        dave = next(i for i in data if i["display_name"] == "Dave Grohl")
-        alias_names = sorted([a["display_name"] for a in dave["aliases"]])
+        """Dave Grohl (ID 1) has aliases — verified via detail endpoint."""
+        data = client.get("/api/v1/identities/1").json()
+        alias_names = sorted([a["display_name"] for a in data["aliases"]])
         assert alias_names == [
             "Dave Grohl",
             "Grohlton",
@@ -343,20 +342,18 @@ class TestGetAllIdentities:
         ], f"Expected Dave's aliases, got {alias_names}"
 
     def test_dave_has_groups(self, client):
-        """Dave's groups are Nirvana and Foo Fighters."""
-        data = client.get("/api/v1/identities").json()
-        dave = next(i for i in data if i["display_name"] == "Dave Grohl")
-        group_names = sorted([g["display_name"] for g in dave["groups"]])
+        """Dave's groups are Nirvana and Foo Fighters — verified via detail endpoint."""
+        data = client.get("/api/v1/identities/1").json()
+        group_names = sorted([g["display_name"] for g in data["groups"]])
         assert group_names == [
             "Foo Fighters",
             "Nirvana",
         ], f"Expected Dave's groups ['Foo Fighters', 'Nirvana'], got {group_names}"
 
     def test_foo_fighters_has_members(self, client):
-        """Foo Fighters has members Dave Grohl and Taylor Hawkins."""
-        data = client.get("/api/v1/identities").json()
-        ff = next(i for i in data if i["display_name"] == "Foo Fighters")
-        member_names = sorted([m["display_name"] for m in ff["members"]])
+        """Foo Fighters has members Dave Grohl and Taylor Hawkins — verified via detail endpoint."""
+        data = client.get("/api/v1/identities/3").json()
+        member_names = sorted([m["display_name"] for m in data["members"]])
         assert member_names == [
             "Dave Grohl",
             "Taylor Hawkins",

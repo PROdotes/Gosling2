@@ -18,15 +18,11 @@ from src.models.domain import (
 )
 
 from src.engine.config import (
-    STAGING_DIR,
-    SCALAR_VALIDATION,
     get_db_path,
 )
 from src.services.identity_service import IdentityService
 from src.services.library_service import LibraryService
 from src.services.ingestion_service import IngestionService
-from src.services.edit_service import EditService
-from src.engine.models.spotify import SpotifyCredit
 
 
 class CatalogService:
@@ -60,22 +56,6 @@ class CatalogService:
             tag_repo=self._tag_repo,
             identity_repo=self._identity_repo,
         )
-        self._edit_service = EditService(
-            db_path,
-            self._library_service,
-            song_repo=self._song_repo,
-            album_repo_dir=self._album_repo_dir,
-            credit_repo=self._credit_repo,
-            album_repo=self._album_repo,
-            pub_repo=self._pub_repo,
-            tag_repo=self._tag_repo,
-            identity_repo=self._identity_repo,
-            album_credit_repo=self._album_credit_repo,
-        )
-
-    def sync_id3_if_enabled(self, song_id: int) -> None:
-        """Internal trigger for persistent ID3 writing (Delegated)."""
-        return self._edit_service.sync_id3_if_enabled(song_id)
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """Dry-run ingestion check for path, hash, and metadata collisions."""
@@ -112,14 +92,6 @@ class CatalogService:
     ) -> Dict[str, Any]:
         """Internal wrapper for thread-safe single file ingestion (Delegated)."""
         return self._ingestion_service.ingest_single(file_path, original_path)
-
-    def delete_song(
-        self, song_id: int, notes: str = None, delete_file: bool = False
-    ) -> bool:
-        """Soft-delete a single song. Handles physical cleanup if in staging."""
-        return self._edit_service.delete_song(
-            song_id, staging_dir=STAGING_DIR, notes=notes, delete_file=delete_file
-        )
 
     def resolve_conflict(
         self, ghost_id: int, staged_path: str, original_path: Optional[str] = None
@@ -272,83 +244,8 @@ class CatalogService:
         """Deep slim search."""
         return self._library_service.search_songs_deep_slim(query)
 
-    def update_song_scalars(self, song_id: int, fields: Dict[str, Any]) -> Song:
-        """Delegate scalar updates to EditService."""
-        self._edit_service.update_song_scalars(
-            song_id, fields, scalar_rules=SCALAR_VALIDATION
-        )
-        return self.get_song(song_id)
-
     def get_all_roles(self) -> list[str]:
         return self._credit_repo.get_all_roles()
-
-    def update_credit_name(self, name_id: int, new_name: str) -> None:
-        """Update artist display name globally via EditService."""
-        return self._edit_service.update_credit_name(name_id, new_name)
-
-    def update_album(self, album_id: int, album_data: dict) -> Album:
-        """Update album record via EditService."""
-        return self._edit_service.update_album(album_id, album_data)
-
-    def add_album_publisher(
-        self,
-        album_id: int,
-        publisher_name: Optional[str],
-        publisher_id: Optional[int] = None,
-    ) -> Publisher:
-        """Add album publisher via EditService."""
-        return self._edit_service.add_album_publisher(
-            album_id, publisher_name, publisher_id
-        )
-
-    def remove_album_publisher(self, album_id: int, publisher_id: int) -> None:
-        """Remove album publisher via EditService."""
-        return self._edit_service.remove_album_publisher(album_id, publisher_id)
-
-    def update_tag(self, tag_id: int, new_name: str, new_category: str) -> None:
-        """Update tag via EditService."""
-        return self._edit_service.update_tag(tag_id, new_name, new_category)
-
-    def delete_unlinked_albums(self, album_ids: List[int]) -> int:
-        """Clean up unlinked albums via EditService."""
-        return self._edit_service.delete_unlinked_albums(album_ids)
-
-    def delete_unlinked_publishers(self, publisher_ids: List[int]) -> int:
-        """Clean up unlinked publishers via EditService."""
-        return self._edit_service.delete_unlinked_publishers(publisher_ids)
-
-    def delete_unlinked_tags(self, tag_ids: List[int]) -> int:
-        """Clean up unlinked tags via EditService."""
-        return self._edit_service.delete_unlinked_tags(tag_ids)
-
-    def add_song_publisher(
-        self,
-        song_id: int,
-        publisher_name: Optional[str],
-        publisher_id: Optional[int] = None,
-    ) -> Publisher:
-        """Add song publisher via EditService."""
-        return self._edit_service.add_song_publisher(
-            song_id, publisher_name, publisher_id
-        )
-
-    def remove_song_publisher(self, song_id: int, publisher_id: int) -> None:
-        """Remove song publisher via EditService."""
-        return self._edit_service.remove_song_publisher(song_id, publisher_id)
-
-    def import_credits_bulk(
-        self, song_id: int, credits: List[SpotifyCredit], publishers: List[str]
-    ) -> None:
-        """Bulk import via EditService."""
-        return self._edit_service.import_credits_bulk(song_id, credits, publishers)
-
-    def update_publisher(self, publisher_id: int, new_name: str) -> None:
-        """Update publisher via EditService."""
-        return self._edit_service.update_publisher(publisher_id, new_name)
-
-    def delete_original_source(self, song_id: int) -> bool:
-        """Physical deletion of the original file linked to this song."""
-        return self._edit_service.delete_original_source(song_id)
 
     def get_staging_origin(self, song_id: int) -> Optional[str]:
         """Fetch the original birth-path for this staged song."""

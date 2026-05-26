@@ -19,11 +19,14 @@ function close(result) {
     }
 }
 
-okBtn.addEventListener("click", () => close(true));
-cancelBtn.addEventListener("click", () => close(false));
-overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) close(false);
-});
+const _elementsPresent = overlay && okBtn && cancelBtn;
+if (_elementsPresent) {
+    okBtn.addEventListener("click", () => close(true));
+    cancelBtn.addEventListener("click", () => close(false));
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close(false);
+    });
+}
 
 /**
  * Show a styled confirmation dialog.

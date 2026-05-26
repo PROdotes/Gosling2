@@ -220,16 +220,19 @@ class TestUpdateCreditName:
 class TestFindByDisplayName:
     def test_known_name_returns_name_id(self, populated_db):
         repo = SongCreditRepository(populated_db)
-        result = repo.find_by_display_name("Dave Grohl")
+        with repo._get_connection() as conn:
+            result = repo.get_name_id_by_display_name("Dave Grohl", conn)
         assert result is not None, "Expected to find 'Dave Grohl'"
         assert result == 10, f"Expected name_id=10, got {result}"
 
     def test_unknown_name_returns_none(self, populated_db):
         repo = SongCreditRepository(populated_db)
-        result = repo.find_by_display_name("Nobody Famous")
+        with repo._get_connection() as conn:
+            result = repo.get_name_id_by_display_name("Nobody Famous", conn)
         assert result is None, f"Expected None, got {result}"
 
     def test_case_insensitive(self, populated_db):
         repo = SongCreditRepository(populated_db)
-        result = repo.find_by_display_name("dave grohl")
+        with repo._get_connection() as conn:
+            result = repo.get_name_id_by_display_name("dave grohl", conn)
         assert result is not None, "Expected case-insensitive match for 'dave grohl'"

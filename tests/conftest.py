@@ -555,10 +555,10 @@ def cleanup_staging_dir(tmp_path, monkeypatch):
 
     import src.engine.config as config_mod
     import src.engine.routers.ingest as ingest_mod
-    import src.services.catalog_service as catalog_service_mod
+    import src.services.mutation_coordinator as mutation_coordinator_mod
 
     monkeypatch.setattr(config_mod, "STAGING_DIR", test_staging)
     monkeypatch.setattr(ingest_mod, "STAGING_DIR", test_staging)
-    monkeypatch.setattr(catalog_service_mod, "STAGING_DIR", test_staging)
+    monkeypatch.setattr(mutation_coordinator_mod, "STAGING_DIR", test_staging)
 
     yield

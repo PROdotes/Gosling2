@@ -37,7 +37,7 @@ def api_client(populated_db, monkeypatch, tmp_path):
     staging.mkdir(parents=True, exist_ok=True)
     # Ensure both router and service use the SAME isolated staging
     monkeypatch.setattr("src.engine.routers.ingest.STAGING_DIR", str(staging))
-    monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", str(staging))
+    monkeypatch.setattr("src.services.mutation_coordinator.STAGING_DIR", str(staging))
 
     return TestClient(app)
 

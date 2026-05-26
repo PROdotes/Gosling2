@@ -239,12 +239,12 @@ class TestGetByIds:
 
 
 class TestGetPublishers:
-    """PublisherRepository.get_publishers (dict return) contracts."""
+    """PublisherRepository.get_by_ids (dict-keyed) contracts."""
 
     def test_returns_dict_keyed_by_id(self, populated_db):
-        """Test that get_publishers returns dict keyed by ID."""
+        """get_by_ids converted to dict returns publishers keyed by ID."""
         repo = PublisherRepository(populated_db)
-        pubs = repo.get_publishers([1, 2])
+        pubs = {p.id: p for p in repo.get_by_ids([1, 2])}
 
         assert len(pubs) == 2, f"Expected 2 publishers, got {len(pubs)}"
         assert 1 in pubs, f"Expected key 1 in dict, got keys: {pubs.keys()}"
@@ -259,9 +259,9 @@ class TestGetPublishers:
         ), f"Expected 'Island Records', got '{pubs[2].name}'"
 
     def test_empty_input_returns_empty_dict(self, populated_db):
-        """Test that empty input returns empty dict."""
+        """Empty input returns empty dict."""
         repo = PublisherRepository(populated_db)
-        pubs = repo.get_publishers([])
+        pubs = {p.id: p for p in repo.get_by_ids([])}
         assert pubs == {}, f"Expected empty dict, got {pubs}"
 
 

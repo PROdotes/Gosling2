@@ -82,10 +82,6 @@ Only returns non-deleted records.
 
 Batch-fetches core song records for multiple IDs. Supports optional shared connection.
 
-### get_by_title(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Song]
-
-Finds songs by case-insensitive title match (LIKE '%query%'). Supports optional shared connection.
-
 ### search_slim(query: str, conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
 Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated). Supports optional shared connection.
@@ -130,6 +126,9 @@ Find songs matching Title, exact Performer set, and Recording Year. Supports opt
 
 Atomic insert into `MediaSources`, `Songs`, and all relationship tables (tags, albums, publishers, credits). Delegates core file record to `MediaSourceRepository.insert_source`, then calls `TagRepository.insert_tags`, `SongAlbumRepository.insert_albums`, `PublisherRepository.insert_song_publishers`, and `SongCreditRepository.insert_credits`. Returns the new `SourceID`. Does NOT commit.
 
+### find_duplicate_groups(conn: Optional[sqlite3.Connection] = None) -> List[List[int]]
+Find groups of songs sharing the same MediaName (UTF8_NOCASE) and the same set of Performer OwnerIdentityIDs. Songs with zero resolved performer identities are skipped. Returns a list of groups, each containing >= 2 SourceIDs.
+
 ### reactivate_ghost(ghost_id: int, song: Song, conn: sqlite3.Connection) -> bool
 
 Restores a soft-deleted song and updates it with new metadata (Tags, Credits, Albums, Publishers).
@@ -167,10 +166,6 @@ Returns all role names from the Roles table, ordered alphabetically. Supports op
 ### get_or_create_role(role_name: str, cursor) -> int
 
 Get-or-create a Role by name. Returns role_id.
-
-### find_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
-
-Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or None. Read-only. Supports optional shared connection.
 
 ### get_name_id_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 Alternative accessor for find_by_display_name.
@@ -269,6 +264,9 @@ Fetch the full directory of active (non-deleted) albums, ordered by title. Suppo
 
 Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (aggregated label string), SongCount. No tracklist hydration. Pass empty string to get all albums. Supports optional shared connection.
 
+### get_slim_by_ids(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[dict]
+Fetch slim list-view rows for a specific set of AlbumIDs. Same column shape as search_slim.
+
 - Matches: AlbumTitle (via AlbumTitle_Search) or credited artist (DisplayName_Search).
 - Query is normalized by the service layer to diacritic-stripped lowercase for matching against shadows.
 
@@ -279,10 +277,6 @@ Fetch a single album by its ID. Supports optional shared connection.
 ### get_song_ids_by_album(album_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
 
 Fetch all song IDs linked to a specific album, ordered by disc, track, and source ID. Supports optional shared connection.
-
-### get_song_ids_for_albums(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[int]]
-
-Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID]. Supports optional shared connection.
 
 ### create_album(title: str, album_type: str, release_year: int, conn: sqlite3.Connection, title_search: Optional[str] = None) -> int
 
@@ -322,10 +316,6 @@ Batch-fetch publisher objects for a list of Albums (M2M resolution). Supports op
 ### get_publishers_for_songs(song_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Tuple[int, Publisher]]
 
 Batch-fetch master record publisher objects for a list of Songs (M2M resolution). Supports optional shared connection.
-
-### get_publishers(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, Publisher]
-
-Resolve a flat list of ID -> Publisher objects. Supports optional shared connection.
 
 ### get_all(conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
@@ -407,6 +397,9 @@ Update a Publisher's name globally. Affects all songs linked to this publisher. 
 
 Set or clear the ParentPublisherID for a publisher. Pass `None` to clear. Raises `LookupError` if publisher not found. Does NOT commit.
 
+### merge_into(source_id: int, target_id: int, conn: sqlite3.Connection) -> None
+Re-links all song and album links to target, then soft-deletes source. Does NOT commit.
+
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
@@ -468,6 +461,12 @@ Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
 
 Update a Tag's name/category globally. Does NOT commit.
 
+### find_by_name_category(name: str, category: str, conn: sqlite3.Connection) -> Optional[int]
+Return TagID for an exact (case-insensitive) name+category match, or None.
+
+### merge_into(source_id: int, target_id: int, conn: sqlite3.Connection) -> None
+Re-links all song links to target, then soft-deletes source. Does NOT commit.
+
 ### soft_delete(tag_id: int, conn: sqlite3.Connection) -> bool
 
 Set `IsDeleted = 1` for a tag. Returns `True` if a record was updated, `False` if not found or already deleted.
@@ -525,6 +524,15 @@ Batch-fetch multiple identities by ID. Supports optional shared connection.
 
 Finds active identities whose DisplayName, LegalName, or Alias match the query. Supports optional shared connection.
 
+### get_all_slim(conn: Optional[sqlite3.Connection] = None) -> List[dict]
+Fast list-view query. Returns dicts for IdentitySlimView with embedded counts.
+
+### search_slim(query: str, conn: Optional[sqlite3.Connection] = None, exclude_groups: bool = False) -> List[dict]
+Fast list-view search. Matches DisplayName, LegalName, or Alias. Returns dicts with embedded counts.
+
+### search_artist_names(query: str, conn: Optional[sqlite3.Connection] = None, exclude_groups: bool = False) -> List[sqlite3.Row]
+Find ArtistNames whose DisplayName matches the query. One row per name. Returns (NameID, DisplayName, OwnerIdentityID).
+
 ### get_group_ids_for_members(member_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[int]
 
 Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs. Supports optional shared connection.
@@ -544,10 +552,6 @@ Detach an alias from its identity. This creates a fresh Identity record and re-h
 ### update_legal_name(identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection) -> None
 
 Update the LegalName field on an Identity record. Raises LookupError if not found. Does NOT commit.
-
-### get_song_counts_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, int]
-
-Batch fetch active song counts for multiple identities. Returns a map of `IdentityID -> count`.
 
 ### soft_delete(identity_id: int, conn: sqlite3.Connection) -> bool
 
@@ -588,6 +592,9 @@ Remove a membership link. No-op if not linked.
 ### merge_orphan_into(source_name_id: int, target_name_id: int, cursor: sqlite3.Cursor) -> None
 
 Merges a solo (orphan) identity into another by repointing all credits and soft-deleting the source record.
+
+### get_owner_identity_id(name_id: int, cursor: sqlite3.Cursor) -> Optional[int]
+Return the OwnerIdentityID for a given NameID, or None if the name doesn't exist.
 
 ### _row_to_identity(row: sqlite3.Row) -> Identity
 

@@ -25,6 +25,12 @@ Handles song deletion.
 ### handleRejectSong(actionTarget, event)
 Handles song rejection.
 
+### handleRejectReason(actionTarget)
+Opens a reason picker for song rejection.
+
+### handleRejectCancel(actionTarget)
+Cancels an in-progress song rejection.
+
 ### handleToggleActive(actionTarget, event)
 Toggles song active status.
 
@@ -187,6 +193,9 @@ Bulk identity cleanup.
 
 ### setupListeners()
 Attaches UI listeners.
+
+### getState()
+Returns the current sidebar filter state including mode, active filters, and visibility.
 
 ### load()
 Fetches counts and values.

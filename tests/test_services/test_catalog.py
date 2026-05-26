@@ -471,13 +471,13 @@ class TestGetIdentity:
 
 
 class TestGetAllIdentities:
-    """CatalogService.get_all_identities contracts."""
+    """CatalogService.get_all_identities_slim contracts."""
 
     def test_returns_all_four_sorted(self, catalog_service):
-        """All 4 identities returned in sorted order by display_name."""
-        identities = catalog_service.get_all_identities()
+        """All 4 identities returned in sorted order by DisplayName."""
+        identities = catalog_service.get_all_identities_slim()
         assert len(identities) == 4, f"Expected 4 identities, got {len(identities)}"
-        names = [i.display_name for i in identities]
+        names = [i["DisplayName"] for i in identities]
         assert names == [
             "Dave Grohl",
             "Foo Fighters",
@@ -485,50 +485,43 @@ class TestGetAllIdentities:
             "Taylor Hawkins",
         ], f"Expected sorted names, got {names}"
 
-    def test_identities_are_hydrated(self, catalog_service):
-        """Identities should have aliases/members/groups filled in."""
-        identities = catalog_service.get_all_identities()
-        dave = next((i for i in identities if i.display_name == "Dave Grohl"), None)
+    def test_identities_have_required_fields(self, catalog_service):
+        """Slim rows must include IdentityID, DisplayName, and IdentityType."""
+        identities = catalog_service.get_all_identities_slim()
+        dave = next((i for i in identities if i["DisplayName"] == "Dave Grohl"), None)
         assert dave is not None, "Dave Grohl should be in all identities"
-        assert (
-            len(dave.aliases) == 4
-        ), f"Expected 4 aliases for Dave, got {len(dave.aliases)}"
-        assert (
-            len(dave.groups) == 2
-        ), f"Expected 2 groups for Dave, got {len(dave.groups)}"
+        assert "IdentityID" in dave, "Expected IdentityID field in slim row"
+        assert "IdentityType" in dave, "Expected IdentityType field in slim row"
+        assert dave["IdentityType"] == "person", f"Expected 'person', got {dave['IdentityType']}"
 
     def test_empty_db(self, catalog_service_empty):
         """Empty database returns empty list."""
-        result = catalog_service_empty.get_all_identities()
+        result = catalog_service_empty.get_all_identities_slim()
         assert result == [], f"Expected empty list, got {result}"
 
 
 class TestSearchIdentities:
-    """CatalogService.search_identities contracts."""
+    """CatalogService.search_identities_slim contracts."""
 
     def test_by_name(self, catalog_service):
         """Searching by group name returns the identity."""
-        results = catalog_service.search_identities("Nirvana")
+        results = catalog_service.search_identities_slim("Nirvana")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert (
-            results[0].display_name == "Nirvana"
-        ), f"Expected display_name 'Nirvana', got {results[0].display_name}"
+            results[0]["DisplayName"] == "Nirvana"
+        ), f"Expected DisplayName 'Nirvana', got {results[0]['DisplayName']}"
 
     def test_by_alias(self, catalog_service):
-        """Searching 'Grohlton' returns Dave Grohl (hydrated)."""
-        results = catalog_service.search_identities("Grohlton")
+        """Searching 'Grohlton' returns Dave Grohl."""
+        results = catalog_service.search_identities_slim("Grohlton")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert (
-            results[0].display_name == "Dave Grohl"
-        ), f"Expected display_name 'Dave Grohl', got {results[0].display_name}"
-        # Should be hydrated
-        assert (
-            len(results[0].aliases) == 4
-        ), f"Expected 4 aliases, got {len(results[0].aliases)}"
+            results[0]["DisplayName"] == "Dave Grohl"
+        ), f"Expected DisplayName 'Dave Grohl', got {results[0]['DisplayName']}"
 
     def test_no_results(self, catalog_service):
         """Searching non-existent term returns empty list."""
-        result = catalog_service.search_identities("ZZZZ")
+        result = catalog_service.search_identities_slim("ZZZZ")
         assert result == [], f"Expected empty list, got {result}"
 
 
@@ -917,15 +910,16 @@ class TestAlbumViewFromCatalog:
 # Song Workflow & Validation
 # ===================================================================
 class TestSongWorkflowValidation:
-    """CatalogService lifecycle rules from SONG_WORKFLOW_SPEC.md."""
+    """SongMutator lifecycle rules from SONG_WORKFLOW_SPEC.md."""
 
     def test_activate_rejected_if_not_reviewed(self, catalog_service):
         """Cannot activate a song (is_active=True) if processing_status != 0."""
-        from src.models.view_models import SongScalarUpdate
-
-        # 1. Force state to 0 (Inactive) and 1 (Imported)
+        import pytest
         from src.data.song_repository import SongRepository
+        from src.services.mutation_coordinator import MutationCoordinator
+        from src.engine.routers.mutation_models import MutationRequest, UpdateSongItem
 
+        # 1. Force state to inactive + not reviewed
         repo = SongRepository(catalog_service._db_path)
         conn = repo.get_connection()
         conn.execute(
@@ -934,7 +928,7 @@ class TestSongWorkflowValidation:
         conn.commit()
         conn.close()
 
-        # 2. Verify initial state matches our test requirement
+        # 2. Verify initial state
         original = catalog_service.get_song(7)
         assert original.id == 7, f"Expected ID 7, got {original.id}"
         assert (
@@ -944,21 +938,17 @@ class TestSongWorkflowValidation:
             original.processing_status == 1
         ), f"Expected status 1 before activation attempt, got {original.processing_status}"
 
-        # 3. Attempt to activate
-        update = SongScalarUpdate(is_active=True)
-        import pytest
-
+        # 3. Attempt to activate — must raise ValueError
+        coord = MutationCoordinator(catalog_service._db_path)
         with pytest.raises(ValueError) as exc:
-            catalog_service.update_song_scalars(
-                7, update.model_dump(exclude_unset=True)
-            )
+            coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=7, is_active=True)]))
 
         expected_msg = "Cannot activate song unless processing_status is 0 (Reviewed)"
         assert expected_msg in str(
             exc.value
         ), f"Expected error message '{expected_msg}', got '{exc.value}'"
 
-        # 4. Exhaustive check: Verify NOTHING changed
+        # 4. Verify NOTHING changed (transaction rolled back)
         refreshed = catalog_service.get_song(7)
         assert refreshed.id == 7, f"Expected ID 7, got {refreshed.id}"
         assert (
@@ -976,25 +966,24 @@ class TestSongWorkflowValidation:
 
     def test_activate_allowed_if_reviewed(self, catalog_service):
         """Activation allowed if status is 0."""
-        from src.models.view_models import SongScalarUpdate
         from src.data.song_repository import SongRepository
+        from src.services.mutation_coordinator import MutationCoordinator
+        from src.engine.routers.mutation_models import MutationRequest, UpdateSongItem
 
-        # Ensure status is 0
+        # Ensure status is 0 and song is inactive
         repo = SongRepository(catalog_service._db_path)
         conn = repo.get_connection()
-        conn.execute("UPDATE MediaSources SET ProcessingStatus = 0 WHERE SourceID = 7")
+        conn.execute(
+            "UPDATE MediaSources SET ProcessingStatus = 0, IsActive = 0 WHERE SourceID = 7"
+        )
         conn.commit()
         conn.close()
 
-        update = SongScalarUpdate(is_active=True)
-        success = catalog_service.update_song_scalars(
-            7, update.model_dump(exclude_unset=True)
-        )
-        assert (
-            success is not None
-        ), "update_song_scalars should return the hydrated Song object"
+        coord = MutationCoordinator(catalog_service._db_path)
+        result = coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=7, is_active=True)]))
+        assert result is not None, "apply should return a result dict"
 
-        # Exhaustive check: Verify activation AND persistence of other fields
+        # Verify activation persisted
         song = catalog_service.get_song(7)
         assert song.id == 7, f"Expected ID 7, got {song.id}"
         assert song.is_active is True, f"Expected is_active True, got {song.is_active}"
@@ -1008,23 +997,22 @@ class TestSongWorkflowValidation:
 
     def test_deactivate_always_allowed(self, catalog_service):
         """Disabling is_active=False should NOT be blocked by status."""
-        from src.models.view_models import SongScalarUpdate
         from src.data.song_repository import SongRepository
+        from src.services.mutation_coordinator import MutationCoordinator
+        from src.engine.routers.mutation_models import MutationRequest, UpdateSongItem
 
-        # Start with active song (Song 1: SLTS) and force status to 1
+        # Song 1 is active; force status to 1 (not reviewed)
         repo = SongRepository(catalog_service._db_path)
         conn = repo.get_connection()
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 1 WHERE SourceID = 1")
         conn.commit()
         conn.close()
 
-        update = SongScalarUpdate(is_active=False)
-        success = catalog_service.update_song_scalars(
-            1, update.model_dump(exclude_unset=True)
-        )
-        assert success is not None
+        coord = MutationCoordinator(catalog_service._db_path)
+        result = coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=1, is_active=False)]))
+        assert result is not None
 
-        # Exhaustive check: Verify deactivation
+        # Verify deactivation persisted
         song = catalog_service.get_song(1)
         assert song.id == 1, f"Expected ID 1, got {song.id}"
         assert (

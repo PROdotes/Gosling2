@@ -35,6 +35,9 @@ Fetches albums matching query.
 ### searchArtists(query)
 Fetches identities matching query.
 
+### searchArtistNames(query, options)
+Search ArtistNames for picker results. One row per name. Supports `{ excludeGroups }` option.
+
 ### searchPublishers(query)
 Fetches publishers matching query.
 
@@ -62,6 +65,9 @@ Fetches identity details including aliases and members.
 
 ### getArtistSongs(id, options)
 Fetches all songs associated with an identity.
+
+### getArtistAlbums(id, options)
+Fetches all albums associated with an identity.
 
 ### getPublisherDetail(id, options)
 Fetches publisher details.
@@ -139,7 +145,8 @@ Deletes a publisher.
 ### bulkDeleteUnlinkedPublishers()
 Deletes all publishers with no associated songs or albums.
 
----
+### mergePublisher(sourceId, targetId)
+Merges one publisher into another.
 
 ## Mutations (Tags)
 
@@ -151,6 +158,9 @@ Deletes a tag.
 
 ### bulkDeleteUnlinkedTags()
 Deletes all tags with no associated songs.
+
+### mergeTag(sourceId, targetId)
+Merges one tag into another.
 
 ---
 
@@ -259,6 +269,9 @@ Deletes an orphan file from staging.
 
 ### cleanupOriginalFile(filePath)
 Deletes the original source file after successful processing.
+
+### deleteOriginalByPath(filePath)
+Deletes the original source file by its absolute path.
 
 ### formatText(text, type)
 Stateless text casing via `POST /api/v1/tools/format-text`. `type` is `"title"` or `"sentence"`. Returns `{ result }`.

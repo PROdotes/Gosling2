@@ -17,7 +17,36 @@ Orphan tags (zero active song links): none in populated_db by default.
 Tests that need an orphan insert one directly via SQL.
 """
 
+import pytest
 from src.services.catalog_service import CatalogService
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import (
+    MutationRequest,
+    DeleteSongItem,
+    DeleteTagItem,
+    DeleteAlbumItem,
+    DeletePublisherItem,
+)
+
+
+def _coord(db_path):
+    return MutationCoordinator(db_path)
+
+
+def _delete_song(db_path, song_id):
+    _coord(db_path).apply(MutationRequest(delete=[DeleteSongItem(type="song", id=song_id)]))
+
+
+def _delete_tag(db_path, tag_id):
+    _coord(db_path).apply(MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)]))
+
+
+def _delete_album(db_path, album_id):
+    _coord(db_path).apply(MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)]))
+
+
+def _delete_publisher(db_path, publisher_id):
+    _coord(db_path).apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", id=publisher_id)]))
 
 
 def _insert_orphan_tag(db_path: str, tag_id: int, name: str, category: str) -> None:
@@ -34,109 +63,84 @@ def _insert_orphan_tag(db_path: str, tag_id: int, name: str, category: str) -> N
 
 
 class TestDeleteUnlinkedTagsSingle:
-    """Single-delete behaviour: pass [tag_id]."""
+    """Single tag delete via MutationCoordinator."""
 
     def test_unlinked_tag_is_deleted(self, populated_db):
-        """An orphan tag passed as a single-item list is soft-deleted. Returns 1."""
+        """An orphan tag is soft-deleted successfully."""
         _insert_orphan_tag(populated_db, 100, "Orphan", "Test")
         service = CatalogService(populated_db)
 
-        result = service.delete_unlinked_tags([100])
+        _delete_tag(populated_db, 100)
 
-        assert result == 1, f"Expected 1 deleted, got {result}"
+        assert service.get_tag(100) is None, "Expected get_tag to return None after deletion"
 
-    def test_deleted_tag_is_hidden_from_get_tag(self, populated_db):
-        """After deletion, get_tag returns None for the deleted tag."""
-        _insert_orphan_tag(populated_db, 100, "Orphan", "Test")
-        service = CatalogService(populated_db)
-
-        service.delete_unlinked_tags([100])
-
-        assert (
-            service.get_tag(100) is None
-        ), "Expected get_tag to return None after deletion"
-
-    def test_linked_tag_is_not_deleted(self, populated_db):
-        """A tag with active song links returns 0 — not deleted."""
-        service = CatalogService(populated_db)
-
-        result = service.delete_unlinked_tags([1])  # Grunge -> Song 1, Song 9
-
-        assert result == 0, f"Expected 0 (linked tag rejected), got {result}"
+    def test_linked_tag_raises(self, populated_db):
+        """A tag with active song links raises ValueError."""
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 1)  # Grunge -> Song 1, Song 9
 
     def test_linked_tag_remains_in_db(self, populated_db):
         """A linked tag must still exist after a failed delete attempt."""
         service = CatalogService(populated_db)
 
-        service.delete_unlinked_tags([1])
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 1)
 
         tag = service.get_tag(1)
         assert tag is not None, "Expected linked tag to remain after rejected delete"
         assert tag.name == "Grunge", f"Expected 'Grunge', got '{tag.name}'"
 
-    def test_nonexistent_tag_returns_zero(self, populated_db):
-        """A tag ID that doesn't exist returns 0."""
-        service = CatalogService(populated_db)
-
-        result = service.delete_unlinked_tags([9999])
-
-        assert result == 0, f"Expected 0 for nonexistent tag, got {result}"
+    def test_nonexistent_tag_raises(self, populated_db):
+        """A tag ID that doesn't exist raises LookupError."""
+        with pytest.raises(LookupError):
+            _delete_tag(populated_db, 9999)
 
     def test_tag_linked_only_to_deleted_song_is_deletable(self, populated_db):
         """A tag whose only song is soft-deleted counts as unlinked — delete succeeds."""
         service = CatalogService(populated_db)
 
-        # Tag 3 (90s) is only on Song 2 — soft-delete Song 2 first
-        service.delete_song(2)
+        _delete_song(populated_db, 2)  # Tag 3 (90s) is only on Song 2
 
-        result = service.delete_unlinked_tags([3])
+        _delete_tag(populated_db, 3)
 
-        assert (
-            result == 1
-        ), f"Expected 1 (tag unlinked after song deleted), got {result}"
+        assert service.get_tag(3) is None, "Expected tag 3 deleted after its only song was removed"
 
 
 class TestDeleteUnlinkedTagsBulk:
-    """Bulk behaviour: pass multiple IDs."""
+    """Multiple tag deletions via MutationCoordinator."""
 
-    def test_bulk_deletes_all_orphans_in_list(self, populated_db):
-        """All orphan IDs in the list are deleted. Returns count."""
+    def test_bulk_deletes_all_orphans(self, populated_db):
+        """Multiple orphan tags can be deleted in sequence."""
         _insert_orphan_tag(populated_db, 100, "Orphan A", "Test")
         _insert_orphan_tag(populated_db, 101, "Orphan B", "Test")
         service = CatalogService(populated_db)
 
-        result = service.delete_unlinked_tags([100, 101])
+        _delete_tag(populated_db, 100)
+        _delete_tag(populated_db, 101)
 
-        assert result == 2, f"Expected 2 deleted, got {result}"
         assert service.get_tag(100) is None, "Expected tag 100 to be deleted"
         assert service.get_tag(101) is None, "Expected tag 101 to be deleted"
 
-    def test_bulk_skips_linked_tags_in_list(self, populated_db):
-        """Mixed list: orphans deleted, linked tags skipped. Returns only orphan count."""
+    def test_orphan_deleted_linked_preserved(self, populated_db):
+        """Orphan tag deleted; linked tag raises and remains."""
         _insert_orphan_tag(populated_db, 100, "Orphan", "Test")
         service = CatalogService(populated_db)
 
-        result = service.delete_unlinked_tags([100, 1])  # 100=orphan, 1=Grunge (linked)
+        _delete_tag(populated_db, 100)
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 1)  # Grunge (linked)
 
-        assert result == 1, f"Expected 1 deleted (orphan only), got {result}"
         assert service.get_tag(1) is not None, "Expected linked tag 1 to survive"
         assert service.get_tag(100) is None, "Expected orphan tag 100 to be deleted"
 
-    def test_bulk_empty_list_returns_zero(self, populated_db):
-        """Empty list is a no-op. Returns 0."""
-        service = CatalogService(populated_db)
-
-        result = service.delete_unlinked_tags([])
-
-        assert result == 0, f"Expected 0 for empty list, got {result}"
-
-    def test_bulk_all_linked_returns_zero(self, populated_db):
-        """All tags in list are linked — nothing deleted."""
-        service = CatalogService(populated_db)
-
-        result = service.delete_unlinked_tags([1, 2, 3])
-
-        assert result == 0, f"Expected 0 (all linked), got {result}"
+    def test_all_linked_raises(self, populated_db):
+        """All linked tags raise ValueError."""
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 1)
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 2)
+        with pytest.raises(ValueError):
+            _delete_tag(populated_db, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -164,49 +168,41 @@ def _insert_orphan_album(db_path: str, album_id: int, title: str) -> None:
 
 
 class TestDeleteUnlinkedAlbums:
-    """CatalogService.delete_unlinked_albums"""
+    """Album delete via MutationCoordinator."""
 
     def test_unlinked_album_is_deleted(self, populated_db):
         _insert_orphan_album(populated_db, 999, "Orphan Album")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_albums([999])
-        assert result == 1
-
-    def test_deleted_album_hidden_from_get_album(self, populated_db):
-        _insert_orphan_album(populated_db, 999, "Orphan Album")
-        service = CatalogService(populated_db)
-        service.delete_unlinked_albums([999])
+        _delete_album(populated_db, 999)
         assert service.get_album(999) is None
 
-    def test_linked_album_is_not_deleted(self, populated_db):
-        service = CatalogService(populated_db)
-        result = service.delete_unlinked_albums([100])  # Nevermind -> Song 1
-        assert result == 0
+    def test_linked_album_raises(self, populated_db):
+        with pytest.raises(ValueError):
+            _delete_album(populated_db, 100)  # Nevermind -> Song 1
 
     def test_linked_album_remains_in_db(self, populated_db):
         service = CatalogService(populated_db)
-        service.delete_unlinked_albums([100])
+        with pytest.raises(ValueError):
+            _delete_album(populated_db, 100)
         album = service.get_album(100)
         assert album is not None
         assert album.title == "Nevermind"
 
-    def test_nonexistent_album_returns_zero(self, populated_db):
-        service = CatalogService(populated_db)
-        result = service.delete_unlinked_albums([9999])
-        assert result == 0
+    def test_nonexistent_album_raises(self, populated_db):
+        with pytest.raises(LookupError):
+            _delete_album(populated_db, 9999)
 
     def test_album_linked_only_to_deleted_song_is_deletable(self, populated_db):
         service = CatalogService(populated_db)
-        service.delete_song(1)  # soft-delete Song 1 (the only song on album 100)
-        result = service.delete_unlinked_albums([100])
-        assert result == 1
+        _delete_song(populated_db, 1)
+        _delete_album(populated_db, 100)
+        assert service.get_album(100) is None
 
     def test_delete_album_purges_album_credits(self, populated_db):
         from src.data.album_repository import AlbumRepository
 
-        service = CatalogService(populated_db)
-        service.delete_song(1)
-        service.delete_unlinked_albums([100])
+        _delete_song(populated_db, 1)
+        _delete_album(populated_db, 100)
         repo = AlbumRepository(populated_db)
         with repo._get_connection() as conn:
             count = conn.execute(
@@ -217,9 +213,8 @@ class TestDeleteUnlinkedAlbums:
     def test_delete_album_purges_album_publishers(self, populated_db):
         from src.data.album_repository import AlbumRepository
 
-        service = CatalogService(populated_db)
-        service.delete_song(1)
-        service.delete_unlinked_albums([100])
+        _delete_song(populated_db, 1)
+        _delete_album(populated_db, 100)
         repo = AlbumRepository(populated_db)
         with repo._get_connection() as conn:
             count = conn.execute(
@@ -231,22 +226,19 @@ class TestDeleteUnlinkedAlbums:
         _insert_orphan_album(populated_db, 997, "Orphan A")
         _insert_orphan_album(populated_db, 998, "Orphan B")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_albums([997, 998])
-        assert result == 2
+        _delete_album(populated_db, 997)
+        _delete_album(populated_db, 998)
         assert service.get_album(997) is None
         assert service.get_album(998) is None
 
-    def test_bulk_skips_linked_albums(self, populated_db):
+    def test_orphan_deleted_linked_preserved(self, populated_db):
         _insert_orphan_album(populated_db, 999, "Orphan")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_albums([999, 100])  # 999=orphan, 100=linked
-        assert result == 1
+        _delete_album(populated_db, 999)
+        with pytest.raises(ValueError):
+            _delete_album(populated_db, 100)
         assert service.get_album(100) is not None
         assert service.get_album(999) is None
-
-    def test_bulk_empty_list_returns_zero(self, populated_db):
-        service = CatalogService(populated_db)
-        assert service.delete_unlinked_albums([]) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -275,70 +267,59 @@ def _insert_orphan_publisher(db_path: str, publisher_id: int, name: str) -> None
 
 
 class TestDeleteUnlinkedPublishers:
-    """CatalogService.delete_unlinked_publishers"""
+    """Publisher delete via MutationCoordinator."""
 
     def test_publisher_with_no_links_is_deleted(self, populated_db):
         _insert_orphan_publisher(populated_db, 999, "Orphan Publisher")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([999])
-        assert result == 1
-
-    def test_deleted_publisher_hidden_from_get_publisher(self, populated_db):
-        _insert_orphan_publisher(populated_db, 999, "Orphan Publisher")
-        service = CatalogService(populated_db)
-        service.delete_unlinked_publishers([999])
+        _delete_publisher(populated_db, 999)
         assert service.get_publisher(999) is None
 
-    def test_publisher_linked_to_active_song_is_rejected(self, populated_db):
-        service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([10])  # DGC -> song 1
-        assert result == 0
+    def test_publisher_linked_to_active_song_raises(self, populated_db):
+        with pytest.raises(ValueError):
+            _delete_publisher(populated_db, 10)  # DGC -> song 1
 
-    def test_publisher_linked_to_active_album_is_rejected(self, populated_db):
-        service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([4])  # Roswell -> album 200
-        assert result == 0
+    def test_publisher_linked_to_active_album_raises(self, populated_db):
+        with pytest.raises(ValueError):
+            _delete_publisher(populated_db, 4)  # Roswell -> album 200
 
     def test_publisher_linked_to_deleted_song_and_deleted_album_is_deletable(
         self, populated_db
     ):
-        # DGC (10) is on song 1 and album 100. Delete both, then publisher should be deletable.
         service = CatalogService(populated_db)
-        service.delete_song(1)
-        # Now delete album 100 (song 1 was its only song)
-        service.delete_unlinked_albums([100])
-        result = service.delete_unlinked_publishers([10])
-        assert result == 1
+        _delete_song(populated_db, 1)
+        _delete_album(populated_db, 100)
+        _delete_publisher(populated_db, 10)
+        assert service.get_publisher(10) is None
 
-    def test_nonexistent_publisher_returns_zero(self, populated_db):
-        service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([9999])
-        assert result == 0
+    def test_nonexistent_publisher_raises(self, populated_db):
+        with pytest.raises(LookupError):
+            _delete_publisher(populated_db, 9999)
 
     def test_bulk_deletes_orphan_publishers(self, populated_db):
         _insert_orphan_publisher(populated_db, 997, "Orphan A")
         _insert_orphan_publisher(populated_db, 998, "Orphan B")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([997, 998])
-        assert result == 2
+        _delete_publisher(populated_db, 997)
+        _delete_publisher(populated_db, 998)
+        assert service.get_publisher(997) is None
+        assert service.get_publisher(998) is None
 
-    def test_bulk_skips_publishers_with_song_links(self, populated_db):
+    def test_orphan_deleted_song_linked_preserved(self, populated_db):
         _insert_orphan_publisher(populated_db, 999, "Orphan")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([999, 10])  # 10=DGC (song link)
-        assert result == 1
+        _delete_publisher(populated_db, 999)
+        with pytest.raises(ValueError):
+            _delete_publisher(populated_db, 10)
         assert service.get_publisher(10) is not None
 
-    def test_bulk_skips_publishers_with_album_links(self, populated_db):
+    def test_orphan_deleted_album_linked_preserved(self, populated_db):
         _insert_orphan_publisher(populated_db, 999, "Orphan")
         service = CatalogService(populated_db)
-        result = service.delete_unlinked_publishers([999, 4])  # 4=Roswell (album link)
-        assert result == 1
+        _delete_publisher(populated_db, 999)
+        with pytest.raises(ValueError):
+            _delete_publisher(populated_db, 4)
         assert service.get_publisher(4) is not None
-
-    def test_bulk_empty_list_returns_zero(self, populated_db):
-        service = CatalogService(populated_db)
-        assert service.delete_unlinked_publishers([]) == 0
 
 
 # ---------------------------------------------------------------------------

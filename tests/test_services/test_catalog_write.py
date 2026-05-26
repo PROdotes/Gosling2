@@ -3,8 +3,18 @@ import shutil
 import pytest
 from pathlib import Path
 from src.services.catalog_service import CatalogService
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import MutationRequest, DeleteSongItem
 from src.engine.config import SONG_DEFAULT_YEAR
 from tests.conftest import _connect
+
+
+def _delete_song(db_path, song_id, delete_file=False, monkeypatch=None, staging_dir=None):
+    if monkeypatch and staging_dir is not None:
+        monkeypatch.setattr("src.services.mutation_coordinator.STAGING_DIR", str(staging_dir))
+    MutationCoordinator(db_path).apply(
+        MutationRequest(delete=[DeleteSongItem(type="song", id=song_id, delete_file=delete_file)])
+    )
 
 
 @pytest.fixture
@@ -144,7 +154,7 @@ class TestCatalogServiceIngestFile:
         # STAGING_DIR points elsewhere
         staging = tmp_path / "staging"
         staging.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", str(staging))
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(staging))
 
         # Update Song 1 in DB to point at this live file
         with service._song_repo.get_connection() as conn:
@@ -270,12 +280,12 @@ class TestCatalogServiceIngestFile:
         ), "Staged file should be deleted on ingestion failure"
 
         # SIDE EFFECT: DB should be empty (rolled back)
-        all_songs = service._song_repo.get_by_title("Unique Ingest Title")
+        all_songs = service.search_songs_slim("Unique Ingest Title")
         assert len(all_songs) == 0, "Database should be empty after rollback"
 
 
 class TestCatalogServiceDeleteSong:
-    """CatalogService.delete_song(song_id) contracts."""
+    """Delete song via MutationCoordinator contracts."""
 
     def test_delete_existing_song_in_staging_removes_record_and_file(
         self, ingest_db, test_mp3, monkeypatch
@@ -287,33 +297,22 @@ class TestCatalogServiceDeleteSong:
         ), f"Setup ingestion failed: {report.get('message')}"
         song_id = report["song"].id
 
-        # Mock STAGING_DIR to the parent of test_mp3 so implementation thinks it's in staging
         staging_dir = str(Path(test_mp3).parent)
-        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
-
         assert os.path.exists(test_mp3)
 
-        # 1. Delete
-        success = service.delete_song(song_id)
-        assert success is True, "Expected delete_song to return True"
+        _delete_song(ingest_db, song_id, monkeypatch=monkeypatch, staging_dir=staging_dir)
 
-        # 2. Side Effect: DB record gone
         assert service.get_song(song_id) is None
-
-        # 3. Side Effect: Physical file gone
         assert not os.path.exists(test_mp3), "Physical staged file should be deleted"
 
     def test_delete_existing_song_NOT_in_staging_removes_record_only(
         self, populated_db, tmp_path, monkeypatch
     ):
         service = CatalogService(populated_db)
-        # Song 1 is at "/path/1" in populated_db
-        # We need it to be a valid path on disk so os.remove(source_path) could potentially run
         real_temp_path = tmp_path / "external_library" / "song1.mp3"
         real_temp_path.parent.mkdir(parents=True, exist_ok=True)
         real_temp_path.write_bytes(b"External song data")
 
-        # Update DB record with this path
         with service._song_repo.get_connection() as conn:
             conn.execute(
                 "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
@@ -321,37 +320,21 @@ class TestCatalogServiceDeleteSong:
             )
             conn.commit()
 
-        # Mock STAGING_DIR to somewhere else
         staging_dir = str(tmp_path / "staging")
-        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
+        _delete_song(populated_db, 1, monkeypatch=monkeypatch, staging_dir=staging_dir)
 
-        assert os.path.exists(real_temp_path)
-
-        # 1. Delete
-        success = service.delete_song(1)
-        assert success is True
-
-        # 2. Side Effect: DB record gone
         assert service.get_song(1) is None
+        assert os.path.exists(real_temp_path), "File OUTSIDE staging should NOT be deleted"
 
-        # 3. Side Effect: Physical file PRESERVED (since not in staging)
-        assert os.path.exists(
-            real_temp_path
-        ), "File OUTSIDE staging should NOT be deleted"
-
-    def test_delete_nonexistent_id_returns_false(self, ingest_db):
-        service = CatalogService(ingest_db)
-        success = service.delete_song(999)
-        assert (
-            success is False
-        ), "Expected delete_song to return False for nonexistent ID"
+    def test_delete_nonexistent_id_raises(self, ingest_db):
+        with pytest.raises(LookupError):
+            _delete_song(ingest_db, 999)
 
     def test_delete_cascades_work_correctly(self, populated_db):
         """Deleting a song must cascade to SongCredits, SongAlbums, etc."""
         service = CatalogService(populated_db)
         song_id = 1  # SLTS
 
-        # Verify related data exists first
         with service._song_repo.get_connection() as conn:
             credits = conn.execute(
                 "SELECT count(*) FROM SongCredits WHERE SourceID = ?", (song_id,)
@@ -362,14 +345,10 @@ class TestCatalogServiceDeleteSong:
             assert credits > 0, "Setup: Song should have credits"
             assert albums > 0, "Setup: Song should have album associations"
 
-        # Delete
-        success = service.delete_song(song_id)
-        assert success is True, "Expected delete to succeed"
+        _delete_song(populated_db, song_id)
 
-        # Verify song is gone
         assert service.get_song(song_id) is None, "Song should be deleted"
 
-        # Verify related data is gone (CASCADE check)
         with service._song_repo.get_connection() as conn:
             credits = conn.execute(
                 "SELECT count(*) FROM SongCredits WHERE SourceID = ?", (song_id,)
@@ -381,20 +360,13 @@ class TestCatalogServiceDeleteSong:
             ).fetchone()[0]
             assert albums == 0, "SongAlbums should be cascaded"
 
-        # Verify preservation: Album and Identity records NOT deleted (negative isolation)
-        album = service.get_album(
-            100
-        )  # Album "Nevermind" (ID=100 per conftest.py line 111)
+        album = service.get_album(100)
         assert album is not None, "Album should NOT be deleted when song is removed"
         assert album.title == "Nevermind", f"Expected 'Nevermind', got {album.title}"
 
-        identity = service.get_identity(2)  # Nirvana (ID=2 per conftest.py line 111)
-        assert (
-            identity is not None
-        ), "Identity should NOT be deleted when song is removed"
-        assert (
-            identity.display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got {identity.display_name}"
+        identity = service.get_identity(2)
+        assert identity is not None, "Identity should NOT be deleted when song is removed"
+        assert identity.display_name == "Nirvana", f"Expected 'Nirvana', got {identity.display_name}"
 
     def test_delete_with_delete_file_true_removes_library_file(
         self, populated_db, tmp_path, monkeypatch
@@ -411,18 +383,12 @@ class TestCatalogServiceDeleteSong:
             )
             conn.commit()
 
-        staging_dir = str(tmp_path / "staging")
-        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
-
         assert os.path.exists(real_temp_path)
 
-        success = service.delete_song(1, delete_file=True)
-        assert success is True
+        _delete_song(populated_db, 1, delete_file=True)
 
         assert service.get_song(1) is None
-        assert not os.path.exists(
-            real_temp_path
-        ), "Library file should be deleted when delete_file=True"
+        assert not os.path.exists(real_temp_path), "Library file should be deleted when delete_file=True"
 
     def test_delete_with_delete_file_false_preserves_library_file(
         self, populated_db, tmp_path, monkeypatch
@@ -439,15 +405,9 @@ class TestCatalogServiceDeleteSong:
             )
             conn.commit()
 
-        staging_dir = str(tmp_path / "staging")
-        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
-
         assert os.path.exists(real_temp_path)
 
-        success = service.delete_song(1, delete_file=False)
-        assert success is True
+        _delete_song(populated_db, 1, delete_file=False)
 
         assert service.get_song(1) is None
-        assert os.path.exists(
-            real_temp_path
-        ), "Library file should be preserved when delete_file=False"
+        assert os.path.exists(real_temp_path), "Library file should be preserved when delete_file=False"

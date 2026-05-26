@@ -173,66 +173,63 @@ class TestGetByIds:
 
 
 class TestGetByTitle:
-    """SongRepository.get_by_title contracts."""
+    """SongRepository.search_slim contracts for title-based lookup."""
 
     def test_exact_match(self, populated_db):
-        """Test exact title match returns song with all fields."""
+        """Exact title match returns the correct song."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_title("Smells Like Teen Spirit")
+        rows = repo.search_slim("Smells Like Teen Spirit")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
+        assert len(rows) == 1, f"Expected 1 song, got {len(rows)}"
+        assert rows[0]["SourceID"] == 1, f"Expected 1, got {rows[0]['SourceID']}"
         assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
-        assert (
-            songs[0].duration_ms == 200000
-        ), f"Expected 200000, got {songs[0].duration_ms}"
+            rows[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_partial_match(self, populated_db):
-        """Test partial title match works with LIKE query."""
+        """Partial title match works via LIKE."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_title("Teen")
+        rows = repo.search_slim("Teen")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
+        assert len(rows) == 1, f"Expected 1 song, got {len(rows)}"
+        assert rows[0]["SourceID"] == 1, f"Expected 1, got {rows[0]['SourceID']}"
         assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+            rows[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_case_insensitive(self, populated_db):
-        """SQLite LIKE is case-insensitive for ASCII by default."""
+        """Search is case-insensitive for ASCII titles."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_title("everlong")
+        rows = repo.search_slim("everlong")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
+        assert len(rows) == 1, f"Expected 1 song, got {len(rows)}"
+        assert rows[0]["SourceID"] == 2, f"Expected 2, got {rows[0]['SourceID']}"
         assert (
-            songs[0].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[0].title}'"
+            rows[0]["MediaName"] == "Everlong"
+        ), f"Expected 'Everlong', got '{rows[0]['MediaName']}'"
 
     def test_no_match_returns_empty(self, populated_db):
-        """Test that get_by_title returns [] for no matches."""
+        """No match returns empty list."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_title("ZZZZZ_NONEXISTENT")
-        assert songs == [], f"Expected empty list for no match, got {songs}"
+        rows = repo.search_slim("ZZZZZ_NONEXISTENT")
+        assert rows == [], f"Expected empty list for no match, got {rows}"
 
     def test_multi_match(self, populated_db):
         """'oint' appears in 'Joint Venture' only."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_title("oint")
+        rows = repo.search_slim("oint")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 8, f"Expected 8, got {songs[0].id}"
+        assert len(rows) == 1, f"Expected 1 song, got {len(rows)}"
+        assert rows[0]["SourceID"] == 8, f"Expected 8, got {rows[0]['SourceID']}"
         assert (
-            songs[0].title == "Joint Venture"
-        ), f"Expected 'Joint Venture', got '{songs[0].title}'"
+            rows[0]["MediaName"] == "Joint Venture"
+        ), f"Expected 'Joint Venture', got '{rows[0]['MediaName']}'"
 
     def test_empty_on_empty_db(self, empty_db):
-        """Test get_by_title on empty database returns empty."""
+        """Empty database returns empty list."""
         repo = SongRepository(empty_db)
-        songs = repo.get_by_title("anything")
-        assert songs == [], f"Expected empty list on empty DB, got {songs}"
+        rows = repo.search_slim("anything")
+        assert rows == [], f"Expected empty list on empty DB, got {rows}"
 
 
 class TestSearchSlim:

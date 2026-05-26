@@ -14,6 +14,8 @@ from src.models.view_models import (
     IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import MutationRequest, DeletePublisherItem, DeleteAlbumItem, DeleteTagItem
 from src.services.logger import logger
 from src.engine.config import (
     SCALAR_VALIDATION,
@@ -25,9 +27,14 @@ from src.engine.config import (
     SCRUBBER_AUTO_PLAY,
     BLUR_SAVES_SCALARS,
     ID3_FRAMES_PATH,
+    get_db_path,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
+
+
+def _get_coordinator() -> MutationCoordinator:
+    return MutationCoordinator(str(get_db_path()))
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
@@ -291,17 +298,19 @@ async def get_songs_by_publisher(publisher_id: int) -> List[SongSlimView]:
 async def delete_publisher(publisher_id: int) -> None:
     """Soft-delete a single publisher. 404 if not found, 403 if linked to active songs or albums."""
     logger.debug(f"[CatalogRouter] delete_publisher(id={publisher_id})")
-    service = _get_service()
-    if not service.get_publisher(publisher_id):
+    if not _get_service().get_publisher(publisher_id):
         raise HTTPException(
             status_code=404, detail=f"Publisher {publisher_id} not found"
         )
-    deleted = service.delete_unlinked_publishers([publisher_id])
-    if deleted == 0:
+    try:
+        _get_coordinator().apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", id=publisher_id)]))
+    except ValueError:
         raise HTTPException(
             status_code=403,
             detail=f"Publisher {publisher_id} is linked to active songs or albums",
         )
+    except LookupError:
+        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
 
 
 @router.delete("/publishers", response_model=dict)
@@ -314,12 +323,8 @@ async def bulk_delete_unlinked_publishers(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    service = _get_service()
-    all_publishers = service.get_all_publishers()
-    deleted = service.delete_unlinked_publishers(
-        [p.id for p in all_publishers if p.id is not None]
-    )
-    return {"deleted": deleted}
+    _get_coordinator().apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", unlinked=True)]))
+    return {"deleted": 0}
 
 
 @router.get("/albums", response_model=List[AlbumSlimView])
@@ -355,14 +360,16 @@ async def get_album(album_id: int) -> AlbumView:
 async def delete_album(album_id: int) -> None:
     """Soft-delete a single album. 404 if not found, 403 if linked to active songs."""
     logger.debug(f"[CatalogRouter] delete_album(id={album_id})")
-    service = _get_service()
-    if not service.get_album(album_id):
+    if not _get_service().get_album(album_id):
         raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
-    deleted = service.delete_unlinked_albums([album_id])
-    if deleted == 0:
+    try:
+        _get_coordinator().apply(MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)]))
+    except ValueError:
         raise HTTPException(
             status_code=403, detail=f"Album {album_id} is linked to active songs"
         )
+    except LookupError:
+        raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
 
 
 @router.delete("/albums", response_model=dict)
@@ -373,12 +380,8 @@ async def bulk_delete_unlinked_albums(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    service = _get_service()
-    all_albums = service.get_all_albums()
-    deleted = service.delete_unlinked_albums(
-        [a.id for a in all_albums if a.id is not None]
-    )
-    return {"deleted": deleted}
+    _get_coordinator().apply(MutationRequest(delete=[DeleteAlbumItem(type="album", unlinked=True)]))
+    return {"deleted": 0}
 
 
 @router.get("/tags", response_model=List[TagView])
@@ -433,14 +436,16 @@ async def get_songs_by_tag(tag_id: int) -> List[SongSlimView]:
 async def delete_tag(tag_id: int) -> None:
     """Soft-delete a single tag. 404 if not found, 403 if linked to active songs."""
     logger.debug(f"[CatalogRouter] delete_tag(id={tag_id})")
-    service = _get_service()
-    if not service.get_tag(tag_id):
+    if not _get_service().get_tag(tag_id):
         raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
-    deleted = service.delete_unlinked_tags([tag_id])
-    if deleted == 0:
+    try:
+        _get_coordinator().apply(MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)]))
+    except ValueError:
         raise HTTPException(
             status_code=403, detail=f"Tag {tag_id} is linked to active songs"
         )
+    except LookupError:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
 
 
 @router.delete("/tags", response_model=dict)
@@ -451,10 +456,8 @@ async def bulk_delete_unlinked_tags(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    service = _get_service()
-    all_tags = service.get_all_tags()
-    deleted = service.delete_unlinked_tags([t.id for t in all_tags if t.id is not None])
-    return {"deleted": deleted}
+    _get_coordinator().apply(MutationRequest(delete=[DeleteTagItem(type="tag", unlinked=True)]))
+    return {"deleted": 0}
 
 
 @router.get("/songs/{song_id:int}/web-search")

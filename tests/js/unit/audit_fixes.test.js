@@ -1,5 +1,5 @@
 /**
- * Audit Fix Tests (docs/JS_AUDIT.md)
+ * Audit Fix Tests (docs/specs/AUDIT_REFACTOR_SPEC.md)
  * Pure logic tests — no mocks, no network.
  *
  * Covers:

@@ -40,6 +40,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Searches identities by name or alias.
 - Wraps `CatalogService.search_identities`.
 
+### async def search_artist_names(q: str, exclude_groups: bool = False) -> List[ArtistChipView]
+**HTTP**: `GET /api/v1/identities/search-artist-names?q={query}`
+- Search ArtistNames for picker results. One row per name.
+- Wraps `CatalogService.search_artist_names`.
+
 ### async def get_songs_by_identity(identity_id: int) -> List[SongSlimView]
 **HTTP**: `GET /api/v1/identities/{identity_id}/songs`
 - Fetches slim song list for this identity or its group/members.
@@ -100,6 +105,16 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/publishers/{publisher_id}/songs`
 - Fetches slim song repertoire for a given publisher.
 - Wraps `CatalogService.get_songs_slim_by_publisher`.
+
+### async def get_duplicate_songs() -> List[List[int]]
+**HTTP**: `GET /api/v1/songs/duplicates`
+- Returns groups of song IDs that share the same MediaName (case-insensitive) and performer set.
+- Wraps `CatalogService.find_duplicate_songs`.
+
+### async def get_albums_by_identity(identity_id: int) -> List[AlbumSlimView]
+**HTTP**: `GET /api/v1/identities/{identity_id}/albums`
+- Fetch slim album list for an identity (across aliases, members, and groups).
+- Wraps `CatalogService.get_albums_slim_by_identity`.
 
 ### async def get_all_tags() -> List[Tag]
 **HTTP**: `GET /api/v1/tags`

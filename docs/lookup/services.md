@@ -23,9 +23,6 @@ Parses the filename (stem) using tokens like {Artist}, {Title}, and {Ignore}.
 ### get_identity(identity_id: int) -> Optional[Identity]
 Fetch a single Identity and all its aliases/members/groups by ID.
 
-### get_all_identities() -> List[Identity]
-Fetch a list of all active identities.
-
 ### resolve_identity_by_name(display_name: str) -> Optional[int]
 Return the IdentityID for an ArtistName (Truth-First resolution).
 
@@ -35,11 +32,8 @@ Slim list-view identity search. Query is normalized to diacritic-stripped lowerc
 ### search_artist_names(query: str, exclude_groups: bool = False) -> List[ArtistChipView]
 Fuzzy search artist names (aliases). Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
 
-### search_identities(query: str) -> List[Identity]
-Search for identities by name or alias. Query is normalized to diacritic-stripped lowercase before repo access (Phase 3.1).
-
-### get_identity_song_counts(identity_ids: List[int]) -> dict
-Batch active song counts for identities (across all aliases). Returns {id: N}.
+### get_all_slim() -> List[dict]
+Fetch slim list-view rows for all active identities (no hydration).
 
 ## IngestionService
 *Location: `src/services/ingestion_service.py`*
@@ -67,9 +61,6 @@ Update a status-3 record with the final MP3 path and hash post-conversion. Handl
 
 ### resolve_conflict(ghost_id: int, staged_path: str) -> Dict[str, Any]
 Resolve a 409 conflict by reactivating a soft-deleted record with new file data.
-
-### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
-Parallel ingestion of multiple staged files. Each file has its own transaction.
 
 ### ingest_single(file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]
 Thread-safe single-file ingestion wrapper around `ingest_file`. Catches `ReingestionConflictError` and returns it as a `CONFLICT` dict instead of raising.
@@ -133,6 +124,12 @@ Fetch slim list-view rows for all songs linked to a tag.
 ### get_songs_slim_by_identity(identity_id: int) -> List[dict]
 Slim reverse credit lookup — resolves aliases/members/groups, returns slim rows.
 
+### get_albums_slim_by_identity(identity_id: int) -> List[dict]
+Slim reverse album-credit lookup for an identity and its related aliases/members/groups.
+
+### find_duplicate_groups() -> List[List[int]]
+Returns groups of song IDs sharing the same MediaName + performer identity set.
+
 ### get_filter_values(q: str = "") -> dict
 Returns all distinct filter sidebar values. When `q` is non-empty, normalizes it (via `normalize_for_search`) and delegates both forms to the repo for server-side filtering per category.
 
@@ -162,21 +159,17 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration. Que
 ### search_albums_slim(query: str) -> List[dict]
 ### search_publishers(query: str) -> List[Publisher]
 ### search_tags(query: str) -> List[Tag]
-### search_identities(query: str) -> List[Identity]
 
 ### get_all_publishers() -> List[Publisher]
 ### get_all_albums() -> List[Album]
 ### get_all_tags() -> List[Tag]
-### get_all_identities() -> List[Identity]
 ### get_all_roles() -> List[str]
 
 ### filter_songs_slim(...) -> List[dict]
 ### get_filter_values(q: str = "") -> dict
 ### get_tag_categories() -> List[str]
-### get_id3_frames_config() -> Dict[str, Any]
 
 ### ingest_file(staged_path: str) -> Dict[str, Any]
-### ingest_batch(file_paths: List[str]) -> Dict[str, Any]
 ### ingest_single(file_path: str) -> Dict[str, Any]
 ### scan_folder(folder_path: str, recursive: bool) -> List[str]
 ### check_ingestion(file_path: str) -> Dict[str, Any]
@@ -184,86 +177,25 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration. Que
 ### finalize_wav_conversion(...) -> int
 ### resolve_conflict(...) -> Dict[str, Any]
 
-### sync_id3_if_enabled(song_id: int) -> None
-### move_song_to_library(song_id: int) -> str
-### delete_song(song_id: int) -> bool
-### delete_original_source(song_id: int) -> bool
 ### get_staging_origin(song_id: int) -> Optional[str]
 
-### update_song_scalars(song_id: int, fields: dict)
-### add_song_credit(song_id: int, display_name: str, role_name: str)
-### remove_song_credit(song_id: int, credit_id: int)
-### update_credit_name(name_id: int, new_name: str)
-### add_song_album(song_id: int, album_id: int)
-### remove_song_album(song_id: int, album_id: int)
-### update_song_album_link(song_id: int, album_id: int, ...)
-### update_album(album_id: int, album_data: dict)
-### add_song_tag(song_id: int, tag_name: str)
-### remove_song_tag(song_id: int, tag_id: int)
-### update_tag(tag_id: int, new_name: str, new_category: str)
-### set_primary_song_tag(song_id: int, tag_id: int)
-### add_song_publisher(song_id: int, publisher_name: str)
-### remove_song_publisher(song_id: int, publisher_id: int)
-### update_publisher(publisher_id: int, new_name: str)
-### set_publisher_parent(publisher_id: int, parent_id: int)
-### add_album_credit(album_id: int, display_name: str)
-### remove_album_credit(album_id: int, artist_name_id: int)
-### add_album_publisher(album_id: int, publisher_name: str)
-### remove_album_publisher(album_id: int, publisher_id: int)
-### delete_unlinked_albums(album_ids: list)
-### delete_unlinked_publishers(publisher_ids: list)
-### delete_unlinked_tags(tag_ids: list)
-### import_credits_bulk(song_id: int, credits: list, publishers: list)
-### quick_create_album_for_song(song_id: int, title: str)
-### format_entity_field(field: str, value: str, format_type: str)
 ### enrich_metadata(song_id: int, conn: sqlite3.Connection)
 ### publisher_exists(name: str) -> bool
 ### resolve_identity_by_name(name: str) -> Optional[int]
 ### get_publisher_link_counts(publisher_ids: List[int]) -> dict
-### get_identity_song_counts(identity_ids: List[int]) -> dict
 ### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
 ### get_songs_slim_by_tag(tag_id: int) -> List[dict]
 ### get_songs_slim_by_identity(identity_id: int) -> List[dict]
-### create_and_link_album(song_id: int, album_data: dict)
-
----
-
-## EditService
-*Location: `src/services/edit_service.py`*
-**Responsibility**: Specialized orchestrator for metadata modifications. Legacy layer being replaced by `MutationCoordinator`.
-
-### update_song_scalars(song_id: int, fields: dict)
-### add_song_credit(song_id: int, display_name: str, role_name: str)
-### remove_song_credit(song_id: int, credit_id: int)
-### update_credit_name(name_id: int, new_name: str)
-### add_song_album(song_id: int, album_id: int)
-### create_and_link_album(song_id: int, album_data: dict)
-### remove_song_album(song_id: int, album_id: int)
-### update_song_album_link(song_id: int, album_id: int, ...)
-### update_album(album_id: int, album_data: dict)
-### add_album_credit(album_id: int, display_name: str)
-### remove_album_credit(album_id: int, artist_name_id: int)
-### add_album_publisher(album_id: int, publisher_name: str)
-### remove_album_publisher(album_id: int, publisher_id: int)
-### sync_album_with_song(album_id: int, song_id: int)
-### quick_create_album_for_song(song_id: int, title: str)
-### add_song_tag(song_id: int, tag_name: str)
-### remove_song_tag(song_id: int, tag_id: int)
-### update_tag(tag_id: int, new_name: str, new_category: str)
-### set_primary_song_tag(song_id: int, tag_id: int)
-### add_song_publisher(song_id: int, publisher_name: str)
-### remove_song_publisher(song_id: int, publisher_id: int)
-### update_publisher(publisher_id: int, new_name: str)
-### set_publisher_parent(publisher_id: int, parent_id: int)
-### import_credits_bulk(song_id: int, credits: list, publishers: list)
-### format_entity_field(field: str, value: str, format_type: str)
-### delete_song(song_id: int)
-### move_song_to_library(song_id: int)
-### delete_unlinked_albums(album_ids: list)
-### delete_unlinked_publishers(publisher_ids: list)
-### delete_unlinked_tags(tag_ids: list)
-### sync_id3_if_enabled(song_id: int)
-### delete_original_source(song_id: int)
+### get_all_identities_slim() -> List[dict]
+Slim list-view rows for all active identities (no hydration).
+### search_identities_slim(query: str, exclude_groups: bool = False) -> List[dict]
+Slim list-view search (no hydration).
+### search_artist_names(query: str, exclude_groups: bool = False)
+Search ArtistNames for picker results (one row per name).
+### get_albums_slim_by_identity(identity_id: int) -> List[dict]
+Slim reversed album-credit lookup from identity.
+### find_duplicate_songs() -> List[List[int]]
+Groups of song IDs sharing MediaName + performer identity set.
 
 ---
 
@@ -333,6 +265,27 @@ Performs the low-level SQL operations for album links and album records. When ad
 ### apply_within(action: str, item: MutationItem, conn: sqlite3.Connection) -> None
 Performs the low-level SQL soft-delete operations.
 
+
+---
+
+## IdentityMutator
+*Location: `src/services/mutators/identity_mutator.py`*
+**Responsibility**: Handles identity mutations (alias/member add/remove, identity update, identity merge).
+
+### apply_within(action: str, item: Union[AddIdentityAliasItem, AddIdentityMemberItem, RemoveIdentityAliasItem, RemoveIdentityMemberItem, UpdateIdentityItem, MergeIdentityItem], conn: sqlite3.Connection) -> None
+Routes the mutation to the correct internal handler based on item type.
+
+### _add(item: Union[AddIdentityAliasItem, AddIdentityMemberItem], conn: sqlite3.Connection) -> None
+Adds an alias or member to an identity.
+
+### _remove(item: Union[RemoveIdentityAliasItem, RemoveIdentityMemberItem], conn: sqlite3.Connection) -> None
+Removes an alias or member from an identity.
+
+### _update(item: UpdateIdentityItem, conn: sqlite3.Connection) -> None
+Updates identity type (person/group).
+
+### _merge(item: MergeIdentityItem, conn: sqlite3.Connection) -> None
+Merges one identity into another via `merge_orphan_into`.
 
 ---
 
@@ -479,3 +432,6 @@ Converts a WAV file to MP3 using FFmpeg.
 
 ### get_or_build_peaks(song_id: int, audio_path: Path) -> List[float]
 Returns 1000 normalized RMS peaks. Cache hit reads from `sqldb/waveform_cache/{song_id}.json`; miss invokes ffmpeg to decode the file as mono 8kHz s16le PCM, splits into 1000 chunks, computes RMS per chunk, normalizes against the loudest bar, and writes the cache.
+
+### delete_cache(song_id: int) -> None
+Best-effort removal of the cached waveform for a song. Silent if missing.

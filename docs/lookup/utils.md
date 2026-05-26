@@ -34,16 +34,8 @@ Reduces text to lowercase ASCII. Used by search shadows and query normalization.
 - Returns diacritic-stripped lowercase: MÖTLEY CRÜE → motley crue.
 - **Read-write symmetry**: Both write paths (mutators) and read paths (services) use this function.
 
-### Transliteration Map
-*Location: `json/transliterations.json`*
-Custom character mappings for atomic characters NFKD normalization cannot decompose:
-- Slavic: Đ→Dj, Č→C, Š→S, Ž→Z
-- German: ß→ss
-- Ligatures: Æ→Ae, Œ→Oe
-- Map is loaded at startup; missing file defaults to empty map (graceful degradation).
-
-### JSON Loaders
+## JSON Loaders
 *Location: `src/utils/json_loaders.py`*
 
-#### load_transliterations() -> dict[str, str]
+### load_transliterations() -> dict[str, str]
 Loads custom transliteration map from `json/transliterations.json`. Returns empty dict if file missing or unreadable.

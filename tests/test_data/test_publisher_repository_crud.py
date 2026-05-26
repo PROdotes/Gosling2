@@ -223,15 +223,13 @@ class TestSetParent:
             publisher.name == "DGC Records"
         ), f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
 
-    def test_set_parent_nonexistent_publisher_raises(self, populated_db):
-        """set_parent on a nonexistent publisher_id should raise LookupError."""
+    def test_set_parent_nonexistent_publisher_returns_zero(self, populated_db):
+        """set_parent on a nonexistent publisher_id returns rowcount=0 (repo contract)."""
         repo = PublisherRepository(populated_db)
 
         with repo._get_connection() as conn:
-            import pytest
-
-            with pytest.raises(LookupError):
-                repo.set_parent(9999, 1, conn)
+            result = repo.set_parent(9999, 1, conn)
+        assert result == 0, f"Expected rowcount=0 for nonexistent publisher, got {result}"
 
     def test_set_parent_does_not_affect_other_publishers(self, populated_db):
         """Changing parent of publisher 5 must not touch publisher 4."""

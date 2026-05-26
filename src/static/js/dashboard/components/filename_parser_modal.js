@@ -83,7 +83,17 @@ function renderPresets() {
         `).join("");
 }
 
-initConfig();
+// Lazy init — only when modal elements are actually in the DOM
+// Guard all module-level DOM work so importing this module in a test
+// environment (where the modal isn't rendered) doesn't crash.
+const _elementsPresent = overlay && patternInput && presetSelect &&
+    tokenContainer && previewThead && previewTbody && applyBtn && indicator;
+
+if (_elementsPresent) {
+    initConfig();
+} else {
+    console.debug("[ParserModal] Modal elements not in DOM — deferring init");
+}
 
 // ---------------------------------------------------------------------------
 // Main Logic
@@ -164,50 +174,86 @@ function renderPreviewTable(results) {
 // Event Handlers
 // ---------------------------------------------------------------------------
 
-patternInput.addEventListener("input", () => {
-    clearTimeout(_debounceTimer);
-    _debounceTimer = setTimeout(updatePreview, 300);
+if (_elementsPresent) {
+    patternInput.addEventListener("input", () => {
+        clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(updatePreview, 300);
 
-    // Update Preset Select if it matches
-    presetSelect.value = Array.from(presetSelect.options).some(
-        (o) => o.value === patternInput.value,
-    )
-        ? patternInput.value
-        : "";
-});
+        // Update Preset Select if it matches
+        presetSelect.value = Array.from(presetSelect.options).some(
+            (o) => o.value === patternInput.value,
+        )
+            ? patternInput.value
+            : "";
+    });
 
-presetSelect.addEventListener("change", () => {
-    patternInput.value = presetSelect.value;
-    patternInput.dispatchEvent(new Event("input"));
-});
+    presetSelect.addEventListener("change", () => {
+        patternInput.value = presetSelect.value;
+        patternInput.dispatchEvent(new Event("input"));
+    });
 
-applyBtn.addEventListener("click", async () => {
-    if (!_config) return;
+    applyBtn.addEventListener("click", async () => {
+        if (!_config) return;
 
-    const pattern = patternInput.value.trim();
-    if (!pattern) return;
+        const pattern = patternInput.value.trim();
+        if (!pattern) return;
 
-    applyBtn.disabled = true;
-    applyBtn.textContent = "Applying...";
-    const { onApply, onError } = _config;
+        applyBtn.disabled = true;
+        applyBtn.textContent = "Applying...";
+        const { onApply, onError } = _config;
 
-    try {
-        const items = _config.entries.map((e) => ({
-            song_id: e.id,
-            filename: e.filename,
-        }));
+        try {
+            const items = _config.entries.map((e) => ({
+                song_id: e.id,
+                filename: e.filename,
+            }));
 
-        const payload = await applyFilenameParsing(items, pattern);
-        await mutate(payload);
-        closeFilenameParserModal();
-        if (onApply) await onApply();
-    } catch (err) {
-        if (typeof onError === "function")
-            onError(`Apply failed: ${err.message}`);
-        applyBtn.disabled = false;
-        applyBtn.textContent = "Apply Metadata";
-    }
-});
+            const payload = await applyFilenameParsing(items, pattern);
+            await mutate(payload);
+            closeFilenameParserModal();
+            if (onApply) await onApply();
+        } catch (err) {
+            if (typeof onError === "function")
+                onError(`Apply failed: ${err.message}`);
+            applyBtn.disabled = false;
+            applyBtn.textContent = "Apply Metadata";
+        }
+    });
+
+    // ─── Modal Lifecycle ──────────────────────────────────────────
+
+    modal = createModalLifecycle(overlay, {
+        onOpen: (config) => {
+            _config = config;
+            applyBtn.disabled = true;
+            applyBtn.textContent = "Apply Metadata";
+
+            const firstEntry = config.entries?.[0];
+            if (firstEntry?.filename) {
+                previewThead.innerHTML = `<tr><th colspan="2" class="preview-filename" title="${escapeHtml(firstEntry.filename)}">${escapeHtml(firstEntry.filename)}</th></tr>`;
+                previewTbody.innerHTML = "";
+            } else {
+                previewThead.innerHTML = "";
+                previewTbody.innerHTML = "";
+            }
+
+            const saved = localStorage.getItem("gosling_last_pattern");
+            patternInput.value = saved || "{Artist} - {Title}";
+            presetSelect.value = patternInput.value;
+
+            updatePreview();
+        },
+        onClose: () => {
+            localStorage.setItem("gosling_last_pattern", patternInput.value);
+            _config = null;
+            _lastPreview = [];
+        },
+        overlayClickCheck: (e) => {
+            if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+            return e.target === overlay;
+        }
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Open / Close
@@ -220,39 +266,3 @@ export function openFilenameParserModal(config) {
 export function closeFilenameParserModal() {
     modal.close();
 }
-
-// ─── Modal Lifecycle ──────────────────────────────────────────
-
-modal = createModalLifecycle(overlay, {
-    onOpen: (config) => {
-        _config = config;
-        applyBtn.disabled = true;
-        applyBtn.textContent = "Apply Metadata";
-
-        // Show filename immediately before any pattern is typed
-        const firstEntry = config.entries?.[0];
-        if (firstEntry?.filename) {
-            previewThead.innerHTML = `<tr><th colspan="2" class="preview-filename" title="${escapeHtml(firstEntry.filename)}">${escapeHtml(firstEntry.filename)}</th></tr>`;
-            previewTbody.innerHTML = "";
-        } else {
-            previewThead.innerHTML = "";
-            previewTbody.innerHTML = "";
-        }
-
-        // Default pattern from storage or simple default
-        const saved = localStorage.getItem("gosling_last_pattern");
-        patternInput.value = saved || "{Artist} - {Title}";
-        presetSelect.value = patternInput.value;
-
-        updatePreview();
-    },
-    onClose: () => {
-        localStorage.setItem("gosling_last_pattern", patternInput.value);
-        _config = null;
-        _lastPreview = [];
-    },
-    overlayClickCheck: (e) => {
-        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
-        return e.target === overlay;
-    }
-});

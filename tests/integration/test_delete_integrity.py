@@ -1,6 +1,13 @@
 import sqlite3
-from src.services.catalog_service import CatalogService
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import MutationRequest, DeleteSongItem
 from tests.conftest import _connect  # Use gosling-aware connector
+
+
+def _delete_song(db_path, song_id):
+    MutationCoordinator(db_path).apply(
+        MutationRequest(delete=[DeleteSongItem(type="song", id=song_id)])
+    )
 
 
 class TestSongDeletionIntegrity:
@@ -19,7 +26,6 @@ class TestSongDeletionIntegrity:
         2. Song 1 rows are gone from SongCredits, SongAlbums, SongTags, SongPublishers.
         3. Identity 2 (Nirvana) and Album 100 (Nevermind) are PRESERVED.
         """
-        service = CatalogService(populated_db)
         song_id = 1
 
         # 0. Setup/Sanity: Verify data exists before delete
@@ -82,8 +88,7 @@ class TestSongDeletionIntegrity:
             conn.close()
 
         # 1. Action: Delete via Service
-        success = service.delete_song(song_id)
-        assert success is True, f"Expected delete_song({song_id}) to return True"
+        _delete_song(populated_db, song_id)
 
         # 2. Assertions: Purgatory (Core)
         conn = _connect(populated_db)
@@ -178,9 +183,7 @@ class TestSongDeletionIntegrity:
         finally:
             conn.close()
 
-        service = CatalogService(empty_db)
-        success = service.delete_song(999)
-        assert success is True, f"Expected True, got {success}"
+        _delete_song(empty_db, 999)
 
         # Verify song is marked deleted
         conn = _connect(empty_db)
@@ -274,11 +277,8 @@ class TestSongDeletionIntegrity:
         finally:
             conn.close()
 
-        service = CatalogService(empty_db)
-
         # 2. ACTION: Delete Lone Survivor
-        success = service.delete_song(SID)
-        assert success is True, f"Expected True, got {success}"
+        _delete_song(empty_db, SID)
 
         # 3. VERIFY SURGICAL DESTRUCTION
         conn = _connect(empty_db)
@@ -416,13 +416,8 @@ class TestSongDeletionIntegrity:
         finally:
             conn.close()
 
-        service = CatalogService(empty_db)
-
         # ACTION: Delete Song A
-        success = service.delete_song(S_A)
-        assert (
-            success is True
-        ), f"Expected delete_song({S_A}) to return True, got {success}"
+        _delete_song(empty_db, S_A)
 
         # VERIFY: B is still linked
         conn = _connect(empty_db)
@@ -577,11 +572,9 @@ class TestSongDeletionIntegrity:
         finally:
             conn.close()
 
-        service = CatalogService(empty_db)
-
         # ACTION: Delete Song 1 (Island) and Song 2 (Shared)
-        service.delete_song(S1)
-        service.delete_song(S2)
+        _delete_song(empty_db, S1)
+        _delete_song(empty_db, S2)
 
         # VERIFY RESULTS
         conn = _connect(empty_db)

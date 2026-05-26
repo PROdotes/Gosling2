@@ -21,12 +21,14 @@ from src.models.view_models import (
 from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
 from src.services.logger import logger
-from src.services.waveform_service import delete_cache as delete_waveform_cache
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import MutationRequest, DeleteSongItem, DeleteOriginalFileItem
 from src.engine.config import (
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
     WAV_AUTO_CONVERT,
     get_downloads_folder,
+    get_db_path,
     ProcessingStatus,
     PARSER_PRESETS_PATH,
 )
@@ -326,14 +328,13 @@ async def delete_song(
     logger.info(
         f"[IngestRouter] -> delete_song(id={song_id}, delete_file={delete_file})"
     )
-    service = _get_service()
-    success = service.delete_song(song_id, notes=notes, delete_file=delete_file)
-
-    if not success:
+    try:
+        MutationCoordinator(str(get_db_path())).apply(
+            MutationRequest(delete=[DeleteSongItem(type="song", id=song_id, delete_file=delete_file)])
+        )
+    except LookupError:
         logger.warning(f"[IngestRouter] Delete failed: Song ID {song_id} not found.")
         raise HTTPException(status_code=404, detail=f"Song ID {song_id} not found.")
-
-    delete_waveform_cache(song_id)
 
     logger.info(f"[IngestRouter] <- delete_song(id={song_id}) SUCCESS")
     return {"status": "DELETED", "id": song_id}
@@ -348,34 +349,31 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
 
     try:
         service = _get_service()
-        file_path = request.file_path
 
         if request.song_id is not None:
-            # Enhanced cleanup via song_id lookup
-            success = service.delete_original_source(request.song_id)
-            if success:
-                return {"status": "DELETED", "id": request.song_id}
-            else:
-                # If we have song_id but lookup fails or file is already gone
-                origin = service.get_staging_origin(request.song_id)
-                if not origin:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="No original source link found for this song.",
-                    )
-                file_path = origin
+            origin = service.get_staging_origin(request.song_id)
+            if not origin:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No original source link found for this song.",
+                )
+            MutationCoordinator(str(get_db_path())).apply(
+                MutationRequest(delete=[DeleteOriginalFileItem(type="original_file", song_id=request.song_id)])
+            )
+            logger.info(f"[IngestRouter] <- cleanup_original_file(song_id={request.song_id}) SUCCESS")
+            return {"status": "DELETED", "id": request.song_id}
 
-        if not file_path:
+        if not request.file_path:
             raise HTTPException(
                 status_code=400, detail="Either file_path or song_id must be provided."
             )
 
-        real_target = Path(file_path).resolve()
+        real_target = Path(request.file_path).resolve()
 
         filed_song = service._song_repo.get_by_path(str(real_target))
         if filed_song is not None:
             logger.warning(
-                f"[IngestRouter] Security: Blocked deletion of filed library copy: {file_path}"
+                f"[IngestRouter] Security: Blocked deletion of filed library copy: {request.file_path}"
             )
             raise HTTPException(
                 status_code=403,
@@ -383,15 +381,9 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
             )
 
         if not os.path.exists(real_target):
-            # If path existed in DB but is gone from disk, clear it
-            if request.song_id:
-                service._edit_service._staging_repo.clear_origin(request.song_id)
             return {"status": "ALREADY_GONE", "path": str(real_target)}
 
         os.remove(real_target)
-        if request.song_id:
-            service._edit_service._staging_repo.clear_origin(request.song_id)
-
         logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
         return {"status": "DELETED", "path": str(real_target)}
     except HTTPException:

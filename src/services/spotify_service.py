@@ -1,4 +1,5 @@
 from src.engine.models.spotify import SpotifyCredit, SpotifyParseResult
+from src.utils.text import normalize_for_search
 
 
 class SpotifyService:
@@ -108,7 +109,7 @@ class SpotifyService:
                 current_name = line
 
         title_match = (
-            parsed_title.lower() == reference_title.lower()
+            normalize_for_search(parsed_title) == normalize_for_search(reference_title)
             if reference_title
             else False
         )

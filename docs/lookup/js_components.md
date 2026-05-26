@@ -95,6 +95,9 @@ Displays a temporary banner (info, success, error).
 ### renderSongList(songs, emptyMessage)
 Renders a vertical list of song rows with standardized metadata layout.
 
+### renderAlbumList(albums, emptyMessage)
+Renders a vertical list of album cards with standardized metadata layout.
+
 
 ### renderEmptyState(container, message)
 Renders a centered placeholder view.

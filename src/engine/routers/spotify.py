@@ -6,7 +6,10 @@ from src.engine.models.spotify import (
 )
 from src.services.spotify_service import SpotifyService
 from src.services.catalog_service import CatalogService
+from src.services.mutation_coordinator import MutationCoordinator
+from src.engine.routers.mutation_models import MutationRequest, AddCreditItem, AddPublisherItem
 from src.services.logger import logger
+from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/spotify", tags=["Spotify"])
 
@@ -29,19 +32,24 @@ def parse_credits(
 
 
 @router.post("/import", status_code=204)
-def import_credits(
-    request: SpotifyImportRequest, service: CatalogService = Depends(_get_service)
-):
+def import_credits(request: SpotifyImportRequest):
     """
     Atomically import parsed credits and publishers into the catalog.
     """
     logger.debug(f"[SpotifyRouter] -> import_credits(song_id={request.song_id})")
+    db_path = str(get_db_path())
+    if not CatalogService(db_path).get_song(request.song_id):
+        raise HTTPException(status_code=404, detail=f"Song {request.song_id} not found")
     try:
-        service.import_credits_bulk(
-            song_id=request.song_id,
-            credits=request.credits,
-            publishers=request.publishers,
-        )
+        add_items = [
+            AddCreditItem(type="credit", song_id=request.song_id, name=c.name, role=c.role, id=c.identity_id)
+            for c in request.credits
+        ] + [
+            AddPublisherItem(type="publisher", song_id=request.song_id, name=pub)
+            for pub in request.publishers
+        ]
+        if add_items:
+            MutationCoordinator(db_path).apply(MutationRequest(add=add_items))
         return Response(status_code=204)
     except LookupError as e:
         logger.warning(

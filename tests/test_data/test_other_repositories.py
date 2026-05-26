@@ -171,7 +171,7 @@ class TestAlbumRepositoryGetSongIdsForAlbums:
     def test_batch_both_albums_returns_correct_mapping(self, populated_db):
         """Batch fetch for [100, 200] must map each album to its song IDs."""
         repo = AlbumRepository(populated_db)
-        result = repo.get_song_ids_for_albums([100, 200])
+        result = repo._get_song_ids_for_albums([100, 200])
         assert len(result) == 2, f"Expected 2 keys, got {len(result)}"
         assert result[100] == [
             1
@@ -183,7 +183,7 @@ class TestAlbumRepositoryGetSongIdsForAlbums:
     def test_empty_input_returns_empty_dict(self, populated_db):
         """get_song_ids_for_albums([]) must return an empty dict."""
         repo = AlbumRepository(populated_db)
-        result = repo.get_song_ids_for_albums([])
+        result = repo._get_song_ids_for_albums([])
         assert result == {}, f"Expected {{}}, got {result!r}"
 
 
