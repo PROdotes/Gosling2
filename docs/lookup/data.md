@@ -294,6 +294,10 @@ Set `IsDeleted = 1` for an album. Returns `True` if a record was updated, `False
 
 Hard-delete `AlbumCredits` and `AlbumPublishers` rows for this album. Called before `soft_delete`.
 
+### get_unlinked_ids(conn: sqlite3.Connection) -> List[int]
+
+Return IDs of all active albums with no active song links. Supports optional shared connection.
+
 ### _row_to_album(row: sqlite3.Row) -> Album
 
 **Internal**: Maps a physical database row to the strict Pydantic `Album` model.
@@ -400,6 +404,10 @@ Set or clear the ParentPublisherID for a publisher. Pass `None` to clear. Raises
 ### merge_into(source_id: int, target_id: int, conn: sqlite3.Connection) -> None
 Re-links all song and album links to target, then soft-deletes source. Does NOT commit.
 
+### get_unlinked_ids(conn: sqlite3.Connection) -> List[int]
+
+Return IDs of all active publishers with no active song or album links. Supports optional shared connection.
+
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
@@ -470,6 +478,10 @@ Re-links all song links to target, then soft-deletes source. Does NOT commit.
 ### soft_delete(tag_id: int, conn: sqlite3.Connection) -> bool
 
 Set `IsDeleted = 1` for a tag. Returns `True` if a record was updated, `False` if not found or already deleted.
+
+### get_unlinked_ids(conn: sqlite3.Connection) -> List[int]
+
+Return IDs of all active tags with no active song links. Supports optional shared connection.
 
 ### _row_to_tag(row: sqlite3.Row) -> Tag
 
@@ -595,6 +607,10 @@ Merges a solo (orphan) identity into another by repointing all credits and soft-
 
 ### get_owner_identity_id(name_id: int, cursor: sqlite3.Cursor) -> Optional[int]
 Return the OwnerIdentityID for a given NameID, or None if the name doesn't exist.
+
+### get_unlinked_ids(conn: sqlite3.Connection) -> List[int]
+
+Return IDs of all active identities with no active song or album credits via any alias. Supports optional shared connection.
 
 ### _row_to_identity(row: sqlite3.Row) -> Identity
 
