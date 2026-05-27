@@ -845,5 +845,3 @@ AlbumView.model_rebuild()
 IngestionReportView.model_rebuild()
 BatchIngestReport.model_rebuild()
 IngestStatusModel.model_rebuild()
-
-

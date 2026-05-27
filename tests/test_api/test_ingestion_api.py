@@ -440,8 +440,8 @@ class TestScanFolderApi:
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
-        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-        updates = [json.loads(l) for l in lines]
+        lines = [line for line in resp.text.strip().split("\n") if line.strip()]
+        updates = [json.loads(line) for line in lines]
         results = [u["last_result"] for u in updates if "last_result" in u]
 
         assert len(results) == 2, f"Expected 2 results, got {len(results)}"
@@ -465,8 +465,8 @@ class TestScanFolderApi:
         )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-        updates = [json.loads(l) for l in lines]
+        lines = [line for line in resp.text.strip().split("\n") if line.strip()]
+        updates = [json.loads(line) for line in lines]
         results = [u["last_result"] for u in updates if "last_result" in u]
 
         assert len(results) == 1, f"Expected 1 file (non-recursive), got {len(results)}"
@@ -487,8 +487,8 @@ class TestScanFolderApi:
         )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-        updates = [json.loads(l) for l in lines]
+        lines = [line for line in resp.text.strip().split("\n") if line.strip()]
+        updates = [json.loads(line) for line in lines]
         results = [u["last_result"] for u in updates if "last_result" in u]
 
         assert len(results) == 2, f"Expected 2 files (recursive), got {len(results)}"

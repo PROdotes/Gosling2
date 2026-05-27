@@ -91,9 +91,7 @@ class AlbumRepository(BaseRepository):
             new_conn.row_factory = sqlite3.Row
             rows = new_conn.execute(sql, album_ids).fetchall()
             result = [dict(row) for row in rows]
-            logger.debug(
-                f"[AlbumRepository] <- get_slim_by_ids() count={len(result)}"
-            )
+            logger.debug(f"[AlbumRepository] <- get_slim_by_ids() count={len(result)}")
             return result
 
     def get_by_id(

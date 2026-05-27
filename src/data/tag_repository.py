@@ -401,9 +401,7 @@ class TagRepository(BaseRepository):
             "UPDATE MediaSourceTags SET TagID = ? WHERE TagID = ?",
             (target_id, source_id),
         )
-        cursor.execute(
-            "UPDATE Tags SET IsDeleted = 1 WHERE TagID = ?", (source_id,)
-        )
+        cursor.execute("UPDATE Tags SET IsDeleted = 1 WHERE TagID = ?", (source_id,))
         logger.info(
             f"[TagRepository] <- merge_into OK — tag {source_id} -> {target_id}"
         )

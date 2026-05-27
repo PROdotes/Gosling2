@@ -7,7 +7,11 @@ from src.engine.models.spotify import (
 from src.services.spotify_service import SpotifyService
 from src.services.catalog_service import CatalogService
 from src.services.mutation_coordinator import MutationCoordinator
-from src.engine.routers.mutation_models import MutationRequest, AddCreditItem, AddPublisherItem
+from src.engine.routers.mutation_models import (
+    MutationRequest,
+    AddCreditItem,
+    AddPublisherItem,
+)
 from src.services.logger import logger
 from src.engine.config import get_db_path
 
@@ -42,7 +46,13 @@ def import_credits(request: SpotifyImportRequest):
         raise HTTPException(status_code=404, detail=f"Song {request.song_id} not found")
     try:
         add_items = [
-            AddCreditItem(type="credit", song_id=request.song_id, name=c.name, role=c.role, id=c.identity_id)
+            AddCreditItem(
+                type="credit",
+                song_id=request.song_id,
+                name=c.name,
+                role=c.role,
+                id=c.identity_id,
+            )
             for c in request.credits
         ] + [
             AddPublisherItem(type="publisher", song_id=request.song_id, name=pub)

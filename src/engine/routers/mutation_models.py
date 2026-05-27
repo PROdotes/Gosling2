@@ -133,7 +133,14 @@ class AddAlbumItem(BaseModel):
 
 
 AddItem = Annotated[
-    Union[AddCreditItem, AddTagItem, AddPublisherItem, AddAlbumItem, AddIdentityMemberItem, AddIdentityAliasItem],
+    Union[
+        AddCreditItem,
+        AddTagItem,
+        AddPublisherItem,
+        AddAlbumItem,
+        AddIdentityMemberItem,
+        AddIdentityAliasItem,
+    ],
     Field(discriminator="type"),
 ]
 
@@ -371,7 +378,14 @@ class RemoveIdentityAliasItem(BaseModel):
 
 
 RemoveItem = Annotated[
-    Union[RemoveCreditItem, RemoveTagItem, RemovePublisherItem, RemoveAlbumItem, RemoveIdentityMemberItem, RemoveIdentityAliasItem],
+    Union[
+        RemoveCreditItem,
+        RemoveTagItem,
+        RemovePublisherItem,
+        RemoveAlbumItem,
+        RemoveIdentityMemberItem,
+        RemoveIdentityAliasItem,
+    ],
     Field(discriminator="type"),
 ]
 

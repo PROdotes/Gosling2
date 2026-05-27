@@ -21,7 +21,6 @@ from src.services.logger import logger, request_id_var
 from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
 
-
 _SEARCH_SHADOW_COLUMNS = [
     ("ArtistNames", "DisplayName_Search"),
     ("MediaSources", "MediaName_Search"),

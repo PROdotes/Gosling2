@@ -53,5 +53,3 @@ def load_tag_categories(path: str = _FRAMES_PATH) -> List[str]:
 def _load_tag_categories_cached(path: str) -> List[str]:
     raw_data = _load_raw(path)
     return raw_data.get("tag_categories", [])
-
-

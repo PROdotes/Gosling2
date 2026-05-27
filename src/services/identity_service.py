@@ -78,7 +78,6 @@ class IdentityService:
         )
         return result
 
-
     def _hydrate_identities(self, identities: List[Identity]) -> List[Identity]:
         """Centralized batch hydration for identities and their relations."""
         identities = [i for i in identities if i is not None]

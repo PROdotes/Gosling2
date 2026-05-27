@@ -146,9 +146,7 @@ class IdentityRepository(BaseRepository):
             )
             return result
 
-    def get_all_slim(
-        self, conn: Optional[sqlite3.Connection] = None
-    ) -> List[dict]:
+    def get_all_slim(self, conn: Optional[sqlite3.Connection] = None) -> List[dict]:
         """Fast list-view query. Returns dicts for IdentitySlimView with embedded counts."""
         logger.debug("[IdentityRepository] -> get_all_slim()")
         sql = f"""

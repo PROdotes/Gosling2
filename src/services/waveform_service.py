@@ -24,17 +24,26 @@ def _build_peaks(audio_path: Path) -> List[float]:
         result = subprocess.run(
             [
                 str(FFMPEG_PATH),
-                "-v", "error",
-                "-i", str(audio_path),
-                "-f", "s16le",
-                "-ac", "1",
-                "-ar", str(SAMPLE_RATE),
+                "-v",
+                "error",
+                "-i",
+                str(audio_path),
+                "-f",
+                "s16le",
+                "-ac",
+                "1",
+                "-ar",
+                str(SAMPLE_RATE),
                 "-",
             ],
             capture_output=True,
             stdin=subprocess.DEVNULL,
             close_fds=True,
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if hasattr(subprocess, "CREATE_NO_WINDOW")
+                else 0
+            ),
         )
     except FileNotFoundError:
         logger.error(f"[Waveform] ffmpeg not found at '{FFMPEG_PATH}'")
@@ -101,7 +110,9 @@ def get_or_build_peaks(song_id: int, audio_path: Path) -> List[float]:
                 return peaks
             logger.warning(f"[Waveform] cache for {song_id} malformed; rebuilding")
         except (OSError, json.JSONDecodeError) as e:
-            logger.warning(f"[Waveform] cache read failed for {song_id}: {e}; rebuilding")
+            logger.warning(
+                f"[Waveform] cache read failed for {song_id}: {e}; rebuilding"
+            )
 
     peaks = _build_peaks(audio_path)
     WAVEFORM_CACHE_DIR.mkdir(parents=True, exist_ok=True)

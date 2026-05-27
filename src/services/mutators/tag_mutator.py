@@ -19,7 +19,13 @@ class TagMutator:
     def apply_within(
         self,
         action: str,
-        item: Union[AddTagItem, RemoveTagItem, UpdateTagEntityItem, UpdateSongTagItem, MergeTagItem],
+        item: Union[
+            AddTagItem,
+            RemoveTagItem,
+            UpdateTagEntityItem,
+            UpdateSongTagItem,
+            MergeTagItem,
+        ],
         conn: sqlite3.Connection,
     ) -> None:
         if action == "add":

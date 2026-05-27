@@ -704,8 +704,7 @@ class SongRepository(MediaSourceRepository):
                     (rq,),
                 )
             else:
-                artists = fetch(
-                    """
+                artists = fetch("""
                     SELECT DISTINCT an.DisplayName AS val
                     FROM ArtistNames an
                     JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
@@ -713,66 +712,53 @@ class SongRepository(MediaSourceRepository):
                     JOIN MediaSources m ON sc.SourceID = m.SourceID
                     WHERE r.RoleName = 'Performer' AND an.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY an.DisplayName
-                    """
-                )
-                contributors = fetch(
-                    """
+                    """)
+                contributors = fetch("""
                     SELECT DISTINCT an.DisplayName AS val
                     FROM ArtistNames an
                     JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
                     JOIN MediaSources m ON sc.SourceID = m.SourceID
                     WHERE an.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY an.DisplayName
-                    """
-                )
-                years = fetch(
-                    """
+                    """)
+                years = fetch("""
                     SELECT DISTINCT s.RecordingYear AS val
                     FROM Songs s
                     JOIN MediaSources m ON s.SourceID = m.SourceID
                     WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
                     ORDER BY s.RecordingYear DESC
-                    """
-                )
-                decades = fetch(
-                    """
+                    """)
+                decades = fetch("""
                     SELECT DISTINCT (s.RecordingYear / 10) * 10 AS val
                     FROM Songs s
                     JOIN MediaSources m ON s.SourceID = m.SourceID
                     WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
                     ORDER BY val DESC
-                    """
-                )
-                genres = fetch(
-                    """
+                    """)
+                genres = fetch("""
                     SELECT DISTINCT t.TagName AS val
                     FROM Tags t
                     JOIN MediaSourceTags mst ON t.TagID = mst.TagID
                     JOIN MediaSources m ON mst.SourceID = m.SourceID
                     WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY t.TagName
-                    """
-                )
-                albums = fetch(
-                    """
+                    """)
+                albums = fetch("""
                     SELECT DISTINCT a.AlbumTitle AS val
                     FROM Albums a
                     JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
                     JOIN MediaSources m ON sa.SourceID = m.SourceID
                     WHERE a.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY a.AlbumTitle
-                    """
-                )
-                publishers = fetch(
-                    """
+                    """)
+                publishers = fetch("""
                     SELECT DISTINCT p.PublisherName AS val
                     FROM Publishers p
                     JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
                     JOIN MediaSources m ON rp.SourceID = m.SourceID
                     WHERE p.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY p.PublisherName
-                    """
-                )
+                    """)
 
             result = {
                 "artists": artists,
@@ -801,8 +787,7 @@ class SongRepository(MediaSourceRepository):
                     (rq, rq),
                 ).fetchall()
             else:
-                other_tags_rows = c.execute(
-                    """
+                other_tags_rows = c.execute("""
                     SELECT DISTINCT t.TagCategory AS cat, t.TagName AS val
                     FROM Tags t
                     JOIN MediaSourceTags mst ON t.TagID = mst.TagID
@@ -811,8 +796,7 @@ class SongRepository(MediaSourceRepository):
                       AND LOWER(t.TagCategory) != 'genre'
                       AND t.IsDeleted = 0 AND m.IsDeleted = 0
                     ORDER BY t.TagCategory, t.TagName
-                    """
-                ).fetchall()
+                    """).fetchall()
 
             tag_categories: Dict[str, List[str]] = {}
             for row in other_tags_rows:
@@ -982,7 +966,11 @@ class SongRepository(MediaSourceRepository):
             params.extend([fmt_q] * 7)
 
         live_clause = "AND m.IsActive = 1" if live_only else ""
-        original_clause = "AND EXISTS (SELECT 1 FROM StagingOrigins so WHERE so.SourceID = m.SourceID)" if has_original else ""
+        original_clause = (
+            "AND EXISTS (SELECT 1 FROM StagingOrigins so WHERE so.SourceID = m.SourceID)"
+            if has_original
+            else ""
+        )
 
         query_sql = f"""
             SELECT

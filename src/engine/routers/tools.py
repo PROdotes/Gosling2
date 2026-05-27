@@ -5,6 +5,7 @@ from typing import List, Literal, Optional
 from src.services.tokenizer import tokenize_credits, resolve_names
 from src.services.filename_parser import parse_with_pattern
 from src.services.catalog_service import CatalogService
+from src.services.casing_service import CasingService
 
 logger = logging.getLogger(__name__)
 
@@ -207,8 +208,6 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
 
 
 # --- Text Formatting ---
-
-from src.services.casing_service import CasingService
 
 
 class FormatTextRequest(BaseModel):

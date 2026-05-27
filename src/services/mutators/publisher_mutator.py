@@ -18,7 +18,12 @@ class PublisherMutator:
     def apply_within(
         self,
         action: str,
-        item: Union[AddPublisherItem, RemovePublisherItem, UpdatePublisherEntityItem, MergePublisherItem],
+        item: Union[
+            AddPublisherItem,
+            RemovePublisherItem,
+            UpdatePublisherEntityItem,
+            MergePublisherItem,
+        ],
         conn: sqlite3.Connection,
     ) -> None:
         if action == "add":
@@ -55,9 +60,13 @@ class PublisherMutator:
         if source is None:
             raise LookupError(f"Publisher {item.source_id} not found")
         if source.parent_id is not None:
-            raise ValueError(f"Publisher {item.source_id} has a parent — hierarchy merge not supported yet")
+            raise ValueError(
+                f"Publisher {item.source_id} has a parent — hierarchy merge not supported yet"
+            )
         if self._repo.get_children(item.source_id, conn):
-            raise ValueError(f"Publisher {item.source_id} has children — hierarchy merge not supported yet")
+            raise ValueError(
+                f"Publisher {item.source_id} has children — hierarchy merge not supported yet"
+            )
         self._repo.merge_into(item.source_id, item.target_id, conn)
 
     def _update(

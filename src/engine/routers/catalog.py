@@ -15,7 +15,12 @@ from src.models.view_models import (
 )
 from src.services.catalog_service import CatalogService
 from src.services.mutation_coordinator import MutationCoordinator
-from src.engine.routers.mutation_models import MutationRequest, DeletePublisherItem, DeleteAlbumItem, DeleteTagItem
+from src.engine.routers.mutation_models import (
+    MutationRequest,
+    DeletePublisherItem,
+    DeleteAlbumItem,
+    DeleteTagItem,
+)
 from src.services.logger import logger
 from src.engine.config import (
     SCALAR_VALIDATION,
@@ -35,6 +40,7 @@ from src.services.search_service import SearchService
 
 def _get_coordinator() -> MutationCoordinator:
     return MutationCoordinator(str(get_db_path()))
+
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
@@ -140,6 +146,7 @@ async def get_song(song_id: int) -> SongView:
         # 1. Original source path — from StagingOrigins DB record only
         if view.estimated_original_path:
             import os
+
             if os.path.exists(view.estimated_original_path):
                 view.original_exists = True
 
@@ -183,7 +190,9 @@ async def get_all_identities() -> List[IdentitySlimView]:
 
 
 @router.get("/identities/search", response_model=List[IdentitySlimView])
-async def search_identities(q: str, exclude_groups: bool = False) -> List[IdentitySlimView]:
+async def search_identities(
+    q: str, exclude_groups: bool = False
+) -> List[IdentitySlimView]:
     """Slim list-view search by DisplayName, LegalName, or Alias."""
     logger.debug(
         f"[CatalogRouter] search_identities(q='{q}', exclude_groups={exclude_groups})"
@@ -193,7 +202,9 @@ async def search_identities(q: str, exclude_groups: bool = False) -> List[Identi
 
 
 @router.get("/artist-names/search", response_model=List[ArtistChipView])
-async def search_artist_names(q: str, exclude_groups: bool = False) -> List[ArtistChipView]:
+async def search_artist_names(
+    q: str, exclude_groups: bool = False
+) -> List[ArtistChipView]:
     """Search ArtistNames for picker results. One row per name."""
     logger.debug(
         f"[CatalogRouter] search_artist_names(q='{q}', exclude_groups={exclude_groups})"
@@ -303,14 +314,20 @@ async def delete_publisher(publisher_id: int) -> None:
             status_code=404, detail=f"Publisher {publisher_id} not found"
         )
     try:
-        _get_coordinator().apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", id=publisher_id)]))
+        _get_coordinator().apply(
+            MutationRequest(
+                delete=[DeletePublisherItem(type="publisher", id=publisher_id)]
+            )
+        )
     except ValueError:
         raise HTTPException(
             status_code=403,
             detail=f"Publisher {publisher_id} is linked to active songs or albums",
         )
     except LookupError:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
 
 @router.delete("/publishers", response_model=dict)
@@ -323,7 +340,9 @@ async def bulk_delete_unlinked_publishers(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    _get_coordinator().apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", unlinked=True)]))
+    _get_coordinator().apply(
+        MutationRequest(delete=[DeletePublisherItem(type="publisher", unlinked=True)])
+    )
     return {"deleted": 0}
 
 
@@ -363,7 +382,9 @@ async def delete_album(album_id: int) -> None:
     if not _get_service().get_album(album_id):
         raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
     try:
-        _get_coordinator().apply(MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)]))
+        _get_coordinator().apply(
+            MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)])
+        )
     except ValueError:
         raise HTTPException(
             status_code=403, detail=f"Album {album_id} is linked to active songs"
@@ -380,7 +401,9 @@ async def bulk_delete_unlinked_albums(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    _get_coordinator().apply(MutationRequest(delete=[DeleteAlbumItem(type="album", unlinked=True)]))
+    _get_coordinator().apply(
+        MutationRequest(delete=[DeleteAlbumItem(type="album", unlinked=True)])
+    )
     return {"deleted": 0}
 
 
@@ -439,7 +462,9 @@ async def delete_tag(tag_id: int) -> None:
     if not _get_service().get_tag(tag_id):
         raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
     try:
-        _get_coordinator().apply(MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)]))
+        _get_coordinator().apply(
+            MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)])
+        )
     except ValueError:
         raise HTTPException(
             status_code=403, detail=f"Tag {tag_id} is linked to active songs"
@@ -456,7 +481,9 @@ async def bulk_delete_unlinked_tags(unlinked: bool = False) -> dict:
         raise HTTPException(
             status_code=400, detail="Pass ?unlinked=true to confirm bulk delete"
         )
-    _get_coordinator().apply(MutationRequest(delete=[DeleteTagItem(type="tag", unlinked=True)]))
+    _get_coordinator().apply(
+        MutationRequest(delete=[DeleteTagItem(type="tag", unlinked=True)])
+    )
     return {"deleted": 0}
 
 

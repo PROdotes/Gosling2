@@ -24,7 +24,11 @@ async def mutate(body: MutationRequest) -> dict:
     except MergeRequiredError as e:
         raise HTTPException(
             status_code=409,
-            detail={"code": "MERGE_REQUIRED", "entity_type": e.entity_type, "collision_id": e.collision_id},
+            detail={
+                "code": "MERGE_REQUIRED",
+                "entity_type": e.entity_type,
+                "collision_id": e.collision_id,
+            },
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

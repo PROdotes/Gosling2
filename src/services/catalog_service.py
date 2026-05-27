@@ -125,9 +125,7 @@ class CatalogService:
         self, query: str, exclude_groups: bool = False
     ) -> List[dict]:
         """Slim list-view search (no hydration)."""
-        return self._identity_service.search_slim(
-            query, exclude_groups=exclude_groups
-        )
+        return self._identity_service.search_slim(query, exclude_groups=exclude_groups)
 
     def search_artist_names(self, query: str, exclude_groups: bool = False):
         """Search ArtistNames for picker results (one row per name)."""

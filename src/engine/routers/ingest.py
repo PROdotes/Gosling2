@@ -22,7 +22,11 @@ from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
 from src.services.logger import logger
 from src.services.mutation_coordinator import MutationCoordinator
-from src.engine.routers.mutation_models import MutationRequest, DeleteSongItem, DeleteOriginalFileItem
+from src.engine.routers.mutation_models import (
+    MutationRequest,
+    DeleteSongItem,
+    DeleteOriginalFileItem,
+)
 from src.engine.config import (
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
@@ -330,7 +334,11 @@ async def delete_song(
     )
     try:
         MutationCoordinator(str(get_db_path())).apply(
-            MutationRequest(delete=[DeleteSongItem(type="song", id=song_id, delete_file=delete_file)])
+            MutationRequest(
+                delete=[
+                    DeleteSongItem(type="song", id=song_id, delete_file=delete_file)
+                ]
+            )
         )
     except LookupError:
         logger.warning(f"[IngestRouter] Delete failed: Song ID {song_id} not found.")
@@ -358,9 +366,17 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
                     detail="No original source link found for this song.",
                 )
             MutationCoordinator(str(get_db_path())).apply(
-                MutationRequest(delete=[DeleteOriginalFileItem(type="original_file", song_id=request.song_id)])
+                MutationRequest(
+                    delete=[
+                        DeleteOriginalFileItem(
+                            type="original_file", song_id=request.song_id
+                        )
+                    ]
+                )
             )
-            logger.info(f"[IngestRouter] <- cleanup_original_file(song_id={request.song_id}) SUCCESS")
+            logger.info(
+                f"[IngestRouter] <- cleanup_original_file(song_id={request.song_id}) SUCCESS"
+            )
             return {"status": "DELETED", "id": request.song_id}
 
         if not request.file_path:

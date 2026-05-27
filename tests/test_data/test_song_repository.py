@@ -479,7 +479,6 @@ class TestSearchSlimByIdentityIds:
         repo = SongRepository(populated_db)
         songs = repo.search_slim_by_identity_ids([1])
         assert len(songs) == 4
-        ids = sorted([s["SourceID"] for s in songs])
         titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Grohlton Theme",
@@ -493,7 +492,6 @@ class TestSearchSlimByIdentityIds:
         repo = SongRepository(populated_db)
         songs = repo.search_slim_by_identity_ids([2])
         assert len(songs) == 1
-        ids = sorted([s["SourceID"] for s in songs])
         assert songs[0]["SourceID"] == 1, f"Expected 1, got {songs[0]['SourceID']}"
         assert (
             songs[0]["MediaName"] == "Smells Like Teen Spirit"
@@ -504,7 +502,6 @@ class TestSearchSlimByIdentityIds:
         repo = SongRepository(populated_db)
         songs = repo.search_slim_by_identity_ids([4])
         assert len(songs) == 3
-        ids = sorted([s["SourceID"] for s in songs])
         titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Range Rover Bitch",
@@ -517,7 +514,6 @@ class TestSearchSlimByIdentityIds:
         repo = SongRepository(populated_db)
         songs = repo.search_slim_by_identity_ids([2, 3])
         assert len(songs) == 2
-        ids = sorted([s["SourceID"] for s in songs])
         titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Smells Like Teen Spirit",
