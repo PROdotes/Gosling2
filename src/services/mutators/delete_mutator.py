@@ -61,10 +61,8 @@ class DeleteMutator:
 
     def _delete_tag(self, item: DeleteTagItem, conn: sqlite3.Connection) -> None:
         if item.unlinked:
-            for tag in self._tag_repo.get_all(conn):
-                song_ids = self._tag_repo.get_song_ids_by_tag(tag.id, conn)
-                if not song_ids:
-                    self._tag_repo.soft_delete(tag.id, conn)
+            for tag_id in self._tag_repo.get_unlinked_ids(conn):
+                self._tag_repo.soft_delete(tag_id, conn)
             return
         linked = self._tag_repo.get_song_ids_by_tag(item.id, conn)
         if linked:
@@ -77,13 +75,8 @@ class DeleteMutator:
         self, item: DeletePublisherItem, conn: sqlite3.Connection
     ) -> None:
         if item.unlinked:
-            for pub in self._publisher_repo.get_all(conn):
-                song_ids = self._publisher_repo.get_song_ids_by_publisher(pub.id, conn)
-                album_ids = self._publisher_repo.get_album_ids_by_publisher(
-                    pub.id, conn
-                )
-                if not song_ids and not album_ids:
-                    self._publisher_repo.soft_delete(pub.id, conn)
+            for pub_id in self._publisher_repo.get_unlinked_ids(conn):
+                self._publisher_repo.soft_delete(pub_id, conn)
             return
         linked_songs = self._publisher_repo.get_song_ids_by_publisher(item.id, conn)
         linked_albums = self._publisher_repo.get_album_ids_by_publisher(item.id, conn)
@@ -96,11 +89,9 @@ class DeleteMutator:
 
     def _delete_album(self, item: DeleteAlbumItem, conn: sqlite3.Connection) -> None:
         if item.unlinked:
-            for album in self._album_repo.get_all(conn):
-                song_ids = self._album_repo.get_song_ids_by_album(album.id, conn)
-                if not song_ids:
-                    self._album_repo.delete_album_links(album.id, conn)
-                    self._album_repo.soft_delete(album.id, conn)
+            for album_id in self._album_repo.get_unlinked_ids(conn):
+                self._album_repo.delete_album_links(album_id, conn)
+                self._album_repo.soft_delete(album_id, conn)
             return
         linked = self._album_repo.get_song_ids_by_album(item.id, conn)
         if linked:
@@ -116,12 +107,8 @@ class DeleteMutator:
         self, item: DeleteIdentityItem, conn: sqlite3.Connection
     ) -> None:
         if item.unlinked:
-            for identity in self._identity_repo.get_all_identities(conn):
-                song_ids = self._identity_repo.get_song_ids_by_identity(
-                    identity.id, conn
-                )
-                if not song_ids:
-                    self._identity_repo.soft_delete(identity.id, conn)
+            for identity_id in self._identity_repo.get_unlinked_ids(conn):
+                self._identity_repo.soft_delete(identity_id, conn)
             return
         linked = self._identity_repo.get_song_ids_by_identity(item.id, conn)
         if linked:

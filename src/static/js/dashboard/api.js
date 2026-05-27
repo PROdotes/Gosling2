@@ -436,8 +436,7 @@ export async function quickCreateAlbum(songId, title = null) {
     if (!payload.add && !payload.update) return {};
     const result = await mutate(payload);
     const song = result?.songs?.[0];
-    const albumTitle = title || song?.media_name;
-    const newAlbum = song?.albums?.find(a => a.album_title === albumTitle);
+    const newAlbum = song?.albums?.find(a => a.album_title === title);
     if (newAlbum?.album_id) {
         await syncAlbumFromSong(newAlbum.album_id, songId);
     }

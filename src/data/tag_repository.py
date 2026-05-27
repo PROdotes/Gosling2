@@ -185,6 +185,20 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch song IDs by tag: {e}")
             raise
 
+    def get_unlinked_ids(self, conn: sqlite3.Connection) -> List[int]:
+        """Return IDs of all active tags with no active song links."""
+        query = """
+            SELECT t.TagID FROM Tags t
+            WHERE t.IsDeleted = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM MediaSourceTags mst
+                JOIN MediaSources ms ON mst.SourceID = ms.SourceID
+                WHERE mst.TagID = t.TagID AND ms.IsDeleted = 0
+              )
+        """
+        rows = conn.execute(query).fetchall()
+        return [row[0] for row in rows]
+
     def soft_delete(self, tag_id: int, conn: sqlite3.Connection) -> bool:
         """Set IsDeleted = 1. Returns True if a row was updated, False if not found or already deleted."""
         logger.debug(f"[TagRepository] -> soft_delete(tag_id={tag_id})")

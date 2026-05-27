@@ -351,6 +351,25 @@ class PublisherRepository(BaseRepository):
             _run(new_conn)
             return result
 
+    def get_unlinked_ids(self, conn: sqlite3.Connection) -> List[int]:
+        """Return IDs of all active publishers with no active song or album links."""
+        query = """
+            SELECT p.PublisherID FROM Publishers p
+            WHERE p.IsDeleted = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM RecordingPublishers rp
+                JOIN MediaSources ms ON rp.SourceID = ms.SourceID
+                WHERE rp.PublisherID = p.PublisherID AND ms.IsDeleted = 0
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM AlbumPublishers ap
+                JOIN Albums a ON ap.AlbumID = a.AlbumID
+                WHERE ap.PublisherID = p.PublisherID AND a.IsDeleted = 0
+              )
+        """
+        rows = conn.execute(query).fetchall()
+        return [row[0] for row in rows]
+
     def soft_delete(self, publisher_id: int, conn: sqlite3.Connection) -> bool:
         """Set IsDeleted = 1 for a publisher. Returns True if a record was updated."""
         logger.debug(f"[PublisherRepository] -> soft_delete(id={publisher_id})")

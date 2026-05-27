@@ -96,7 +96,7 @@ async def prepare_album_from_song(
 
     # No album yet — return only the album creation item.
     # Credits/publishers are synced in a follow-up syncAlbumFromSong call once the album ID is known.
-    album_title = (body.title or song.media_name or "Unknown Album").strip()
+    album_title = (body.title or "Unknown Album").strip()
     add = [
         {
             "type": "album",

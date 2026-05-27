@@ -235,6 +235,20 @@ class AlbumRepository(BaseRepository):
         logger.debug("[AlbumRepository] <- update_album() done")
         return cursor.rowcount
 
+    def get_unlinked_ids(self, conn: sqlite3.Connection) -> List[int]:
+        """Return IDs of all active albums with no active song links."""
+        query = """
+            SELECT a.AlbumID FROM Albums a
+            WHERE a.IsDeleted = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM SongAlbums sa
+                JOIN MediaSources ms ON sa.SourceID = ms.SourceID
+                WHERE sa.AlbumID = a.AlbumID AND ms.IsDeleted = 0
+              )
+        """
+        rows = conn.execute(query).fetchall()
+        return [row[0] for row in rows]
+
     def soft_delete(self, album_id: int, conn: sqlite3.Connection) -> bool:
         """Set IsDeleted = 1 for an album. Returns True if a record was updated."""
         logger.debug(f"[AlbumRepository] -> soft_delete(id={album_id})")

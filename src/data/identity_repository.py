@@ -757,6 +757,27 @@ class IdentityRepository(BaseRepository):
             logger.debug("[IdentityRepository] <- find_identity_by_name() NOT_FOUND")
             return None
 
+    def get_unlinked_ids(self, conn: sqlite3.Connection) -> List[int]:
+        """Return IDs of all active identities with no active song or album credits via any alias."""
+        query = """
+            SELECT i.IdentityID FROM Identities i
+            WHERE i.IsDeleted = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM ArtistNames an
+                JOIN SongCredits sc ON sc.CreditedNameID = an.NameID
+                JOIN MediaSources ms ON sc.SourceID = ms.SourceID
+                WHERE an.OwnerIdentityID = i.IdentityID AND an.IsDeleted = 0 AND ms.IsDeleted = 0
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM ArtistNames an
+                JOIN AlbumCredits ac ON ac.CreditedNameID = an.NameID
+                JOIN Albums a ON ac.AlbumID = a.AlbumID
+                WHERE an.OwnerIdentityID = i.IdentityID AND an.IsDeleted = 0 AND a.IsDeleted = 0
+              )
+        """
+        rows = conn.execute(query).fetchall()
+        return [row[0] for row in rows]
+
     def soft_delete(self, identity_id: int, conn: sqlite3.Connection) -> bool:
         """Soft-delete an Identity and all its ArtistNames. Returns True if the Identity row was updated."""
         logger.debug(f"[IdentityRepository] -> soft_delete(id={identity_id})")
