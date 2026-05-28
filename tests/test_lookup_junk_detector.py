@@ -86,14 +86,20 @@ def get_actual_members(path: str):
                 tree = ast.parse(f.read())
             members = set()
             for node in tree.body:
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                ):
                     members.add(node.name)
                     if isinstance(node, ast.ClassDef):
                         for item in node.body:
-                            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            if isinstance(
+                                item, (ast.FunctionDef, ast.AsyncFunctionDef)
+                            ):
                                 members.add(item.name)
                 elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-                    targets = node.targets if hasattr(node, "targets") else [node.target]
+                    targets = (
+                        node.targets if hasattr(node, "targets") else [node.target]
+                    )
                     for target in targets:
                         if isinstance(target, ast.Name):
                             members.add(target.id)
@@ -103,38 +109,50 @@ def get_actual_members(path: str):
 
     if path.endswith(".js"):
         import re
+
         try:
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
+
             members = set()
             # 1. Functions, Classes, and Constants
-            matches = re.finditer(r'export\s+(?:async\s+)?(?:function|class|const)\s+([a-zA-Z0-9_]+)', content)
+            matches = re.finditer(
+                r"export\s+(?:async\s+)?(?:function|class|const)\s+([a-zA-Z0-9_]+)",
+                content,
+            )
             for m in matches:
                 members.add(m.group(1))
-            
+
             # 2. Methods in classes
-            class_blocks = re.finditer(r'export\s+class\s+([a-zA-Z0-9_]+)\s*\{([\s\S]*?)\n\}', content)
+            class_blocks = re.finditer(
+                r"export\s+class\s+([a-zA-Z0-9_]+)\s*\{([\s\S]*?)\n\}", content
+            )
             for cb in class_blocks:
                 class_content = cb.group(2)
-                keywords = {'if', 'for', 'while', 'catch', 'switch'}
-                method_matches = re.finditer(r'^\s*(?:async\s+)?([a-zA-Z0-9][a-zA-Z0-9_]*)\s*\([^)]*\)\s*\{', class_content, re.MULTILINE)
+                keywords = {"if", "for", "while", "catch", "switch"}
+                method_matches = re.finditer(
+                    r"^\s*(?:async\s+)?([a-zA-Z0-9][a-zA-Z0-9_]*)\s*\([^)]*\)\s*\{",
+                    class_content,
+                    re.MULTILINE,
+                )
                 for mm in method_matches:
                     m_name = mm.group(1)
                     if m_name != "constructor" and m_name not in keywords:
                         members.add(m_name)
-            
+
             # 3. Named exports
-            named_matches = re.finditer(r'export\s+\{(.*)\}', content)
+            named_matches = re.finditer(r"export\s+\{(.*)\}", content)
             for m in named_matches:
                 for n in m.group(1).split(","):
                     members.add(n.strip())
-            
+
             # 4. Local functions (for shared.js/utils.js where they aren't always exported)
-            local_matches = re.finditer(r'(?:async\s+)?function\s+([a-zA-Z0-9_]+)\s*\(', content)
+            local_matches = re.finditer(
+                r"(?:async\s+)?function\s+([a-zA-Z0-9_]+)\s*\(", content
+            )
             for m in local_matches:
                 members.add(m.group(1))
-                
+
             return members
         except Exception:
             return set()

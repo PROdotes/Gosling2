@@ -229,7 +229,9 @@ class TestSetParent:
 
         with repo._get_connection() as conn:
             result = repo.set_parent(9999, 1, conn)
-        assert result == 0, f"Expected rowcount=0 for nonexistent publisher, got {result}"
+        assert (
+            result == 0
+        ), f"Expected rowcount=0 for nonexistent publisher, got {result}"
 
     def test_set_parent_does_not_affect_other_publishers(self, populated_db):
         """Changing parent of publisher 5 must not touch publisher 4."""

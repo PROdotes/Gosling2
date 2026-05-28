@@ -173,7 +173,9 @@ def _make_song(source_path: str) -> object:
 class TestCopyToLibraryInPlace:
     """copy_to_library when source IS already the target (in-place ingestion path)."""
 
-    def test_source_equals_target_returns_path_without_error(self, filing_service, tmp_path):
+    def test_source_equals_target_returns_path_without_error(
+        self, filing_service, tmp_path
+    ):
         """When source_path resolves to the same inode as target, return target without raising."""
         library_root = tmp_path / "library"
         (library_root / "2024").mkdir(parents=True)
@@ -184,11 +186,13 @@ class TestCopyToLibraryInPlace:
 
         result = filing_service.copy_to_library(song, library_root)
 
-        assert result == existing_file, (
-            f"Expected target path {existing_file}, got {result}"
-        )
+        assert (
+            result == existing_file
+        ), f"Expected target path {existing_file}, got {result}"
 
-    def test_source_equals_target_file_still_exists_after_call(self, filing_service, tmp_path):
+    def test_source_equals_target_file_still_exists_after_call(
+        self, filing_service, tmp_path
+    ):
         """Original file must survive copy_to_library when source IS the target — no deletion."""
         library_root = tmp_path / "library"
         (library_root / "2024").mkdir(parents=True)
@@ -198,10 +202,12 @@ class TestCopyToLibraryInPlace:
         song = _make_song(str(existing_file))
         filing_service.copy_to_library(song, library_root)
 
-        assert existing_file.exists(), "Original file was deleted during in-place copy_to_library — this is a critical regression"
-        assert existing_file.read_bytes() == b"original content do not delete", (
-            "File contents were modified during in-place copy_to_library"
-        )
+        assert (
+            existing_file.exists()
+        ), "Original file was deleted during in-place copy_to_library — this is a critical regression"
+        assert (
+            existing_file.read_bytes() == b"original content do not delete"
+        ), "File contents were modified during in-place copy_to_library"
 
     def test_different_source_and_target_still_copies(self, filing_service, tmp_path):
         """When source != target, the normal copy path still works correctly."""
@@ -216,7 +222,12 @@ class TestCopyToLibraryInPlace:
         song = _make_song(str(source_file))
         result = filing_service.copy_to_library(song, library_root)
 
-        assert result.exists(), f"Expected file to be copied to {result}, but it does not exist"
-        assert result.read_bytes() == b"staged content", "Copied file content does not match source"
-        assert source_file.exists(), "Source staging file was deleted during copy — should only be unlinked by EditService"
-
+        assert (
+            result.exists()
+        ), f"Expected file to be copied to {result}, but it does not exist"
+        assert (
+            result.read_bytes() == b"staged content"
+        ), "Copied file content does not match source"
+        assert (
+            source_file.exists()
+        ), "Source staging file was deleted during copy — should only be unlinked by EditService"

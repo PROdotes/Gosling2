@@ -103,7 +103,8 @@ def test_detach_newly_added_alias(populated_db):
 
         # Verify it now belongs to a NEW identity and is primary/active
         row = cursor.execute(
-            "SELECT OwnerIdentityID, IsPrimaryName, IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
+            "SELECT OwnerIdentityID, IsPrimaryName, IsDeleted FROM ArtistNames WHERE NameID = ?",
+            (alias_id,),
         ).fetchone()
         assert row[0] != identity_id, "Alias was not re-homed to a new identity"
         assert row[1] == 1, f"Expected IsPrimaryName=1, got {row[1]}"
@@ -123,7 +124,8 @@ def test_detach_alias_in_use(populated_db):
 
         # Verify it was re-homed, NOT soft-deleted
         row = cursor.execute(
-            "SELECT OwnerIdentityID, IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
+            "SELECT OwnerIdentityID, IsDeleted FROM ArtistNames WHERE NameID = ?",
+            (alias_id,),
         ).fetchone()
         assert row[0] != 1, "Alias should have been moved from identity 1"
         assert row[1] == 0, f"Expected IsDeleted=0 (reactivated/active), got {row[1]}"
@@ -136,7 +138,9 @@ def test_delete_alias_primary_forbidden(populated_db):
 
     with repo._get_connection() as conn:
         cursor = conn.cursor()
-        with pytest.raises(ValueError, match="Cannot detach the primary name of an identity"):
+        with pytest.raises(
+            ValueError, match="Cannot detach the primary name of an identity"
+        ):
             repo.delete_alias(primary_alias, cursor)
 
 
@@ -155,10 +159,15 @@ def test_detach_alias_preserves_credits(populated_db):
         cursor = conn.cursor()
 
         # 1. Verify initial state: Grohlton belongs to identity 1 and is credited on song 1
-        row = cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)).fetchone()
+        row = cursor.execute(
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)
+        ).fetchone()
         assert row[0] == original_owner_id
 
-        row = cursor.execute("SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?", (song_id, alias_id)).fetchone()
+        row = cursor.execute(
+            "SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?",
+            (song_id, alias_id),
+        ).fetchone()
         assert row is not None, "Initial credit not found"
 
         # 2. Detach 'Grohlton'
@@ -166,14 +175,21 @@ def test_detach_alias_preserves_credits(populated_db):
         conn.commit()
 
         # 3. Verify: Grohlton has a NEW owner
-        row = cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)).fetchone()
+        row = cursor.execute(
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)
+        ).fetchone()
         new_owner_id = row[0]
         assert new_owner_id != original_owner_id
 
         # 4. Verify: Song 1 STILL credits 'Grohlton' (NameID 11)
-        row = cursor.execute("SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?", (song_id, alias_id)).fetchone()
+        row = cursor.execute(
+            "SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?",
+            (song_id, alias_id),
+        ).fetchone()
         assert row is not None, "Credit was lost during detachment"
-        assert row[0] == alias_id, f"Expected credit to still point to NameID {alias_id}, got {row[0]}"
+        assert (
+            row[0] == alias_id
+        ), f"Expected credit to still point to NameID {alias_id}, got {row[0]}"
 
 
 def test_add_alias_rollback(populated_db):
@@ -308,7 +324,10 @@ class TestMergeOrphanInto:
 
         with repo._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (target_name_id,))
+            cursor.execute(
+                "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?",
+                (target_name_id,),
+            )
             cursor.execute(
                 "UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = (SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?)",
                 (target_name_id,),

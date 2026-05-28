@@ -1,1 +1,3 @@
 .mulch/expertise/*.jsonl merge=union
+*.py text eol=lf
+*.md text eol=lf

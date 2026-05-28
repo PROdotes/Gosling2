@@ -10,6 +10,7 @@ Data map used here:
   RoleID=1: Performer  RoleID=2: Composer
   CreditIDs are fetched at runtime since they're auto-assigned.
 """
+
 import sqlite3
 
 import pytest
@@ -21,10 +22,10 @@ from src.engine.routers.mutation_models import (
 )
 from src.services.mutators.credit_mutator import CreditMutator
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_conn(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -65,7 +66,9 @@ def _get_credit_id(conn: sqlite3.Connection, song_id: int, name: str, role: str)
 
 
 def _get_display_name(conn: sqlite3.Connection, name_id: int) -> str:
-    row = conn.execute("SELECT DisplayName FROM ArtistNames WHERE NameID = ?", (name_id,)).fetchone()
+    row = conn.execute(
+        "SELECT DisplayName FROM ArtistNames WHERE NameID = ?", (name_id,)
+    ).fetchone()
     assert row is not None
     return row["DisplayName"]
 
@@ -73,6 +76,7 @@ def _get_display_name(conn: sqlite3.Connection, name_id: int) -> str:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mutator(populated_db):
@@ -90,24 +94,46 @@ def conn(populated_db):
 # add
 # ---------------------------------------------------------------------------
 
+
 class TestCreditMutatorAdd:
     def test_add_new_name_creates_credit(self, mutator, conn):
         item = AddCreditItem.model_validate(
-            {"type": "credit", "song_id": 7, "name": "Brand New Artist", "role": "Performer"}
+            {
+                "type": "credit",
+                "song_id": 7,
+                "name": "Brand New Artist",
+                "role": "Performer",
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
         credits = _get_credits(conn, 7)
-        assert any(c["DisplayName"] == "Brand New Artist" and c["RoleName"] == "Performer" for c in credits)
+        assert any(
+            c["DisplayName"] == "Brand New Artist" and c["RoleName"] == "Performer"
+            for c in credits
+        )
 
     def test_add_with_identity_id_links_correctly(self, mutator, conn):
         item = AddCreditItem.model_validate(
-            {"type": "credit", "song_id": 7, "name": "Dave Grohl", "role": "Composer", "id": 1}
+            {
+                "type": "credit",
+                "song_id": 7,
+                "name": "Dave Grohl",
+                "role": "Composer",
+                "id": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
         credits = _get_credits(conn, 7)
-        match = next((c for c in credits if c["DisplayName"] == "Dave Grohl" and c["RoleName"] == "Composer"), None)
+        match = next(
+            (
+                c
+                for c in credits
+                if c["DisplayName"] == "Dave Grohl" and c["RoleName"] == "Composer"
+            ),
+            None,
+        )
         assert match is not None
         assert match["OwnerIdentityID"] == 1
 
@@ -133,6 +159,7 @@ class TestCreditMutatorAdd:
 # ---------------------------------------------------------------------------
 # remove
 # ---------------------------------------------------------------------------
+
 
 class TestCreditMutatorRemove:
     def test_remove_credit_deletes_link(self, mutator, conn):
@@ -166,6 +193,7 @@ class TestCreditMutatorRemove:
 # ---------------------------------------------------------------------------
 # update
 # ---------------------------------------------------------------------------
+
 
 class TestCreditMutatorUpdate:
     def test_update_display_name(self, mutator, conn):

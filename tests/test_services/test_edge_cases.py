@@ -259,7 +259,9 @@ class TestSongEdgeCases:
         """Japanese characters normalize to empty string, so search returns no results."""
         repo = SongRepository(edge_case_db)
         rows = repo.search_slim("\u65e5\u672c\u8a9e")
-        assert len(rows) == 0, f"Expected 0 results (Japanese normalizes to ''), got {len(rows)}"
+        assert (
+            len(rows) == 0
+        ), f"Expected 0 results (Japanese normalizes to ''), got {len(rows)}"
 
     def test_search_single_char(self, edge_case_db):
         """search_slim with 'A' finds at least song 102."""
@@ -583,7 +585,9 @@ class TestSongsWithNoAlbum:
         assert song.year == 1997, f"Expected year=1997, got {song.year}"
         assert song.isrc is None, f"Expected isrc=None, got {song.isrc}"
         assert song.publishers == [], f"Expected no publishers, got {song.publishers}"
-        assert len(song.tags) == 2, f"Expected 2 tags on Song 2 (90s, Rock), got {len(song.tags)}"
+        assert (
+            len(song.tags) == 2
+        ), f"Expected 2 tags on Song 2 (90s, Rock), got {len(song.tags)}"
         tag = song.tags[0]
         assert tag.id == 3, f"Expected tag id=3, got {tag.id}"
         assert tag.name == "90s", f"Expected tag name='90s', got {tag.name}"

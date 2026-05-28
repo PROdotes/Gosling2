@@ -5,11 +5,11 @@ this phase get them via _migrate_search_columns. This test simulates the
 legacy case by creating tables without the new columns, then asserts the
 migration adds them and is a no-op on the second run.
 """
+
 import sqlite3
 import pytest
 
 from src.engine_server import _migrate_search_columns, _SEARCH_SHADOW_COLUMNS
-
 
 LEGACY_SCHEMA = """
 CREATE TABLE ArtistNames (
@@ -62,9 +62,9 @@ def test_migration_adds_missing_columns(legacy_conn):
     _migrate_search_columns(legacy_conn)
 
     for table, col in _SEARCH_SHADOW_COLUMNS:
-        assert col in _column_names(legacy_conn, table), (
-            f"Migration failed to add {table}.{col}"
-        )
+        assert col in _column_names(
+            legacy_conn, table
+        ), f"Migration failed to add {table}.{col}"
 
 
 def test_migration_is_idempotent(legacy_conn):
@@ -83,18 +83,22 @@ def test_migration_preserves_existing_data(legacy_conn):
     legacy_conn.execute(
         "INSERT INTO MediaSources (SourceID, TypeID, MediaName) VALUES (1, 1, 'Måneskin Song')"
     )
-    legacy_conn.execute(
-        "INSERT INTO Albums (AlbumID, AlbumTitle) VALUES (1, 'Straße')"
-    )
+    legacy_conn.execute("INSERT INTO Albums (AlbumID, AlbumTitle) VALUES (1, 'Straße')")
     legacy_conn.commit()
 
     _migrate_search_columns(legacy_conn)
 
     # Row values are intact; new column defaults to NULL (backfill is the
     # responsibility of tools/backfill_search_columns.py).
-    name = legacy_conn.execute("SELECT DisplayName, DisplayName_Search FROM ArtistNames WHERE NameID = 1").fetchone()
+    name = legacy_conn.execute(
+        "SELECT DisplayName, DisplayName_Search FROM ArtistNames WHERE NameID = 1"
+    ).fetchone()
     assert name == ("Noëp", None)
-    media = legacy_conn.execute("SELECT MediaName, MediaName_Search FROM MediaSources WHERE SourceID = 1").fetchone()
+    media = legacy_conn.execute(
+        "SELECT MediaName, MediaName_Search FROM MediaSources WHERE SourceID = 1"
+    ).fetchone()
     assert media == ("Måneskin Song", None)
-    album = legacy_conn.execute("SELECT AlbumTitle, AlbumTitle_Search FROM Albums WHERE AlbumID = 1").fetchone()
+    album = legacy_conn.execute(
+        "SELECT AlbumTitle, AlbumTitle_Search FROM Albums WHERE AlbumID = 1"
+    ).fetchone()
     assert album == ("Straße", None)

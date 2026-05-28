@@ -19,6 +19,7 @@ Unlinked entities (safe to delete):
   Publisher 2 (Island Records) — no song or album links → safe to delete.
   Album 200 is linked to song 2 → blocked. Need an unlinked album.
 """
+
 import sqlite3
 import pytest
 
@@ -66,6 +67,7 @@ def conn(populated_db):
 # Song delete
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteSong:
     def test_soft_deletes_song(self, mutator, conn):
         mutator.apply_within("delete", DeleteSongItem(type="song", id=1), conn)
@@ -85,10 +87,13 @@ class TestDeleteSong:
 # Tag delete
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteTag:
     def test_soft_deletes_unlinked_tag(self, mutator, conn):
         # Insert an unlinked tag to delete
-        conn.execute("INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (99, 'Orphan', 'Genre')")
+        conn.execute(
+            "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (99, 'Orphan', 'Genre')"
+        )
         mutator.apply_within("delete", DeleteTagItem(type="tag", id=99), conn)
         conn.commit()
         assert _is_deleted(conn, "Tags", "TagID", 99)
@@ -107,30 +112,40 @@ class TestDeleteTag:
 # Publisher delete
 # ---------------------------------------------------------------------------
 
+
 class TestDeletePublisher:
     def test_soft_deletes_unlinked_publisher(self, mutator, conn):
         # Publisher 2 (Island Records) has no song or album links
-        mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=2), conn)
+        mutator.apply_within(
+            "delete", DeletePublisherItem(type="publisher", id=2), conn
+        )
         conn.commit()
         assert _is_deleted(conn, "Publishers", "PublisherID", 2)
 
     def test_linked_publisher_raises_value_error(self, mutator, conn):
         # Publisher 10 (DGC Records) linked to song 1
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=10), conn)
+            mutator.apply_within(
+                "delete", DeletePublisherItem(type="publisher", id=10), conn
+            )
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeletePublisherItem(type="publisher", id=9999), conn)
+            mutator.apply_within(
+                "delete", DeletePublisherItem(type="publisher", id=9999), conn
+            )
 
 
 # ---------------------------------------------------------------------------
 # Album delete
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteAlbum:
     def test_soft_deletes_unlinked_album(self, mutator, conn):
-        conn.execute("INSERT INTO Albums (AlbumID, AlbumTitle) VALUES (999, 'Orphan Album')")
+        conn.execute(
+            "INSERT INTO Albums (AlbumID, AlbumTitle) VALUES (999, 'Orphan Album')"
+        )
         mutator.apply_within("delete", DeleteAlbumItem(type="album", id=999), conn)
         conn.commit()
         assert _is_deleted(conn, "Albums", "AlbumID", 999)
@@ -149,33 +164,46 @@ class TestDeleteAlbum:
 # Identity delete
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteIdentity:
     def test_soft_deletes_unlinked_identity(self, mutator, conn):
         # Insert a fresh identity with no credits
-        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
-        mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=999), conn)
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')"
+        )
+        mutator.apply_within(
+            "delete", DeleteIdentityItem(type="identity", id=999), conn
+        )
         conn.commit()
         assert _is_deleted(conn, "Identities", "IdentityID", 999)
 
     def test_linked_identity_raises_value_error(self, mutator, conn):
         # Identity 1 (Dave Grohl) credited on multiple songs
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=1), conn)
+            mutator.apply_within(
+                "delete", DeleteIdentityItem(type="identity", id=1), conn
+            )
 
     def test_not_found_raises_lookup_error(self, mutator, conn):
         with pytest.raises(LookupError):
-            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=9999), conn)
+            mutator.apply_within(
+                "delete", DeleteIdentityItem(type="identity", id=9999), conn
+            )
 
     def test_linked_via_secondary_alias_rejected(self, mutator, conn):
         # Dave (id=1) is credited on song 4 via Grohlton alias (NameID=11),
         # not via his primary name. The check must follow aliases.
         with pytest.raises(ValueError, match="still linked"):
-            mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=1), conn)
+            mutator.apply_within(
+                "delete", DeleteIdentityItem(type="identity", id=1), conn
+            )
 
     def test_delete_soft_deletes_all_aliases(self, mutator, conn):
         # Build an orphan identity with two names attached, delete it, and
         # confirm both alias rows are soft-deleted.
-        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')"
+        )
         conn.execute(
             "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (9001, 999, 'Orphan Primary', 1)"
         )
@@ -183,7 +211,9 @@ class TestDeleteIdentity:
             "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (9002, 999, 'Orphan Alias', 0)"
         )
         conn.commit()
-        mutator.apply_within("delete", DeleteIdentityItem(type="identity", id=999), conn)
+        mutator.apply_within(
+            "delete", DeleteIdentityItem(type="identity", id=999), conn
+        )
         conn.commit()
         live = conn.execute(
             "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = 999 AND IsDeleted = 0"
@@ -195,11 +225,16 @@ class TestDeleteIdentity:
 # Identity delete — unlinked (bulk) mode
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteIdentityUnlinked:
     def test_bulk_deletes_orphan_identities(self, mutator, conn):
         # Insert two truly orphan identities (no credits, no album credits).
-        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (997, 'person')")
-        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (998, 'person')")
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (997, 'person')"
+        )
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (998, 'person')"
+        )
         conn.commit()
         mutator.apply_within(
             "delete",
@@ -212,7 +247,9 @@ class TestDeleteIdentityUnlinked:
 
     def test_bulk_skips_linked_identities(self, mutator, conn):
         # Insert an orphan alongside Nirvana (id=2, linked to song 1 via NameID 20).
-        conn.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')")
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')"
+        )
         conn.commit()
         mutator.apply_within(
             "delete",

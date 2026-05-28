@@ -24,6 +24,7 @@ import sqlite3  # noqa: E402
 import pytest  # noqa: E402
 from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
+
 # from src.services.audit_service import AuditService  # REMOVED
 from src.engine import config  # noqa: E402
 from src.utils.text import normalize_for_search  # noqa: E402
@@ -81,7 +82,6 @@ def hermetic_logging(tmp_path_factory):
     # Restore
     logger.log_file = orig_file
     logger.console_enabled = orig_console
-
 
 
 # ---------------------------------------------------------------------------
@@ -535,7 +535,6 @@ def catalog_service(populated_db):
 def catalog_service_empty(empty_db):
     """CatalogService wired to an empty test DB."""
     return CatalogService(empty_db)
-
 
 
 @pytest.fixture

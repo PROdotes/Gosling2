@@ -620,6 +620,27 @@ Return IDs of all active identities with no active song or album credits via any
 
 
 
+## AuditRepository
+
+*Location: `src/data/audit_repository.py`*
+**Responsibility**: Fills in `batch_id` and `batch_label` on ChangeLog rows written by triggers during the current transaction.
+
+### flush_batch(batch_id: str, label: str, conn: sqlite3.Connection) -> None
+
+Updates all NULL `batch_id` rows in ChangeLog with the given `batch_id` and `batch_label`. Called by every write path (MutationCoordinator, IngestionService) before `conn.commit()`. Does NOT commit.
+
+---
+
+## Schema Utilities
+
+*Location: `src/data/schema.py`*
+
+### build_trigger_sql(conn: sqlite3.Connection) -> str
+
+Generates `CREATE TRIGGER IF NOT EXISTS` SQL for every non-excluded table, derived live from `PRAGMA table_info` so triggers always match the real schema. Excludes tables in `EXCLUDED_FROM_AUDIT`. Called once at startup by `_ensure_db()`. Returns a semicolon-separated SQL string suitable for `conn.executescript()`.
+
+---
+
 ## StagingRepository
 
 *Location: `src/data/staging_repository.py`*

@@ -613,7 +613,9 @@ class TestIngestFileStagedCleanup:
     def test_duplicate_outside_staging_is_not_deleted(
         self, empty_db, tmp_path, monkeypatch, test_audio_file
     ):
-        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        monkeypatch.setattr(
+            "src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging")
+        )
         service = CatalogService(empty_db)
 
         staging = tmp_path / "staging"
@@ -633,7 +635,9 @@ class TestIngestFileStagedCleanup:
     def test_duplicate_in_staging_is_cleaned_up(
         self, empty_db, tmp_path, monkeypatch, test_audio_file
     ):
-        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        monkeypatch.setattr(
+            "src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging")
+        )
         service = CatalogService(empty_db)
 
         staging = tmp_path / "staging"

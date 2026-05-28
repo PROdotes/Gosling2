@@ -11,6 +11,7 @@ Covers:
   - unsupported action raises ValueError
   - no-op (no fields set) returns without error
 """
+
 import sqlite3
 
 import pytest
@@ -18,10 +19,10 @@ import pytest
 from src.engine.routers.mutation_models import UpdateSongItem
 from src.services.mutators.song_mutator import SongMutator
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_conn(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -45,6 +46,7 @@ def _fetch_song_row(conn: sqlite3.Connection, song_id: int) -> sqlite3.Row:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mutator(populated_db):
     return SongMutator(populated_db)
@@ -61,6 +63,7 @@ def conn(populated_db):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSongMutatorUpdate:
     def test_update_bpm(self, mutator, conn):
         item = UpdateSongItem.model_validate({"type": "song", "id": 1, "bpm": 140})
@@ -70,14 +73,18 @@ class TestSongMutatorUpdate:
         assert row["TempoBPM"] == 140
 
     def test_update_media_name(self, mutator, conn):
-        item = UpdateSongItem.model_validate({"type": "song", "id": 1, "media_name": "New Title"})
+        item = UpdateSongItem.model_validate(
+            {"type": "song", "id": 1, "media_name": "New Title"}
+        )
         mutator.apply_within("update", item, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
         assert row["MediaName"] == "New Title"
 
     def test_update_notes(self, mutator, conn):
-        item = UpdateSongItem.model_validate({"type": "song", "id": 1, "notes": "some note"})
+        item = UpdateSongItem.model_validate(
+            {"type": "song", "id": 1, "notes": "some note"}
+        )
         mutator.apply_within("update", item, conn)
         conn.commit()
         row = _fetch_song_row(conn, 1)
@@ -85,7 +92,9 @@ class TestSongMutatorUpdate:
 
     def test_clear_notes_with_null(self, mutator, conn):
         # First set a note
-        item = UpdateSongItem.model_validate({"type": "song", "id": 1, "notes": "temporary"})
+        item = UpdateSongItem.model_validate(
+            {"type": "song", "id": 1, "notes": "temporary"}
+        )
         mutator.apply_within("update", item, conn)
         conn.commit()
         # Then clear it

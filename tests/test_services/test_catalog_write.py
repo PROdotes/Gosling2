@@ -9,11 +9,17 @@ from src.engine.config import SONG_DEFAULT_YEAR
 from tests.conftest import _connect
 
 
-def _delete_song(db_path, song_id, delete_file=False, monkeypatch=None, staging_dir=None):
+def _delete_song(
+    db_path, song_id, delete_file=False, monkeypatch=None, staging_dir=None
+):
     if monkeypatch and staging_dir is not None:
-        monkeypatch.setattr("src.services.mutation_coordinator.STAGING_DIR", str(staging_dir))
+        monkeypatch.setattr(
+            "src.services.mutation_coordinator.STAGING_DIR", str(staging_dir)
+        )
     MutationCoordinator(db_path).apply(
-        MutationRequest(delete=[DeleteSongItem(type="song", id=song_id, delete_file=delete_file)])
+        MutationRequest(
+            delete=[DeleteSongItem(type="song", id=song_id, delete_file=delete_file)]
+        )
     )
 
 
@@ -166,16 +172,22 @@ class TestCatalogServiceIngestFile:
 
         report = service.ingest_file(str(live_file))
 
-        assert report["status"] == "ALREADY_EXISTS", f"Expected ALREADY_EXISTS, got {report['status']}"
+        assert (
+            report["status"] == "ALREADY_EXISTS"
+        ), f"Expected ALREADY_EXISTS, got {report['status']}"
         assert report["match_type"] == "PATH"
 
         # Live file must survive
-        assert os.path.exists(str(live_file)), "Live file outside staging must NOT be deleted on ALREADY_EXISTS"
+        assert os.path.exists(
+            str(live_file)
+        ), "Live file outside staging must NOT be deleted on ALREADY_EXISTS"
 
     def test_ingest_hash_collision_returns_already_exists(
         self, populated_db, test_mp3, tmp_path, monkeypatch
     ):
-        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        monkeypatch.setattr(
+            "src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging")
+        )
         service = CatalogService(populated_db)
         # Mock calculate_audio_hash to return Song 1's hash "hash_1"
         monkeypatch.setattr(
@@ -258,7 +270,9 @@ class TestCatalogServiceIngestFile:
     def test_ingest_failure_rolls_back_and_deletes_staged_file(
         self, ingest_db, test_mp3, tmp_path, monkeypatch
     ):
-        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        monkeypatch.setattr(
+            "src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging")
+        )
         service = CatalogService(ingest_db)
 
         # Induce a DB failure during insert by monkeypatching the repo's insert to raise
@@ -300,7 +314,9 @@ class TestCatalogServiceDeleteSong:
         staging_dir = str(Path(test_mp3).parent)
         assert os.path.exists(test_mp3)
 
-        _delete_song(ingest_db, song_id, monkeypatch=monkeypatch, staging_dir=staging_dir)
+        _delete_song(
+            ingest_db, song_id, monkeypatch=monkeypatch, staging_dir=staging_dir
+        )
 
         assert service.get_song(song_id) is None
         assert not os.path.exists(test_mp3), "Physical staged file should be deleted"
@@ -324,7 +340,9 @@ class TestCatalogServiceDeleteSong:
         _delete_song(populated_db, 1, monkeypatch=monkeypatch, staging_dir=staging_dir)
 
         assert service.get_song(1) is None
-        assert os.path.exists(real_temp_path), "File OUTSIDE staging should NOT be deleted"
+        assert os.path.exists(
+            real_temp_path
+        ), "File OUTSIDE staging should NOT be deleted"
 
     def test_delete_nonexistent_id_raises(self, ingest_db):
         with pytest.raises(LookupError):
@@ -365,8 +383,12 @@ class TestCatalogServiceDeleteSong:
         assert album.title == "Nevermind", f"Expected 'Nevermind', got {album.title}"
 
         identity = service.get_identity(2)
-        assert identity is not None, "Identity should NOT be deleted when song is removed"
-        assert identity.display_name == "Nirvana", f"Expected 'Nirvana', got {identity.display_name}"
+        assert (
+            identity is not None
+        ), "Identity should NOT be deleted when song is removed"
+        assert (
+            identity.display_name == "Nirvana"
+        ), f"Expected 'Nirvana', got {identity.display_name}"
 
     def test_delete_with_delete_file_true_removes_library_file(
         self, populated_db, tmp_path, monkeypatch
@@ -388,7 +410,9 @@ class TestCatalogServiceDeleteSong:
         _delete_song(populated_db, 1, delete_file=True)
 
         assert service.get_song(1) is None
-        assert not os.path.exists(real_temp_path), "Library file should be deleted when delete_file=True"
+        assert not os.path.exists(
+            real_temp_path
+        ), "Library file should be deleted when delete_file=True"
 
     def test_delete_with_delete_file_false_preserves_library_file(
         self, populated_db, tmp_path, monkeypatch
@@ -410,4 +434,6 @@ class TestCatalogServiceDeleteSong:
         _delete_song(populated_db, 1, delete_file=False)
 
         assert service.get_song(1) is None
-        assert os.path.exists(real_temp_path), "Library file should be preserved when delete_file=False"
+        assert os.path.exists(
+            real_temp_path
+        ), "Library file should be preserved when delete_file=False"

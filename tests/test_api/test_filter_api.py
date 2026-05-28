@@ -232,7 +232,9 @@ class TestFilterSongsStatus:
     def test_filter_missing_data_includes_hollow_song(self, api):
         resp = api.get("/api/v1/songs/filter", params={"statuses": "missing_data"})
         ids = {s["id"] for s in resp.json()}
-        assert 7 in ids, f"Song 7 (no credits/publisher/genre) must be in missing_data: {ids}"
+        assert (
+            7 in ids
+        ), f"Song 7 (no credits/publisher/genre) must be in missing_data: {ids}"
         assert 9 in ids, f"Song 9 must be in missing_data: {ids}"
 
 

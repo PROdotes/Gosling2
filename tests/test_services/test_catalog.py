@@ -492,7 +492,9 @@ class TestGetAllIdentities:
         assert dave is not None, "Dave Grohl should be in all identities"
         assert "IdentityID" in dave, "Expected IdentityID field in slim row"
         assert "IdentityType" in dave, "Expected IdentityType field in slim row"
-        assert dave["IdentityType"] == "person", f"Expected 'person', got {dave['IdentityType']}"
+        assert (
+            dave["IdentityType"] == "person"
+        ), f"Expected 'person', got {dave['IdentityType']}"
 
     def test_empty_db(self, catalog_service_empty):
         """Empty database returns empty list."""
@@ -871,7 +873,6 @@ class TestSongViewFromCatalog:
         ), f"Expected primary_genre None, got {view.primary_genre}"
 
 
-
 class TestAlbumViewFromCatalog:
     """Verify AlbumView.from_domain produces correct computed fields."""
 
@@ -941,7 +942,11 @@ class TestSongWorkflowValidation:
         # 3. Attempt to activate — must raise ValueError
         coord = MutationCoordinator(catalog_service._db_path)
         with pytest.raises(ValueError) as exc:
-            coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=7, is_active=True)]))
+            coord.apply(
+                MutationRequest(
+                    update=[UpdateSongItem(type="song", id=7, is_active=True)]
+                )
+            )
 
         expected_msg = "Cannot activate song unless processing_status is 0 (Reviewed)"
         assert expected_msg in str(
@@ -980,7 +985,9 @@ class TestSongWorkflowValidation:
         conn.close()
 
         coord = MutationCoordinator(catalog_service._db_path)
-        result = coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=7, is_active=True)]))
+        result = coord.apply(
+            MutationRequest(update=[UpdateSongItem(type="song", id=7, is_active=True)])
+        )
         assert result is not None, "apply should return a result dict"
 
         # Verify activation persisted
@@ -1009,7 +1016,9 @@ class TestSongWorkflowValidation:
         conn.close()
 
         coord = MutationCoordinator(catalog_service._db_path)
-        result = coord.apply(MutationRequest(update=[UpdateSongItem(type="song", id=1, is_active=False)]))
+        result = coord.apply(
+            MutationRequest(update=[UpdateSongItem(type="song", id=1, is_active=False)])
+        )
         assert result is not None
 
         # Verify deactivation persisted

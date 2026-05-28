@@ -148,7 +148,11 @@ class TestConfirm:
         )
         assert add.status_code == 200, f"Setup failed: {add.status_code} {add.text}"
         song = add.json()["songs"][0]
-        matching = [c for c in song["credits"] if c["display_name"] == "Dave Grohl & Taylor Hawkins"]
+        matching = [
+            c
+            for c in song["credits"]
+            if c["display_name"] == "Dave Grohl & Taylor Hawkins"
+        ]
         assert matching, f"Could not find added credit in: {song['credits']}"
         credit_id = matching[0]["credit_id"]
 
@@ -169,7 +173,9 @@ class TestConfirm:
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
 
         mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
-        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
+        assert (
+            mutate_resp.status_code == 200
+        ), f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
 
         song = api_db.get("/api/v1/songs/2").json()
         credit_names = [c["display_name"] for c in song["credits"]]
@@ -193,7 +199,11 @@ class TestConfirm:
         )
         assert add.status_code == 200, f"Setup failed: {add.status_code} {add.text}"
         song = add.json()["songs"][0]
-        matching = [c for c in song["credits"] if c["display_name"] == "Earth, Wind & Fire & ABBA"]
+        matching = [
+            c
+            for c in song["credits"]
+            if c["display_name"] == "Earth, Wind & Fire & ABBA"
+        ]
         assert matching, f"Could not find added credit in: {song['credits']}"
         credit_id = matching[0]["credit_id"]
 
@@ -218,7 +228,9 @@ class TestConfirm:
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
 
         mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
-        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
+        assert (
+            mutate_resp.status_code == 200
+        ), f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
 
         song = api_db.get("/api/v1/songs/2").json()
         credit_names = [c["display_name"] for c in song["credits"]]
@@ -262,7 +274,9 @@ class TestConfirm:
         assert r.status_code == 200, f"Expected 200, got {r.status_code} {r.text}"
 
         mutate_resp = api_db.post("/api/v1/mutate", json=r.json())
-        assert mutate_resp.status_code == 200, f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
+        assert (
+            mutate_resp.status_code == 200
+        ), f"Mutation failed: {mutate_resp.status_code} {mutate_resp.text}"
 
         song = api_db.get("/api/v1/songs/2").json()
         pub_names = [p["name"] for p in song["publishers"]]

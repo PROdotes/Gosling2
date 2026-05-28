@@ -1,3 +1,5 @@
+import sqlite3
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS Types (
     TypeID INTEGER PRIMARY KEY,
@@ -151,4 +153,65 @@ CREATE TABLE IF NOT EXISTS StagingOrigins (
     OriginPath TEXT NOT NULL,
     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS ChangeLog (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id    TEXT,
+    batch_label TEXT,
+    changed_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    table_name  TEXT NOT NULL,
+    entity_id   INTEGER NOT NULL,
+    field_name  TEXT NOT NULL,
+    old_value   TEXT,
+    new_value   TEXT
+);
 """
+
+# Tables excluded from audit triggers. Everything else is audited.
+EXCLUDED_FROM_AUDIT = {"ChangeLog", "StagingOrigins"}
+
+
+def build_trigger_sql(conn: sqlite3.Connection) -> str:
+    """Generate CREATE TRIGGER IF NOT EXISTS SQL for every non-excluded table,
+    derived live from PRAGMA table_info so triggers always match the real schema."""
+    tables = [
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
+        if row[0] not in EXCLUDED_FROM_AUDIT
+    ]
+
+    parts = []
+    for table in tables:
+        cols = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
+        if not cols:
+            continue
+
+        ins = "\n    ".join(
+            f"INSERT INTO ChangeLog (table_name, entity_id, field_name, old_value, new_value) "
+            f"VALUES ('{table}', NEW.rowid, '{c}', NULL, NULLIF(CAST(NEW.{c} AS TEXT), ''));"
+            for c in cols
+        )
+        upd = "\n    ".join(
+            f"INSERT INTO ChangeLog (table_name, entity_id, field_name, old_value, new_value) "
+            f"SELECT '{table}', NEW.rowid, '{c}', "
+            f"NULLIF(CAST(OLD.{c} AS TEXT), ''), NULLIF(CAST(NEW.{c} AS TEXT), '') "
+            f"WHERE OLD.{c} IS NOT NEW.{c};"
+            for c in cols
+        )
+        dlt = "\n    ".join(
+            f"INSERT INTO ChangeLog (table_name, entity_id, field_name, old_value, new_value) "
+            f"VALUES ('{table}', OLD.rowid, '{c}', NULLIF(CAST(OLD.{c} AS TEXT), ''), NULL);"
+            for c in cols
+        )
+        parts += [
+            f"CREATE TRIGGER IF NOT EXISTS trg_{table}_INSERT\n"
+            f"AFTER INSERT ON {table} FOR EACH ROW\nBEGIN\n    {ins}\nEND",
+            f"CREATE TRIGGER IF NOT EXISTS trg_{table}_UPDATE\n"
+            f"AFTER UPDATE ON {table} FOR EACH ROW\nBEGIN\n    {upd}\nEND",
+            f"CREATE TRIGGER IF NOT EXISTS trg_{table}_DELETE\n"
+            f"AFTER DELETE ON {table} FOR EACH ROW\nBEGIN\n    {dlt}\nEND",
+        ]
+
+    return ";\n\n".join(parts) + ";"

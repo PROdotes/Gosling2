@@ -19,7 +19,7 @@ from src.engine.routers.mutations import router as mutations_router
 import uuid
 from src.services.logger import logger, request_id_var
 from src.engine.config import TRUSTED_ORIGINS, get_db_path
-from src.data.schema import SCHEMA_SQL
+from src.data.schema import SCHEMA_SQL, build_trigger_sql
 
 _SEARCH_SHADOW_COLUMNS = [
     ("ArtistNames", "DisplayName_Search"),
@@ -38,6 +38,15 @@ def _migrate_search_columns(conn: sqlite3.Connection) -> None:
             logger.info(f"[EngineServer] Migrated: added {table}.{col}")
 
 
+def _migrate_changelog(conn: sqlite3.Connection) -> None:
+    """Drop legacy ChangeLog table if it has the old column schema.
+    The old stub used different column names; SCHEMA_SQL will recreate it correctly."""
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(ChangeLog)")}
+    if existing_cols and "table_name" not in existing_cols:
+        conn.execute("DROP TABLE ChangeLog")
+        logger.info("[EngineServer] Migrated: dropped legacy ChangeLog (wrong schema)")
+
+
 def _ensure_db():
     db_path = get_db_path()
     abs_path = db_path.resolve()
@@ -49,9 +58,11 @@ def _ensure_db():
         "UTF8_NOCASE",
         lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
     )
+    _migrate_changelog(conn)
     conn.executescript(SCHEMA_SQL)
     _migrate_search_columns(conn)
     conn.execute("INSERT OR IGNORE INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
+    conn.executescript(build_trigger_sql(conn))
     conn.commit()
     conn.close()
     logger.info(f"[EngineServer] DB ready at {abs_path}")

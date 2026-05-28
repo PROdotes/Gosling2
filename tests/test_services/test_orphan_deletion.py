@@ -34,19 +34,27 @@ def _coord(db_path):
 
 
 def _delete_song(db_path, song_id):
-    _coord(db_path).apply(MutationRequest(delete=[DeleteSongItem(type="song", id=song_id)]))
+    _coord(db_path).apply(
+        MutationRequest(delete=[DeleteSongItem(type="song", id=song_id)])
+    )
 
 
 def _delete_tag(db_path, tag_id):
-    _coord(db_path).apply(MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)]))
+    _coord(db_path).apply(
+        MutationRequest(delete=[DeleteTagItem(type="tag", id=tag_id)])
+    )
 
 
 def _delete_album(db_path, album_id):
-    _coord(db_path).apply(MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)]))
+    _coord(db_path).apply(
+        MutationRequest(delete=[DeleteAlbumItem(type="album", id=album_id)])
+    )
 
 
 def _delete_publisher(db_path, publisher_id):
-    _coord(db_path).apply(MutationRequest(delete=[DeletePublisherItem(type="publisher", id=publisher_id)]))
+    _coord(db_path).apply(
+        MutationRequest(delete=[DeletePublisherItem(type="publisher", id=publisher_id)])
+    )
 
 
 def _insert_orphan_tag(db_path: str, tag_id: int, name: str, category: str) -> None:
@@ -72,7 +80,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         _delete_tag(populated_db, 100)
 
-        assert service.get_tag(100) is None, "Expected get_tag to return None after deletion"
+        assert (
+            service.get_tag(100) is None
+        ), "Expected get_tag to return None after deletion"
 
     def test_linked_tag_raises(self, populated_db):
         """A tag with active song links raises ValueError."""
@@ -103,7 +113,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         _delete_tag(populated_db, 3)
 
-        assert service.get_tag(3) is None, "Expected tag 3 deleted after its only song was removed"
+        assert (
+            service.get_tag(3) is None
+        ), "Expected tag 3 deleted after its only song was removed"
 
 
 class TestDeleteUnlinkedTagsBulk:
@@ -352,5 +364,3 @@ def _insert_orphan_identity(db_path: str, identity_id: int) -> None:
             (identity_id, f"Orphan Artist {identity_id}"),
         )
         conn.commit()
-
-

@@ -1236,12 +1236,16 @@ class TestSongViewDisplayTitle:
     def test_title_present_returns_title(self):
         song = self._make_song(media_name="Hello World")
         view = SongView.from_domain(song)
-        assert view.display_title == "Hello World", f"Expected 'Hello World', got '{view.display_title}'"
+        assert (
+            view.display_title == "Hello World"
+        ), f"Expected 'Hello World', got '{view.display_title}'"
 
     def test_empty_title_returns_untitled(self):
         song = self._make_song(media_name="")
         view = SongView.from_domain(song)
-        assert view.display_title == "Untitled", f"Expected 'Untitled', got '{view.display_title}'"
+        assert (
+            view.display_title == "Untitled"
+        ), f"Expected 'Untitled', got '{view.display_title}'"
 
 
 class TestSongSlimViewDisplayTitle:
@@ -1266,11 +1270,15 @@ class TestSongSlimViewDisplayTitle:
 
     def test_title_present_returns_title(self):
         view = SongSlimView.from_row(self._make_row())
-        assert view.display_title == "Song", f"Expected 'Song', got '{view.display_title}'"
+        assert (
+            view.display_title == "Song"
+        ), f"Expected 'Song', got '{view.display_title}'"
 
     def test_empty_title_returns_untitled(self):
         view = SongSlimView.from_row(self._make_row(MediaName=""))
-        assert view.display_title == "Untitled", f"Expected 'Untitled', got '{view.display_title}'"
+        assert (
+            view.display_title == "Untitled"
+        ), f"Expected 'Untitled', got '{view.display_title}'"
 
 
 class TestSongAlbumViewDisplayTitleFallback:
@@ -1278,15 +1286,21 @@ class TestSongAlbumViewDisplayTitleFallback:
 
     def test_empty_album_title_returns_unknown_album(self):
         v = SongAlbumView(album_title="", track_number=5, disc_number=1)
-        assert v.display_title == "[05] Unknown Album", f"Expected '[05] Unknown Album', got '{v.display_title}'"
+        assert (
+            v.display_title == "[05] Unknown Album"
+        ), f"Expected '[05] Unknown Album', got '{v.display_title}'"
 
     def test_empty_title_no_track(self):
         v = SongAlbumView(album_title="", track_number=None, disc_number=1)
-        assert v.display_title == "Unknown Album", f"Expected 'Unknown Album', got '{v.display_title}'"
+        assert (
+            v.display_title == "Unknown Album"
+        ), f"Expected 'Unknown Album', got '{v.display_title}'"
 
     def test_normal_title_unchanged(self):
         v = SongAlbumView(album_title="Nevermind", track_number=5, disc_number=1)
-        assert v.display_title == "[05] Nevermind", f"Expected '[05] Nevermind', got '{v.display_title}'"
+        assert (
+            v.display_title == "[05] Nevermind"
+        ), f"Expected '[05] Nevermind', got '{v.display_title}'"
 
 
 class TestIdentityViewResolvedName:
@@ -1295,17 +1309,25 @@ class TestIdentityViewResolvedName:
     def test_display_name_present(self):
         identity = Identity(id=1, type="person", display_name="Dave Grohl")
         view = IdentityView.from_domain(identity)
-        assert view.resolved_name == "Dave Grohl", f"Expected 'Dave Grohl', got '{view.resolved_name}'"
+        assert (
+            view.resolved_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{view.resolved_name}'"
 
     def test_display_name_empty_legal_name_present(self):
-        identity = Identity(id=1, type="person", display_name=None, legal_name="David Grohl")
+        identity = Identity(
+            id=1, type="person", display_name=None, legal_name="David Grohl"
+        )
         view = IdentityView.from_domain(identity)
-        assert view.resolved_name == "David Grohl", f"Expected 'David Grohl', got '{view.resolved_name}'"
+        assert (
+            view.resolved_name == "David Grohl"
+        ), f"Expected 'David Grohl', got '{view.resolved_name}'"
 
     def test_both_empty_returns_unknown(self):
         identity = Identity(id=1, type="person", display_name=None)
         view = IdentityView.from_domain(identity)
-        assert view.resolved_name == "Unknown", f"Expected 'Unknown', got '{view.resolved_name}'"
+        assert (
+            view.resolved_name == "Unknown"
+        ), f"Expected 'Unknown', got '{view.resolved_name}'"
 
 
 class TestPublisherViewDisplayLabel:
@@ -1313,15 +1335,21 @@ class TestPublisherViewDisplayLabel:
 
     def test_with_parent(self):
         view = PublisherView(name="DGC Records", parent_name="Universal")
-        assert view.display_label == "DGC Records (Universal)", f"Expected 'DGC Records (Universal)', got '{view.display_label}'"
+        assert (
+            view.display_label == "DGC Records (Universal)"
+        ), f"Expected 'DGC Records (Universal)', got '{view.display_label}'"
 
     def test_without_parent(self):
         view = PublisherView(name="Sub Pop", parent_name=None)
-        assert view.display_label == "Sub Pop", f"Expected 'Sub Pop', got '{view.display_label}'"
+        assert (
+            view.display_label == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{view.display_label}'"
 
     def test_empty_parent(self):
         view = PublisherView(name="Sub Pop", parent_name="")
-        assert view.display_label == "Sub Pop", f"Expected 'Sub Pop', got '{view.display_label}'"
+        assert (
+            view.display_label == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{view.display_label}'"
 
 
 # --- Item 14: status_label + status_severity (DE-1, DE-2, SM-2) ---
@@ -1332,31 +1360,52 @@ class TestSongViewStatusFields:
 
     def _make_song(self, **overrides: Any) -> Song:
         defaults: dict[str, Any] = dict(
-            id=1, type_id=1, media_name="Song", source_path="/p",
-            duration_s=200.0, processing_status=0, is_active=True,
+            id=1,
+            type_id=1,
+            media_name="Song",
+            source_path="/p",
+            duration_s=200.0,
+            processing_status=0,
+            is_active=True,
         )
         defaults.update(overrides)
         return Song(**defaults)  # type: ignore[arg-type]
 
     def test_reviewed(self):
         view = SongView.from_domain(self._make_song(processing_status=0))
-        assert view.status_label == "Reviewed", f"Expected 'Reviewed', got '{view.status_label}'"
-        assert view.status_severity == "success", f"Expected 'success', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Reviewed"
+        ), f"Expected 'Reviewed', got '{view.status_label}'"
+        assert (
+            view.status_severity == "success"
+        ), f"Expected 'success', got '{view.status_severity}'"
 
     def test_needs_review(self):
         view = SongView.from_domain(self._make_song(processing_status=1))
-        assert view.status_label == "Needs Review", f"Expected 'Needs Review', got '{view.status_label}'"
-        assert view.status_severity == "warning", f"Expected 'warning', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Needs Review"
+        ), f"Expected 'Needs Review', got '{view.status_label}'"
+        assert (
+            view.status_severity == "warning"
+        ), f"Expected 'warning', got '{view.status_severity}'"
 
     def test_pending_enrichment(self):
         view = SongView.from_domain(self._make_song(processing_status=2))
-        assert view.status_label == "Enriching", f"Expected 'Enriching', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Enriching"
+        ), f"Expected 'Enriching', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
     def test_converting(self):
         view = SongView.from_domain(self._make_song(processing_status=3))
-        assert view.status_label == "Converting", f"Expected 'Converting', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Converting"
+        ), f"Expected 'Converting', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
 
 class TestSongSlimViewStatusFields:
@@ -1364,33 +1413,56 @@ class TestSongSlimViewStatusFields:
 
     def _make_row(self, **overrides) -> dict:
         base = {
-            "SourceID": 1, "MediaName": "Song", "SourcePath": "/p",
-            "SourceDuration": 200, "RecordingYear": 1991, "TempoBPM": 120,
-            "ISRC": None, "IsActive": 1, "ProcessingStatus": 0,
-            "DisplayArtist": None, "PrimaryGenre": None,
+            "SourceID": 1,
+            "MediaName": "Song",
+            "SourcePath": "/p",
+            "SourceDuration": 200,
+            "RecordingYear": 1991,
+            "TempoBPM": 120,
+            "ISRC": None,
+            "IsActive": 1,
+            "ProcessingStatus": 0,
+            "DisplayArtist": None,
+            "PrimaryGenre": None,
         }
         base.update(overrides)
         return base
 
     def test_reviewed(self):
         view = SongSlimView.from_row(self._make_row(ProcessingStatus=0))
-        assert view.status_label == "Reviewed", f"Expected 'Reviewed', got '{view.status_label}'"
-        assert view.status_severity == "success", f"Expected 'success', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Reviewed"
+        ), f"Expected 'Reviewed', got '{view.status_label}'"
+        assert (
+            view.status_severity == "success"
+        ), f"Expected 'success', got '{view.status_severity}'"
 
     def test_needs_review(self):
         view = SongSlimView.from_row(self._make_row(ProcessingStatus=1))
-        assert view.status_label == "Needs Review", f"Expected 'Needs Review', got '{view.status_label}'"
-        assert view.status_severity == "warning", f"Expected 'warning', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Needs Review"
+        ), f"Expected 'Needs Review', got '{view.status_label}'"
+        assert (
+            view.status_severity == "warning"
+        ), f"Expected 'warning', got '{view.status_severity}'"
 
     def test_pending_enrichment(self):
         view = SongSlimView.from_row(self._make_row(ProcessingStatus=2))
-        assert view.status_label == "Enriching", f"Expected 'Enriching', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Enriching"
+        ), f"Expected 'Enriching', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
     def test_converting(self):
         view = SongSlimView.from_row(self._make_row(ProcessingStatus=3))
-        assert view.status_label == "Converting", f"Expected 'Converting', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Converting"
+        ), f"Expected 'Converting', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
 
 class TestIngestionReportViewStatusFields:
@@ -1398,38 +1470,66 @@ class TestIngestionReportViewStatusFields:
 
     def test_new(self):
         view = IngestionReportView(status="NEW")
-        assert view.status_label == "New File", f"Expected 'New File', got '{view.status_label}'"
-        assert view.status_severity == "success", f"Expected 'success', got '{view.status_severity}'"
+        assert (
+            view.status_label == "New File"
+        ), f"Expected 'New File', got '{view.status_label}'"
+        assert (
+            view.status_severity == "success"
+        ), f"Expected 'success', got '{view.status_severity}'"
 
     def test_ingested(self):
         view = IngestionReportView(status="INGESTED")
-        assert view.status_label == "Ingested", f"Expected 'Ingested', got '{view.status_label}'"
-        assert view.status_severity == "success", f"Expected 'success', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Ingested"
+        ), f"Expected 'Ingested', got '{view.status_label}'"
+        assert (
+            view.status_severity == "success"
+        ), f"Expected 'success', got '{view.status_severity}'"
 
     def test_converting(self):
         view = IngestionReportView(status="CONVERTING")
-        assert view.status_label == "Converting (WAV\u2192MP3)", f"Expected 'Converting (WAV→MP3)', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Converting (WAV\u2192MP3)"
+        ), f"Expected 'Converting (WAV→MP3)', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
     def test_pending_convert(self):
         view = IngestionReportView(status="PENDING_CONVERT")
-        assert view.status_label == "WAV \u2014 Awaiting Conversion", f"Expected 'WAV — Awaiting Conversion', got '{view.status_label}'"
-        assert view.status_severity == "info", f"Expected 'info', got '{view.status_severity}'"
+        assert (
+            view.status_label == "WAV \u2014 Awaiting Conversion"
+        ), f"Expected 'WAV — Awaiting Conversion', got '{view.status_label}'"
+        assert (
+            view.status_severity == "info"
+        ), f"Expected 'info', got '{view.status_severity}'"
 
     def test_already_exists(self):
         view = IngestionReportView(status="ALREADY_EXISTS", match_type="HASH")
-        assert view.status_label == "Already Exists", f"Expected 'Already Exists', got '{view.status_label}'"
-        assert view.status_severity == "warning", f"Expected 'warning', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Already Exists"
+        ), f"Expected 'Already Exists', got '{view.status_label}'"
+        assert (
+            view.status_severity == "warning"
+        ), f"Expected 'warning', got '{view.status_severity}'"
 
     def test_conflict(self):
         view = IngestionReportView(status="CONFLICT", match_type="HASH")
-        assert view.status_label == "Conflict", f"Expected 'Conflict', got '{view.status_label}'"
-        assert view.status_severity == "error", f"Expected 'error', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Conflict"
+        ), f"Expected 'Conflict', got '{view.status_label}'"
+        assert (
+            view.status_severity == "error"
+        ), f"Expected 'error', got '{view.status_severity}'"
 
     def test_error(self):
         view = IngestionReportView(status="ERROR")
-        assert view.status_label == "Error", f"Expected 'Error', got '{view.status_label}'"
-        assert view.status_severity == "error", f"Expected 'error', got '{view.status_severity}'"
+        assert (
+            view.status_label == "Error"
+        ), f"Expected 'Error', got '{view.status_label}'"
+        assert (
+            view.status_severity == "error"
+        ), f"Expected 'error', got '{view.status_severity}'"
 
 
 # --- Item 15: formatted_duration + display_size (DT-5, DT-6) ---
@@ -1440,15 +1540,21 @@ class TestIngestionReportViewFormattedDuration:
 
     def test_with_duration(self):
         view = IngestionReportView(status="INGESTED", duration_s=200.0)
-        assert view.formatted_duration == "3:20", f"Expected '3:20', got '{view.formatted_duration}'"
+        assert (
+            view.formatted_duration == "3:20"
+        ), f"Expected '3:20', got '{view.formatted_duration}'"
 
     def test_no_duration(self):
         view = IngestionReportView(status="INGESTED", duration_s=None)
-        assert view.formatted_duration == "Unknown", f"Expected 'Unknown', got '{view.formatted_duration}'"
+        assert (
+            view.formatted_duration == "Unknown"
+        ), f"Expected 'Unknown', got '{view.formatted_duration}'"
 
     def test_zero_duration(self):
         view = IngestionReportView(status="INGESTED", duration_s=0.0)
-        assert view.formatted_duration == "0:00", f"Expected '0:00', got '{view.formatted_duration}'"
+        assert (
+            view.formatted_duration == "0:00"
+        ), f"Expected '0:00', got '{view.formatted_duration}'"
 
 
 class TestIngestionReportViewDisplayTitle:
@@ -1456,47 +1562,76 @@ class TestIngestionReportViewDisplayTitle:
 
     def test_conflict_uses_ghost_title(self):
         view = IngestionReportView(status="CONFLICT", title="Ghost Song")
-        assert view.display_title == "Ghost Song", f"Expected 'Ghost Song', got '{view.display_title}'"
+        assert (
+            view.display_title == "Ghost Song"
+        ), f"Expected 'Ghost Song', got '{view.display_title}'"
 
     def test_conflict_no_title_falls_to_song(self):
-        song = SongView(media_name="Real Song", title="Real Song", source_path="/p", duration_s=200.0)
+        song = SongView(
+            media_name="Real Song",
+            title="Real Song",
+            source_path="/p",
+            duration_s=200.0,
+        )
         view = IngestionReportView(status="CONFLICT", title=None, song=song)
-        assert view.display_title == "Real Song", f"Expected 'Real Song', got '{view.display_title}'"
+        assert (
+            view.display_title == "Real Song"
+        ), f"Expected 'Real Song', got '{view.display_title}'"
 
     def test_ingested_with_song(self):
-        song = SongView(media_name="My Song", title="My Song", source_path="/p", duration_s=200.0)
+        song = SongView(
+            media_name="My Song", title="My Song", source_path="/p", duration_s=200.0
+        )
         view = IngestionReportView(status="INGESTED", song=song)
-        assert view.display_title == "My Song", f"Expected 'My Song', got '{view.display_title}'"
+        assert (
+            view.display_title == "My Song"
+        ), f"Expected 'My Song', got '{view.display_title}'"
 
     def test_no_song_uses_staged_path_basename(self):
         view = IngestionReportView(status="NEW", staged_path="/staging/my_file.mp3")
-        assert view.display_title == "my_file.mp3", f"Expected 'my_file.mp3', got '{view.display_title}'"
+        assert (
+            view.display_title == "my_file.mp3"
+        ), f"Expected 'my_file.mp3', got '{view.display_title}'"
 
     def test_no_data_returns_unknown_title(self):
         view = IngestionReportView(status="ERROR")
-        assert view.display_title == "Unknown Title", f"Expected 'Unknown Title', got '{view.display_title}'"
+        assert (
+            view.display_title == "Unknown Title"
+        ), f"Expected 'Unknown Title', got '{view.display_title}'"
 
 
 class TestFormatFileSize:
     """Item 15 (DT-6): format_file_size utility."""
 
     def test_zero(self):
-        assert format_file_size(0) == "0 B", f"Expected '0 B', got '{format_file_size(0)}'"
+        assert (
+            format_file_size(0) == "0 B"
+        ), f"Expected '0 B', got '{format_file_size(0)}'"
 
     def test_bytes(self):
-        assert format_file_size(512) == "512 B", f"Expected '512 B', got '{format_file_size(512)}'"
+        assert (
+            format_file_size(512) == "512 B"
+        ), f"Expected '512 B', got '{format_file_size(512)}'"
 
     def test_kilobytes(self):
-        assert format_file_size(1536) == "1.5 KB", f"Expected '1.5 KB', got '{format_file_size(1536)}'"
+        assert (
+            format_file_size(1536) == "1.5 KB"
+        ), f"Expected '1.5 KB', got '{format_file_size(1536)}'"
 
     def test_exact_kb(self):
-        assert format_file_size(1024) == "1.0 KB", f"Expected '1.0 KB', got '{format_file_size(1024)}'"
+        assert (
+            format_file_size(1024) == "1.0 KB"
+        ), f"Expected '1.0 KB', got '{format_file_size(1024)}'"
 
     def test_megabytes(self):
-        assert format_file_size(1572864) == "1.5 MB", f"Expected '1.5 MB', got '{format_file_size(1572864)}'"
+        assert (
+            format_file_size(1572864) == "1.5 MB"
+        ), f"Expected '1.5 MB', got '{format_file_size(1572864)}'"
 
     def test_large_mb(self):
-        assert format_file_size(52428800) == "50.0 MB", f"Expected '50.0 MB', got '{format_file_size(52428800)}'"
+        assert (
+            format_file_size(52428800) == "50.0 MB"
+        ), f"Expected '50.0 MB', got '{format_file_size(52428800)}'"
 
 
 # --- Item 16: credits_by_role (DT-8) ---
@@ -1507,19 +1642,50 @@ class TestSongViewCreditsByRole:
 
     def _make_song(self, **overrides: Any) -> Song:
         defaults: dict[str, Any] = dict(
-            id=1, type_id=1, media_name="Song", source_path="/p",
-            duration_s=200.0, processing_status=0, is_active=True,
-            credits=[], albums=[], publishers=[], tags=[],
+            id=1,
+            type_id=1,
+            media_name="Song",
+            source_path="/p",
+            duration_s=200.0,
+            processing_status=0,
+            is_active=True,
+            credits=[],
+            albums=[],
+            publishers=[],
+            tags=[],
         )
         defaults.update(overrides)
         return Song(**defaults)  # type: ignore[arg-type]
 
     def test_grouped_by_role(self):
-        song = self._make_song(credits=[
-            SongCredit(source_id=1, name_id=1, identity_id=1, role_id=1, role_name="Performer", display_name="Alice"),
-            SongCredit(source_id=1, name_id=2, identity_id=2, role_id=1, role_name="Performer", display_name="Bob"),
-            SongCredit(source_id=1, name_id=3, identity_id=3, role_id=2, role_name="Composer", display_name="Charlie"),
-        ])
+        song = self._make_song(
+            credits=[
+                SongCredit(
+                    source_id=1,
+                    name_id=1,
+                    identity_id=1,
+                    role_id=1,
+                    role_name="Performer",
+                    display_name="Alice",
+                ),
+                SongCredit(
+                    source_id=1,
+                    name_id=2,
+                    identity_id=2,
+                    role_id=1,
+                    role_name="Performer",
+                    display_name="Bob",
+                ),
+                SongCredit(
+                    source_id=1,
+                    name_id=3,
+                    identity_id=3,
+                    role_id=2,
+                    role_name="Composer",
+                    display_name="Charlie",
+                ),
+            ]
+        )
         view = SongView.from_domain(song)
         assert view.credits_by_role == {
             "Performer": ["Alice", "Bob"],
@@ -1529,21 +1695,57 @@ class TestSongViewCreditsByRole:
     def test_empty_credits(self):
         song = self._make_song(credits=[])
         view = SongView.from_domain(song)
-        assert view.credits_by_role == {}, f"Expected empty dict, got {view.credits_by_role}"
+        assert (
+            view.credits_by_role == {}
+        ), f"Expected empty dict, got {view.credits_by_role}"
 
     def test_single_role(self):
-        song = self._make_song(credits=[
-            SongCredit(source_id=1, name_id=1, identity_id=1, role_id=1, role_name="Performer", display_name="Alice"),
-        ])
+        song = self._make_song(
+            credits=[
+                SongCredit(
+                    source_id=1,
+                    name_id=1,
+                    identity_id=1,
+                    role_id=1,
+                    role_name="Performer",
+                    display_name="Alice",
+                ),
+            ]
+        )
         view = SongView.from_domain(song)
-        assert view.credits_by_role == {"Performer": ["Alice"]}, f"Expected single role, got {view.credits_by_role}"
+        assert view.credits_by_role == {
+            "Performer": ["Alice"]
+        }, f"Expected single role, got {view.credits_by_role}"
 
     def test_mixed_roles(self):
-        song = self._make_song(credits=[
-            SongCredit(source_id=1, name_id=1, identity_id=1, role_id=1, role_name="Performer", display_name="Alice"),
-            SongCredit(source_id=1, name_id=2, identity_id=2, role_id=2, role_name="Composer", display_name="Bob"),
-            SongCredit(source_id=1, name_id=3, identity_id=3, role_id=3, role_name="Producer", display_name="Charlie"),
-        ])
+        song = self._make_song(
+            credits=[
+                SongCredit(
+                    source_id=1,
+                    name_id=1,
+                    identity_id=1,
+                    role_id=1,
+                    role_name="Performer",
+                    display_name="Alice",
+                ),
+                SongCredit(
+                    source_id=1,
+                    name_id=2,
+                    identity_id=2,
+                    role_id=2,
+                    role_name="Composer",
+                    display_name="Bob",
+                ),
+                SongCredit(
+                    source_id=1,
+                    name_id=3,
+                    identity_id=3,
+                    role_id=3,
+                    role_name="Producer",
+                    display_name="Charlie",
+                ),
+            ]
+        )
         view = SongView.from_domain(song)
         assert view.credits_by_role == {
             "Performer": ["Alice"],

@@ -16,7 +16,11 @@ Uses populated_db which has:
 import pytest
 from src.services.catalog_service import CatalogService
 from src.services.mutation_coordinator import MutationCoordinator
-from src.engine.routers.mutation_models import MutationRequest, UpdateTagEntityItem, AddTagItem
+from src.engine.routers.mutation_models import (
+    MutationRequest,
+    UpdateTagEntityItem,
+    AddTagItem,
+)
 
 
 class TestGetAllTags:
@@ -166,7 +170,7 @@ class TestGetSongsSlimByTag:
 
         assert songs_sorted[0]["SourceID"] == 1
         assert songs_sorted[0]["MediaName"] == "Smells Like Teen Spirit"
-        
+
         assert songs_sorted[1]["SourceID"] == 9
         assert songs_sorted[1]["MediaName"] == "Priority Test"
 
@@ -203,7 +207,15 @@ class TestUpdateTag:
         service = CatalogService(populated_db)
         coord = MutationCoordinator(populated_db)
 
-        coord.apply(MutationRequest(update=[UpdateTagEntityItem(type="tag", id=1, name="Post-Grunge", category="Style")]))
+        coord.apply(
+            MutationRequest(
+                update=[
+                    UpdateTagEntityItem(
+                        type="tag", id=1, name="Post-Grunge", category="Style"
+                    )
+                ]
+            )
+        )
 
         updated = service.get_tag(1)
         assert updated.name == "Post-Grunge"
@@ -218,7 +230,15 @@ class TestUpdateTag:
         """Should raise LookupError when updating nonexistent tag."""
         coord = MutationCoordinator(populated_db)
         with pytest.raises(LookupError):
-            coord.apply(MutationRequest(update=[UpdateTagEntityItem(type="tag", id=999, name="New Name", category="New Category")]))
+            coord.apply(
+                MutationRequest(
+                    update=[
+                        UpdateTagEntityItem(
+                            type="tag", id=999, name="New Name", category="New Category"
+                        )
+                    ]
+                )
+            )
 
     def test_add_tag_normalizes_whitespace_but_retains_case(self, populated_db):
         """Duplicate adds with different casing should map to the same tag ID."""
@@ -226,12 +246,36 @@ class TestUpdateTag:
         coord = MutationCoordinator(populated_db)
         song_id = 1
 
-        coord.apply(MutationRequest(add=[AddTagItem(type="tag", song_id=song_id, name="NormalizationTest", category="Category")]))
+        coord.apply(
+            MutationRequest(
+                add=[
+                    AddTagItem(
+                        type="tag",
+                        song_id=song_id,
+                        name="NormalizationTest",
+                        category="Category",
+                    )
+                ]
+            )
+        )
         song_after_first = service.get_song(song_id)
         t1 = next(t for t in song_after_first.tags if t.name == "NormalizationTest")
         assert t1.name == "NormalizationTest", "Expected original casing to be retained"
 
-        coord.apply(MutationRequest(add=[AddTagItem(type="tag", song_id=song_id, name="NORMALIZATIONtest", category="category")]))
+        coord.apply(
+            MutationRequest(
+                add=[
+                    AddTagItem(
+                        type="tag",
+                        song_id=song_id,
+                        name="NORMALIZATIONtest",
+                        category="category",
+                    )
+                ]
+            )
+        )
         song_after_second = service.get_song(song_id)
         t2 = next((t for t in song_after_second.tags if t.id == t1.id), None)
-        assert t2 is not None, f"Expected tag with id={t1.id} to still exist after NOCASE re-add"
+        assert (
+            t2 is not None
+        ), f"Expected tag with id={t1.id} to still exist after NOCASE re-add"

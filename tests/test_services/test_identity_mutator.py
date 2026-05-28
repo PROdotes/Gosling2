@@ -8,6 +8,7 @@ Uses populated_db. Reference data:
                40=Taylor Hawkins (primary, owner=4), 33=Ines Prajo (alias, owner=1)
   GroupMemberships: (2,1) Dave in Nirvana, (3,1) Dave in Foo Fighters, (3,4) Taylor in Foo Fighters
 """
+
 import sqlite3
 
 import pytest
@@ -78,6 +79,7 @@ def conn(populated_db):
 # add alias
 # ---------------------------------------------------------------------------
 
+
 class TestIdentityMutatorAddAlias:
     def test_add_new_alias_by_name(self, mutator, conn):
         item = AddIdentityAliasItem.model_validate(
@@ -86,7 +88,9 @@ class TestIdentityMutatorAddAlias:
         mutator.apply_within("add", item, conn)
         conn.commit()
         aliases = _get_aliases_for(conn, 1)
-        assert any(a["DisplayName"] == "Davey G" and not a["IsPrimaryName"] for a in aliases)
+        assert any(
+            a["DisplayName"] == "Davey G" and not a["IsPrimaryName"] for a in aliases
+        )
 
     def test_add_alias_by_existing_name_id_relinks(self, mutator, conn):
         # NameID=40 (Taylor Hawkins) currently owned by identity 4 as primary.
@@ -111,7 +115,9 @@ class TestIdentityMutatorAddAlias:
         after = len(_get_aliases_for(conn, 1))
         assert after == before
 
-    def test_add_alias_reclaims_soft_deleted_name_from_another_identity(self, mutator, conn):
+    def test_add_alias_reclaims_soft_deleted_name_from_another_identity(
+        self, mutator, conn
+    ):
         # Pre-existing soft-deleted name 'Ghost' under identity 4.
         # Adding the same display_name under identity 1 should reclaim the row,
         # not raise a collision error.
@@ -136,7 +142,11 @@ class TestIdentityMutatorAddAlias:
 
     def test_add_alias_invalid_identity_raises(self, mutator, conn):
         item = AddIdentityAliasItem.model_validate(
-            {"type": "identity_alias", "identity_id": 9999, "display_name": "Ghost Alias"}
+            {
+                "type": "identity_alias",
+                "identity_id": 9999,
+                "display_name": "Ghost Alias",
+            }
         )
         with pytest.raises((LookupError, sqlite3.IntegrityError, ValueError)):
             mutator.apply_within("add", item, conn)
@@ -154,7 +164,9 @@ class TestIdentityMutatorAddAlias:
         # Build a solo identity (one primary name, no other aliases) and re-link
         # its primary onto identity 1. Allowed because the source has no orphans.
         cur = conn.cursor()
-        cur.execute("INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)")
+        cur.execute(
+            "INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)"
+        )
         solo_identity_id = cur.lastrowid
         cur.execute(
             "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, 'Solo Artist', 1)",
@@ -173,7 +185,9 @@ class TestIdentityMutatorAddAlias:
 
     def test_add_requires_name_or_id(self):
         with pytest.raises(ValueError):
-            AddIdentityAliasItem.model_validate({"type": "identity_alias", "identity_id": 1})
+            AddIdentityAliasItem.model_validate(
+                {"type": "identity_alias", "identity_id": 1}
+            )
 
     def test_add_new_alias_populates_search_shadow(self, mutator, conn):
         # Diacritics in the display name must produce a lowercase ASCII shadow.
@@ -194,6 +208,7 @@ class TestIdentityMutatorAddAlias:
 # ---------------------------------------------------------------------------
 # remove alias
 # ---------------------------------------------------------------------------
+
 
 class TestIdentityMutatorRemoveAlias:
     def test_remove_alias_detaches_to_new_identity(self, mutator, conn):
@@ -255,6 +270,7 @@ class TestIdentityMutatorRemoveAlias:
 # add / remove member
 # ---------------------------------------------------------------------------
 
+
 class TestIdentityMutatorMembers:
     def test_add_member(self, mutator, conn):
         # Add Taylor (id=4) to Nirvana (id=2). Currently only Dave is in Nirvana.
@@ -306,6 +322,7 @@ class TestIdentityMutatorMembers:
 # update
 # ---------------------------------------------------------------------------
 
+
 class TestIdentityMutatorUpdate:
     def test_update_identity_type(self, mutator, conn):
         # Flip identity 4 (Taylor) from person to group.
@@ -344,12 +361,15 @@ class TestIdentityMutatorUpdate:
 # merge
 # ---------------------------------------------------------------------------
 
+
 class TestIdentityMutatorMerge:
     def test_merge_orphan_into_existing_repoints_credits(self, mutator, conn):
         # Build an orphan identity with a single name, give it a credit on song 7,
         # then merge into Dave's primary (NameID=10).
         cur = conn.cursor()
-        cur.execute("INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)")
+        cur.execute(
+            "INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)"
+        )
         orphan_id = cur.lastrowid
         cur.execute(
             "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, 'Orphan Name', 1)",
@@ -363,7 +383,11 @@ class TestIdentityMutatorMerge:
         conn.commit()
 
         item = MergeIdentityItem.model_validate(
-            {"type": "identity_merge", "source_name_id": orphan_name_id, "target_name_id": 10}
+            {
+                "type": "identity_merge",
+                "source_name_id": orphan_name_id,
+                "target_name_id": 10,
+            }
         )
         mutator.apply_within("merge", item, conn)
         conn.commit()
@@ -396,6 +420,7 @@ class TestIdentityMutatorMerge:
 # ---------------------------------------------------------------------------
 # routing
 # ---------------------------------------------------------------------------
+
 
 class TestIdentityMutatorRouting:
     def test_unsupported_action_raises(self, mutator, conn):

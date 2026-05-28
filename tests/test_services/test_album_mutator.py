@@ -8,6 +8,7 @@ Data map used here:
   Song 2: linked to Album 200 (The Colour and the Shape, 1997), Track 11, IsPrimary=1
   Song 3-9: no album links
 """
+
 import sqlite3
 
 import pytest
@@ -20,10 +21,10 @@ from src.engine.routers.mutation_models import (
 )
 from src.services.mutators.album_mutator import AlbumMutator
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_conn(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -58,6 +59,7 @@ def _get_album_row(conn: sqlite3.Connection, album_id: int) -> sqlite3.Row:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mutator(populated_db):
     return AlbumMutator(populated_db)
@@ -74,11 +76,18 @@ def conn(populated_db):
 # add
 # ---------------------------------------------------------------------------
 
+
 class TestAlbumMutatorAdd:
     def test_add_link_to_existing_album(self, mutator, conn):
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 3, "name": "Nevermind", "id": 100,
-             "track_number": 5, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 3,
+                "name": "Nevermind",
+                "id": 100,
+                "track_number": 5,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -87,8 +96,13 @@ class TestAlbumMutatorAdd:
 
     def test_add_creates_new_album_when_no_id(self, mutator, conn):
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 3, "name": "Brand New Album",
-             "track_number": 1, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 3,
+                "name": "Brand New Album",
+                "track_number": 1,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -98,8 +112,14 @@ class TestAlbumMutatorAdd:
     def test_add_auto_promotes_when_no_primary_exists(self, mutator, conn):
         # Song 3 has no albums — first add must become primary regardless of make_primary
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 3, "name": "Nevermind", "id": 100,
-             "track_number": 1, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 3,
+                "name": "Nevermind",
+                "id": 100,
+                "track_number": 1,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -110,8 +130,15 @@ class TestAlbumMutatorAdd:
     def test_add_make_primary_promotes_and_demotes_existing(self, mutator, conn):
         # Song 1 already has album 100 as primary — add 200 with make_primary=true
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
-             "track_number": 3, "disc_number": 1, "make_primary": True}
+            {
+                "type": "album",
+                "song_id": 1,
+                "name": "TCATS",
+                "id": 200,
+                "track_number": 3,
+                "disc_number": 1,
+                "make_primary": True,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -119,11 +146,19 @@ class TestAlbumMutatorAdd:
         assert next(r for r in links if r["AlbumID"] == 200)["IsPrimary"] == 1
         assert next(r for r in links if r["AlbumID"] == 100)["IsPrimary"] == 0
 
-    def test_add_without_make_primary_does_not_displace_existing_primary(self, mutator, conn):
+    def test_add_without_make_primary_does_not_displace_existing_primary(
+        self, mutator, conn
+    ):
         # Song 1 already has album 100 as primary — add 200 without make_primary
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
-             "track_number": 3, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 1,
+                "name": "TCATS",
+                "id": 200,
+                "track_number": 3,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -134,8 +169,14 @@ class TestAlbumMutatorAdd:
     def test_add_duplicate_link_is_idempotent(self, mutator, conn):
         before = _get_song_albums(conn, 1)
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 1, "name": "Nevermind", "id": 100,
-             "track_number": 1, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 1,
+                "name": "Nevermind",
+                "id": 100,
+                "track_number": 1,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", item, conn)
         conn.commit()
@@ -144,8 +185,14 @@ class TestAlbumMutatorAdd:
 
     def test_unsupported_action_raises(self, mutator, conn):
         item = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 3, "name": "X", "id": 100,
-             "track_number": 1, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 3,
+                "name": "X",
+                "id": 100,
+                "track_number": 1,
+                "disc_number": 1,
+            }
         )
         with pytest.raises(ValueError):
             mutator.apply_within("bad_action", item, conn)
@@ -154,6 +201,7 @@ class TestAlbumMutatorAdd:
 # ---------------------------------------------------------------------------
 # remove
 # ---------------------------------------------------------------------------
+
 
 class TestAlbumMutatorRemove:
     def test_remove_deletes_link(self, mutator, conn):
@@ -183,8 +231,14 @@ class TestAlbumMutatorRemove:
     def test_remove_primary_auto_promotes_next(self, mutator, conn):
         # First add a second album to song 1 so there's something to promote to
         add = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
-             "track_number": 3, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 1,
+                "name": "TCATS",
+                "id": 200,
+                "track_number": 3,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", add, conn)
         conn.commit()
@@ -211,6 +265,7 @@ class TestAlbumMutatorRemove:
 # ---------------------------------------------------------------------------
 # update album entity
 # ---------------------------------------------------------------------------
+
 
 class TestAlbumMutatorUpdateEntity:
     def test_update_title(self, mutator, conn):
@@ -251,6 +306,7 @@ class TestAlbumMutatorUpdateEntity:
 # update song-album link
 # ---------------------------------------------------------------------------
 
+
 class TestAlbumMutatorUpdateSongAlbum:
     def test_update_track_number(self, mutator, conn):
         item = UpdateSongAlbumItem.model_validate(
@@ -265,8 +321,14 @@ class TestAlbumMutatorUpdateSongAlbum:
     def test_update_is_primary_true_demotes_others(self, mutator, conn):
         # Add a second album first
         add = AddAlbumItem.model_validate(
-            {"type": "album", "song_id": 1, "name": "TCATS", "id": 200,
-             "track_number": 3, "disc_number": 1}
+            {
+                "type": "album",
+                "song_id": 1,
+                "name": "TCATS",
+                "id": 200,
+                "track_number": 3,
+                "disc_number": 1,
+            }
         )
         mutator.apply_within("add", add, conn)
         conn.commit()

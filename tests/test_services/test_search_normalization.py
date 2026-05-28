@@ -5,6 +5,7 @@ Inserts rows with diacritics and shadow columns populated, then asserts that
 queries containing diacritics (or their ASCII equivalents) reach those rows
 through the service layer.
 """
+
 import sqlite3
 
 import pytest
@@ -70,7 +71,11 @@ def seeded_diacritics(conn):
         (sima_song,),
     )
     conn.commit()
-    return {"noep_identity": noep_identity, "strasse_album": strasse_album, "sima_song": sima_song}
+    return {
+        "noep_identity": noep_identity,
+        "strasse_album": strasse_album,
+        "sima_song": sima_song,
+    }
 
 
 class TestIdentitySearchNormalization:

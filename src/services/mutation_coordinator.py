@@ -1,7 +1,9 @@
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Any
 
+from src.data.audit_repository import AuditRepository
 from src.data.base_repository import BaseRepository
 from src.data.staging_repository import StagingRepository
 from src.engine.config import LIBRARY_ROOT, RENAME_RULES_PATH, STAGING_DIR
@@ -61,6 +63,7 @@ class MutationCoordinator:
         self._delete_mutator = DeleteMutator(db_path)
         self._identity_mutator = IdentityMutator(db_path)
         self._staging_repo = StagingRepository(db_path)
+        self._audit_repo = AuditRepository(db_path)
         self._id3_writer = MetadataWriter()
         self._filing = FilingService(RENAME_RULES_PATH)
 
@@ -98,6 +101,7 @@ class MutationCoordinator:
         }
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
+        batch_id = str(uuid.uuid4())
         conn = self._conn_factory.get_connection()
         copied_files: list[tuple[str, str]] = []
         try:
@@ -107,13 +111,13 @@ class MutationCoordinator:
             delete_file_ids: set[int] = set()
             for item in body.delete or []:
                 if isinstance(item, DeleteOriginalFileItem):
-                    origin = self._staging_repo.get_origin(item.song_id)
+                    origin = self._staging_repo.get_origin(item.song_id, conn)
                     if origin and Path(origin).exists():
                         Path(origin).unlink()
                         logger.info(
                             f"[MutationCoordinator] Deleted original source: {origin}"
                         )
-                    self._staging_repo.clear_origin(item.song_id)
+                    self._staging_repo.clear_origin(item.song_id, conn)
                     continue
                 if isinstance(item, DeleteSongItem):
                     song = self._library.get_song(item.id, conn)
@@ -158,6 +162,7 @@ class MutationCoordinator:
                         conn,
                     )
 
+            self._audit_repo.flush_batch(batch_id, "ui", conn)
             conn.commit()
 
             for song in deleted_songs:

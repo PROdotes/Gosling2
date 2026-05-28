@@ -307,6 +307,7 @@ class TestWavUploadApi:
         def fake_convert(wav_path):
             mp3_path = wav_path.with_suffix(".mp3")
             import shutil
+
             shutil.copy(wav_path, mp3_path)
             return mp3_path
 
@@ -321,14 +322,18 @@ class TestWavUploadApi:
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = collect_upload_stream(resp)
-        assert data["total_files"] == 1, f"Expected 1 file processed, got {data['total_files']}"
+        assert (
+            data["total_files"] == 1
+        ), f"Expected 1 file processed, got {data['total_files']}"
         result = data["results"][0]
-        assert result["status"] != "PENDING_CONVERT", (
-            f"WAV_AUTO_CONVERT=True must not produce PENDING_CONVERT, got '{result['status']}'"
-        )
-        assert result["status"] in ("INGESTED", "ALREADY_EXISTS", "MATCHED_HASH"), (
-            f"Expected INGESTED-family status, got '{result['status']}'"
-        )
+        assert (
+            result["status"] != "PENDING_CONVERT"
+        ), f"WAV_AUTO_CONVERT=True must not produce PENDING_CONVERT, got '{result['status']}'"
+        assert result["status"] in (
+            "INGESTED",
+            "ALREADY_EXISTS",
+            "MATCHED_HASH",
+        ), f"Expected INGESTED-family status, got '{result['status']}'"
 
     def test_wav_no_auto_convert_produces_pending_convert_status(
         self, client, tmp_path, monkeypatch
@@ -347,11 +352,13 @@ class TestWavUploadApi:
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = collect_upload_stream(resp)
-        assert data["total_files"] == 1, f"Expected 1 file processed, got {data['total_files']}"
+        assert (
+            data["total_files"] == 1
+        ), f"Expected 1 file processed, got {data['total_files']}"
         result = data["results"][0]
-        assert result["status"] == "PENDING_CONVERT", (
-            f"WAV_AUTO_CONVERT=False must produce PENDING_CONVERT, got '{result['status']}'"
-        )
+        assert (
+            result["status"] == "PENDING_CONVERT"
+        ), f"WAV_AUTO_CONVERT=False must produce PENDING_CONVERT, got '{result['status']}'"
 
     def test_wav_auto_convert_error_produces_error_status(
         self, client, tmp_path, monkeypatch
@@ -376,9 +383,9 @@ class TestWavUploadApi:
         data = collect_upload_stream(resp)
         assert data["total_files"] == 1
         result = data["results"][0]
-        assert result["status"] == "ERROR", (
-            f"Conversion failure must yield ERROR status, got '{result['status']}'"
-        )
+        assert (
+            result["status"] == "ERROR"
+        ), f"Conversion failure must yield ERROR status, got '{result['status']}'"
 
 
 class TestScanFolderApi:
@@ -445,9 +452,9 @@ class TestScanFolderApi:
         results = [u["last_result"] for u in updates if "last_result" in u]
 
         assert len(results) == 2, f"Expected 2 results, got {len(results)}"
-        assert all(r["status"] == "INGESTED" for r in results), (
-            f"Expected all INGESTED, got {[r['status'] for r in results]}"
-        )
+        assert all(
+            r["status"] == "INGESTED" for r in results
+        ), f"Expected all INGESTED, got {[r['status'] for r in results]}"
 
     def test_recursive_false_only_scans_top_level(self, client, tmp_path):
         """recursive=false only processes top-level files."""
@@ -497,7 +504,9 @@ class TestScanFolderApi:
 class TestScanFolderInPlace:
     """Tests for in_place=True flag on POST /api/v1/ingest/scan-folder."""
 
-    def test_in_place_true_does_not_copy_files_to_staging(self, client, tmp_path, monkeypatch):
+    def test_in_place_true_does_not_copy_files_to_staging(
+        self, client, tmp_path, monkeypatch
+    ):
         """in_place=True must NOT create any staging copies — source files stay where they are."""
         import src.engine.routers.ingest as ingest_mod
 
@@ -519,17 +528,21 @@ class TestScanFolderInPlace:
 
         # The staging dir must remain empty — no copies were made
         staged = list(staging_dir.iterdir())
-        assert staged == [], (
-            f"in_place=True must not create staging copies, but found: {staged}"
-        )
+        assert (
+            staged == []
+        ), f"in_place=True must not create staging copies, but found: {staged}"
 
         # The original source file must still exist untouched
-        assert source_file.exists(), "Source file was deleted during in_place scan — critical regression"
-        assert source_file.read_bytes() == b"real audio in place", (
-            "Source file contents were modified during in_place scan"
-        )
+        assert (
+            source_file.exists()
+        ), "Source file was deleted during in_place scan — critical regression"
+        assert (
+            source_file.read_bytes() == b"real audio in place"
+        ), "Source file contents were modified during in_place scan"
 
-    def test_in_place_false_default_creates_staging_copies(self, client, tmp_path, monkeypatch):
+    def test_in_place_false_default_creates_staging_copies(
+        self, client, tmp_path, monkeypatch
+    ):
         """in_place=False (default) must copy files to staging as normal."""
         import src.engine.routers.ingest as ingest_mod
 
@@ -550,9 +563,9 @@ class TestScanFolderInPlace:
 
         # At least one staging copy must have been created
         staged = list(staging_dir.iterdir())
-        assert len(staged) >= 1, (
-            "in_place=False must create staging copies, but staging dir is empty"
-        )
+        assert (
+            len(staged) >= 1
+        ), "in_place=False must create staging copies, but staging dir is empty"
 
 
 # ========================================
@@ -674,6 +687,7 @@ class TestConvertWavApi:
             "No DB record" in data["message"]
         ), f"Expected 'No DB record' in message, got '{data['message']}'"
 
+
 class TestCleanupOriginApi:
     """Group 6: GET /api/v1/ingest/cleanup-origin/{song_id} and /parser-config"""
 
@@ -681,9 +695,12 @@ class TestCleanupOriginApi:
         temp_file = tmp_path / "origin.mp3"
         temp_file.write_bytes(b"")
         target_path = str(temp_file)
-        
+
         conn = _connect(populated_db)
-        conn.execute("INSERT OR REPLACE INTO StagingOrigins (SourceID, OriginPath) VALUES (?, ?)", (1, target_path))
+        conn.execute(
+            "INSERT OR REPLACE INTO StagingOrigins (SourceID, OriginPath) VALUES (?, ?)",
+            (1, target_path),
+        )
         conn.commit()
         conn.close()
 

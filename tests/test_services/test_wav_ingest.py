@@ -296,7 +296,6 @@ class TestResolveConflictWav:
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
 
-
         conn = _connect(populated_db)
         row = conn.execute(
             "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
@@ -326,7 +325,6 @@ class TestResolveConflictWav:
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
 
-
         conn = _connect(populated_db)
         row = conn.execute(
             "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
@@ -341,7 +339,6 @@ class TestResolveConflictWav:
         """resolve_conflict must set IsDeleted=0 on the ghost record."""
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
-
 
         conn = _connect(populated_db)
         row = conn.execute(

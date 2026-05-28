@@ -26,24 +26,46 @@ def api(populated_db, monkeypatch):
 
 class TestSetIdentityTypeApi:
     def test_person_to_group_returns_200(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 4, "identity_type": "group"}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"update": [{"type": "identity", "id": 4, "identity_type": "group"}]},
+        )
         assert resp.status_code == 200, resp.text
 
     def test_group_to_person_no_members_returns_200(self, api):
-        api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]})
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]})
+        api.post(
+            "/api/v1/mutate",
+            json={
+                "remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]
+            },
+        )
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]},
+        )
         assert resp.status_code == 200, resp.text
 
     def test_group_to_person_with_members_returns_400(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"update": [{"type": "identity", "id": 2, "identity_type": "person"}]},
+        )
         assert resp.status_code == 400, resp.text
 
     def test_invalid_type_returns_422(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 1, "identity_type": "band"}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"update": [{"type": "identity", "id": 1, "identity_type": "band"}]},
+        )
         assert resp.status_code == 422, resp.text
 
     def test_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/mutate", json={"update": [{"type": "identity", "id": 9999, "identity_type": "group"}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "update": [{"type": "identity", "id": 9999, "identity_type": "group"}]
+            },
+        )
         assert resp.status_code == 404, resp.text
 
 
@@ -54,31 +76,60 @@ class TestSetIdentityTypeApi:
 
 class TestAddIdentityMemberApi:
     def test_add_member_returns_200(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 4}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 4}]},
+        )
         assert resp.status_code == 200, resp.text
 
     def test_add_self_returns_400(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 2}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 2}]},
+        )
         assert resp.status_code == 400, resp.text
 
     def test_add_group_as_member_returns_400(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 3}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 3}]},
+        )
         assert resp.status_code == 400, resp.text
 
     def test_group_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 9999, "member_id": 1}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "add": [{"type": "identity_member", "group_id": 9999, "member_id": 1}]
+            },
+        )
         assert resp.status_code == 404, resp.text
 
     def test_member_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/mutate", json={"add": [{"type": "identity_member", "group_id": 2, "member_id": 9999}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "add": [{"type": "identity_member", "group_id": 2, "member_id": 9999}]
+            },
+        )
         assert resp.status_code == 404, resp.text
 
 
 class TestRemoveIdentityMemberApi:
     def test_remove_member_returns_200(self, api):
-        resp = api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "remove": [{"type": "identity_member", "group_id": 2, "member_id": 1}]
+            },
+        )
         assert resp.status_code == 200, resp.text
 
     def test_remove_nonexistent_member_returns_200(self, api):
-        resp = api.post("/api/v1/mutate", json={"remove": [{"type": "identity_member", "group_id": 2, "member_id": 4}]})
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "remove": [{"type": "identity_member", "group_id": 2, "member_id": 4}]
+            },
+        )
         assert resp.status_code == 200, resp.text

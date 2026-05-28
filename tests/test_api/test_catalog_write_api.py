@@ -239,13 +239,10 @@ class TestCatalogWriteApi:
 
         assert os.path.exists(source_path), "File should exist before delete"
 
-        del_resp = api_client.delete(
-            f"/api/v1/ingest/songs/{song_id}?delete_file=true"
-        )
+        del_resp = api_client.delete(f"/api/v1/ingest/songs/{song_id}?delete_file=true")
         assert del_resp.status_code == 200
         assert del_resp.json()["status"] == "DELETED"
 
         assert not os.path.exists(
             source_path
         ), "Physical file should be deleted when delete_file=true"
-

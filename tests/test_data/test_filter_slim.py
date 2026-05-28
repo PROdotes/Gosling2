@@ -256,7 +256,9 @@ class TestFilterSlimStatus:
         rows = repo.filter_slim(statuses=["missing_data"])
         ids = {r["SourceID"] for r in rows}
         # missing_data returns all songs with any blocker, regardless of processing status
-        assert 7 in ids, f"Song 7 (no credits/publisher/genre) not in missing_data: {ids}"
+        assert (
+            7 in ids
+        ), f"Song 7 (no credits/publisher/genre) not in missing_data: {ids}"
         assert 9 in ids, f"Song 9 (no credits/publisher) not in missing_data: {ids}"
 
     def test_ready_to_finalize_songs_have_no_blockers(self, repo):
