@@ -623,7 +623,11 @@ Return IDs of all active identities with no active song or album credits via any
 ## AuditRepository
 
 *Location: `src/data/audit_repository.py`*
-**Responsibility**: Fills in `batch_id` and `batch_label` on ChangeLog rows written by triggers during the current transaction.
+**Responsibility**: Fills in `batch_id` and `batch_label` on ChangeLog rows written by triggers during the current transaction. Provides read access to audit history.
+
+### get_changelog(conn: sqlite3.Connection, limit: int = 500) -> list
+
+Retrieves audit log entries grouped by batch. Returns a list of batch dicts, each containing `batch_id`, `batch_label`, `timestamp`, and a `rows` list of individual field changes. Entries are ordered by `id` DESC. Supports pagination via `limit`.
 
 ### flush_batch(batch_id: str, label: str, conn: sqlite3.Connection) -> None
 

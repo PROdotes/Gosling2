@@ -135,3 +135,109 @@ def test_tripwire_raises_on_orphaned_null_rows(audit_db):
     repo = BaseRepository(audit_db)
     with pytest.raises(RuntimeError, match="NULL batch_id"):
         repo.get_connection()
+
+
+# ---------------------------------------------------------------------------
+# 4. Null → Null — no audit entries for no-op updates
+# ---------------------------------------------------------------------------
+
+
+def test_null_to_null_update_not_logged(audit_db):
+    coordinator = MutationCoordinator(audit_db)
+    # RecordingYear is nullable in Songs; start with NULL, update to NULL
+    conn = sqlite3.connect(audit_db)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
+    conn.executescript(build_trigger_sql(conn))
+    # Ensure RecordingYear is NULL on a test song
+    conn.execute("UPDATE Songs SET RecordingYear = NULL WHERE SourceID = 1")
+    conn.commit()
+    # Clear changelog to start fresh
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    # Update with same NULL value (no change)
+    coordinator.apply(
+        MutationRequest.model_validate(
+            {"update": [{"type": "song", "id": 1, "recording_year": None}]}
+        )
+    )
+
+    # Verify no changelog entry for RecordingYear
+    conn = sqlite3.connect(audit_db)
+    rows = conn.execute(
+        "SELECT field_name FROM ChangeLog WHERE field_name = 'RecordingYear'"
+    ).fetchall()
+    conn.close()
+    assert len(rows) == 0, "NULL→NULL RecordingYear update should not be logged"
+
+
+def test_null_to_value_update_is_logged(audit_db):
+    coordinator = MutationCoordinator(audit_db)
+    conn = sqlite3.connect(audit_db)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
+    conn.executescript(build_trigger_sql(conn))
+    # Ensure SourceNotes is NULL
+    conn.execute("UPDATE MediaSources SET SourceNotes = NULL WHERE SourceID = 1")
+    conn.commit()
+    # Clear changelog
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    # Update NULL to a value
+    coordinator.apply(
+        MutationRequest.model_validate(
+            {"update": [{"type": "song", "id": 1, "notes": "test notes"}]}
+        )
+    )
+
+    # Verify changelog entry exists for SourceNotes
+    conn = sqlite3.connect(audit_db)
+    rows = conn.execute(
+        "SELECT old_value, new_value FROM ChangeLog WHERE field_name = 'SourceNotes'"
+    ).fetchall()
+    conn.close()
+    assert len(rows) > 0, "NULL→value SourceNotes update should be logged"
+    assert rows[0][0] is None, "Old value should be NULL"
+    assert rows[0][1] is not None, "New value should not be NULL"
+
+
+def test_value_to_null_update_is_logged(audit_db):
+    coordinator = MutationCoordinator(audit_db)
+    conn = sqlite3.connect(audit_db)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
+    conn.executescript(build_trigger_sql(conn))
+    # Ensure SourceNotes has a value
+    conn.execute("UPDATE MediaSources SET SourceNotes = 'initial note' WHERE SourceID = 2")
+    conn.commit()
+    # Clear changelog
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    # Now update back to NULL
+    coordinator.apply(
+        MutationRequest.model_validate(
+            {"update": [{"type": "song", "id": 2, "notes": None}]}
+        )
+    )
+
+    # Verify changelog entry exists for SourceNotes
+    conn = sqlite3.connect(audit_db)
+    rows = conn.execute(
+        "SELECT old_value, new_value FROM ChangeLog WHERE field_name = 'SourceNotes'"
+    ).fetchall()
+    conn.close()
+    assert len(rows) > 0, "value→NULL SourceNotes update should be logged"
+    assert rows[0][0] is not None, "Old value should not be NULL"
+    assert rows[0][1] is None, "New value should be NULL"

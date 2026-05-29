@@ -173,7 +173,18 @@ EXCLUDED_FROM_AUDIT = {"ChangeLog", "StagingOrigins"}
 
 def build_trigger_sql(conn: sqlite3.Connection) -> str:
     """Generate CREATE TRIGGER IF NOT EXISTS SQL for every non-excluded table,
-    derived live from PRAGMA table_info so triggers always match the real schema."""
+    derived live from PRAGMA table_info so triggers always match the real schema.
+
+    IMPORTANT: This function must be called after any schema migrations that add or
+    remove columns. Fresh databases call this in engine_server.py. Legacy databases
+    need manual trigger regeneration via the regenerate_triggers.py utility.
+
+    Triggers implement audit logging with filtering:
+    - INSERT: Only logs fields where NEW.{c} IS NOT NULL (no spurious NULL inserts)
+    - UPDATE: Only logs where the value actually changed AND at least one side is non-NULL
+      (filters out null→null no-ops)
+    - DELETE: Logs all fields as they existed
+    """
     tables = [
         row[0]
         for row in conn.execute(
@@ -190,14 +201,15 @@ def build_trigger_sql(conn: sqlite3.Connection) -> str:
 
         ins = "\n    ".join(
             f"INSERT INTO ChangeLog (table_name, entity_id, field_name, old_value, new_value) "
-            f"VALUES ('{table}', NEW.rowid, '{c}', NULL, NULLIF(CAST(NEW.{c} AS TEXT), ''));"
+            f"SELECT '{table}', NEW.rowid, '{c}', NULL, NULLIF(CAST(NEW.{c} AS TEXT), '') "
+            f"WHERE NEW.{c} IS NOT NULL;"
             for c in cols
         )
         upd = "\n    ".join(
             f"INSERT INTO ChangeLog (table_name, entity_id, field_name, old_value, new_value) "
             f"SELECT '{table}', NEW.rowid, '{c}', "
             f"NULLIF(CAST(OLD.{c} AS TEXT), ''), NULLIF(CAST(NEW.{c} AS TEXT), '') "
-            f"WHERE OLD.{c} IS NOT NEW.{c};"
+            f"WHERE OLD.{c} IS NOT NEW.{c} AND (OLD.{c} IS NOT NULL OR NEW.{c} IS NOT NULL);"
             for c in cols
         )
         dlt = "\n    ".join(

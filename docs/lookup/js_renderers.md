@@ -138,3 +138,11 @@ Replaces the pending card with the final result card after ingestion completes.
 
 ### trackIngestResult(result, path, ctx)
 Records an ingest result into `ctx` state (`ingestTasks` and `cachedIngestResults`).
+
+---
+
+## Audit Rendering
+*Location: `src/static/js/dashboard/renderers/audit_log.js`*
+
+### renderAuditLog(ctx)
+Renders the complete audit log UI. Fetches changelog data via `getChangelog()`, groups entries by batch, and displays expandable batch panels with field-change details. Includes "Expand All", "Collapse All", and "Refresh" controls.

@@ -4,6 +4,7 @@ from src.data.base_repository import BaseRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.models.domain import SongAlbum
 from src.services.logger import logger
+from src.utils.text import normalize_for_search
 
 
 class SongAlbumRepository(BaseRepository):
@@ -94,9 +95,15 @@ class SongAlbumRepository(BaseRepository):
                 from src.engine.config import ALBUM_DEFAULT_TYPE
 
                 album_type = album.album_type or ALBUM_DEFAULT_TYPE
+                # Normalize AlbumTitle for search
+                title_search = (
+                    normalize_for_search(album.album_title)
+                    if album.album_title
+                    else None
+                )
                 cursor.execute(
-                    "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
-                    (album.album_title, album_type, album.release_year),
+                    "INSERT INTO Albums (AlbumTitle, AlbumTitle_Search, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
+                    (album.album_title, title_search, album_type, album.release_year),
                 )
                 album_id = cursor.lastrowid
                 assert isinstance(

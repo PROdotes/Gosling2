@@ -35,6 +35,41 @@ Fuzzy search artist names (aliases). Query is normalized to diacritic-stripped l
 ### get_all_slim() -> List[dict]
 Fetch slim list-view rows for all active identities (no hydration).
 
+---
+
+## CreditService
+*Location: `src/services/credit_service.py`*
+**Responsibility**: Orchestrates credit operations with normalized display names for search.
+
+### insert_credits(source_id: int, credits: List[SongCredit], conn: sqlite3.Connection) -> None
+Insert a batch of credits with normalized display names. Computes `display_name_search` (diacritic-stripped lowercase) for each credit before repo write. Does NOT commit.
+
+### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None) -> SongCredit
+Add a single credit to a song with normalized display name. Does NOT commit.
+
+### remove_credit(credit_id: int, conn: sqlite3.Connection) -> None
+Remove a credit by ID. Does NOT commit.
+
+### update_credit_name(name_id: int, new_name: str, conn: sqlite3.Connection) -> int
+Update a credit name globally with normalized search shadow. Returns rowcount. Does NOT commit.
+
+### get_all_roles() -> List[str]
+Fetch all available role names, ordered alphabetically.
+
+---
+
+## MediaSourceService
+*Location: `src/services/media_source_service.py`*
+**Responsibility**: Orchestrates media source operations with normalized MediaName for search.
+
+### insert_source(model: MediaSource, type_name: str, conn: sqlite3.Connection) -> int
+Insert a media source (base file record) with normalized MediaName_Search. Computes `media_name_search` (diacritic-stripped lowercase) before repo write. Returns the new SourceID. Does NOT commit.
+
+### reactivate_source(source_id: int, model: MediaSource, conn: sqlite3.Connection) -> None
+Reactivate a soft-deleted MediaSource record with new metadata and normalized MediaName_Search. Used when re-ingesting previously deleted files. Does NOT commit.
+
+---
+
 ## IngestionService
 *Location: `src/services/ingestion_service.py`*
 

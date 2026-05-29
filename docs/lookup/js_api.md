@@ -332,3 +332,11 @@ Deletes an identity record.
 
 ### bulkDeleteUnlinkedIdentities()
 Deletes all identities with no associated songs, albums, or roles.
+
+---
+
+## Audit
+
+### getChangelog(limit)
+Fetches audit log entries. Returns `{ batches: [...] }` where each batch contains `batch_id`, `batch_label`, `timestamp`, and `rows` (field changes).
+Entries are ordered by most recent first. Supports pagination via `limit` query param.

@@ -63,6 +63,7 @@ import {
     wireScalarInputs,
 } from "./renderers/song_editor.js";
 import { renderSongs } from "./renderers/songs.js";
+import { renderAuditLog } from "./renderers/audit_log.js";
 import {
     renderTagDetailComplete,
     renderTagDetailLoading,
@@ -81,6 +82,7 @@ const elements = {
     songsWorkspace: document.getElementById("songs-workspace"),
     entityWorkspace: document.getElementById("entity-workspace"),
     ingestWorkspace: document.getElementById("ingest-workspace"),
+    logWorkspace: document.getElementById("log-workspace"),
 };
 
 const state = {
@@ -154,6 +156,12 @@ const modeConfig = {
                 m.renderIngestionPanel(ctx),
             );
         },
+    },
+    log: {
+        placeholder: "",
+        noun: "entry",
+        fetcher: async () => [],
+        renderer: (ctx) => renderAuditLog(ctx),
     },
 };
 
@@ -436,11 +444,13 @@ function syncModeUi() {
     const mode = state.currentMode;
     const isSongs = mode === "songs";
     const isIngest = mode === "ingest";
-    const isEntity = !isSongs && !isIngest;
+    const isLog = mode === "log";
+    const isEntity = !isSongs && !isIngest && !isLog;
 
     elements.songsWorkspace?.classList.toggle("active", isSongs);
     elements.entityWorkspace?.classList.toggle("active", isEntity);
     elements.ingestWorkspace?.classList.toggle("active", isIngest);
+    elements.logWorkspace?.classList.toggle("active", isLog);
 
     if (isSongs) renderSongEditorEmpty();
 }

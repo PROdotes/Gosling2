@@ -563,6 +563,10 @@ export function getFilterValues(q = "") {
     return runSearch("filter-values", url);
 }
 
+export function getChangelog(limit = 500) {
+    return fetchJson(`/api/v1/audit/changelog?limit=${limit}`);
+}
+
 export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal = false, q = "") {
     const params = new URLSearchParams();
     params.set("mode", mode);

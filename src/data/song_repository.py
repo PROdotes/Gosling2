@@ -1,13 +1,16 @@
 import sqlite3
-from typing import List, Optional, Mapping, Any, Dict
+from typing import List, Optional, Mapping, Any, Dict, TYPE_CHECKING
 from src.models.domain import Song
 from src.data.media_source_repository import MediaSourceRepository
 from src.data.tag_repository import TagRepository
 from src.data.song_album_repository import SongAlbumRepository
 from src.data.publisher_repository import PublisherRepository
-from src.data.song_credit_repository import SongCreditRepository
 from src.services.logger import logger
 from src.engine.config import ProcessingStatus
+
+if TYPE_CHECKING:
+    from src.services.credit_service import CreditService
+    from src.services.media_source_service import MediaSourceService
 
 # ── Review blocker SQL fragments ─────────────────────────────────────────────
 # These mirror compute_review_blockers() in view_models.py.
@@ -46,18 +49,40 @@ class SongRepository(MediaSourceRepository):
     """
     _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song') AND m.IsDeleted = 0 LEFT JOIN StagingOrigins so ON so.SourceID = m.SourceID"
 
+    def __init__(
+        self,
+        db_path: str,
+        credit_service: Optional["CreditService"] = None,
+        media_source_service: Optional["MediaSourceService"] = None,
+    ):
+        """Initialize SongRepository with optional service dependencies."""
+        super().__init__(db_path)
+
+        # Lazy import to avoid circular dependencies
+        if credit_service is None:
+            from src.services.credit_service import CreditService
+
+            credit_service = CreditService(db_path)
+        if media_source_service is None:
+            from src.services.media_source_service import MediaSourceService
+
+            media_source_service = MediaSourceService(db_path)
+
+        self._credit_service = credit_service
+        self._media_source_service = media_source_service
+
     def insert(self, song: Song, conn: sqlite3.Connection) -> int:
         """
         Atomic insert into MediaSources, Songs, and all relationship tables.
-        Modular: delegates core MediaSource record to parent, relationships to specialized repos.
+        Modular: delegates core MediaSource record to service, relationships to specialized repos/services.
         Returns the new SourceID.
         """
         logger.debug(
             f"[SongRepository] -> insert(name='{song.title}', path='{song.source_path}')"
         )
 
-        # 1. Insert core record (delegated to MediaSourceRepository)
-        source_id = self.insert_source(song, "Song", conn)
+        # 1. Insert core record using media source service (normalizes search fields)
+        source_id = self._media_source_service.insert_source(song, "Song", conn)
 
         # 2. Insert song-specific extension record
         cursor = conn.cursor()
@@ -73,9 +98,9 @@ class SongRepository(MediaSourceRepository):
         tag_repo = TagRepository(self.db_path)
         album_repo = SongAlbumRepository(self.db_path)
         pub_repo = PublisherRepository(self.db_path)
-        credit_repo = SongCreditRepository(self.db_path)
 
-        credit_repo.insert_credits(source_id, song.credits, conn)
+        # Use credit service to normalize display names for search
+        self._credit_service.insert_credits(source_id, song.credits, conn)
         tag_repo.insert_tags(source_id, song.tags, conn)
         album_repo.insert_albums(source_id, song.albums, conn)
         pub_repo.insert_song_publishers(source_id, song.publishers, conn)
@@ -91,9 +116,9 @@ class SongRepository(MediaSourceRepository):
         """
         Reactivate a soft-deleted ghost song record with new metadata.
         1. Verify ghost exists and is deleted
-        2. Update MediaSources (delegated to parent)
+        2. Update MediaSources with normalized search field (delegated to service)
         3. Update Songs table
-        4. Delete old relationships and insert new ones
+        4. Delete old relationships and insert new ones (delegated to services)
         """
         logger.debug(
             f"[SongRepository] -> reactivate_ghost(id={ghost_id}, title='{song.media_name}')"
@@ -110,10 +135,10 @@ class SongRepository(MediaSourceRepository):
         if row[0] != 1:
             raise ValueError(f"Song ID {ghost_id} is not deleted (IsDeleted={row[0]})")
 
-        # 2. Update MediaSources table (delegated to parent)
-        self.reactivate_source(ghost_id, song, conn)
+        # 2. Update MediaSources table with normalized search field (use service)
+        self._media_source_service.reactivate_source(ghost_id, song, conn)
 
-        # 2. Update Songs table
+        # 3. Update Songs table
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -126,15 +151,16 @@ class SongRepository(MediaSourceRepository):
             (song.bpm, song.year, song.isrc, ghost_id),
         )
 
-        # 3. Delete old relationships and insert new ones
+        # 4. Delete old relationships and insert new ones
         self.delete_song_links(ghost_id, conn)
 
         tag_repo = TagRepository(self.db_path)
         album_repo = SongAlbumRepository(self.db_path)
         pub_repo = PublisherRepository(self.db_path)
-        credit_repo = SongCreditRepository(self.db_path)
 
-        credit_repo.insert_credits(ghost_id, song.credits, conn)
+        # Use credit service to normalize display names for search
+        self._credit_service.insert_credits(ghost_id, song.credits, conn)
+
         tag_repo.insert_tags(ghost_id, song.tags, conn)
         album_repo.insert_albums(ghost_id, song.albums, conn)
         pub_repo.insert_song_publishers(ghost_id, song.publishers, conn)

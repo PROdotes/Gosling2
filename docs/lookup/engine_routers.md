@@ -431,6 +431,20 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ---
 
+## Audit Router
+*Location: `src/engine/routers/audit.py`*
+**Responsibility**: HTTP interface for audit log queries.
+
+### async def get_changelog(limit: int = 500) -> dict
+**HTTP**: `GET /api/v1/audit/changelog?limit=500`
+- Retrieves audit log entries grouped by batch.
+- Returns `{"batches": [batch, ...]}` where each batch contains `batch_id`, `batch_label`, `timestamp`, and `rows` (field changes).
+- Entries are ordered by `id` DESC (most recent first).
+- Supports pagination via `limit` query param.
+- Wraps `AuditRepository.get_changelog`.
+
+---
+
 ## Spotify Router
 *Location: `src/engine/routers/spotify.py`*
 **Responsibility**: Stateless text parsing and atomic bulk credits ingestion.
