@@ -218,7 +218,9 @@ def test_value_to_null_update_is_logged(audit_db):
     )
     conn.executescript(build_trigger_sql(conn))
     # Ensure SourceNotes has a value
-    conn.execute("UPDATE MediaSources SET SourceNotes = 'initial note' WHERE SourceID = 2")
+    conn.execute(
+        "UPDATE MediaSources SET SourceNotes = 'initial note' WHERE SourceID = 2"
+    )
     conn.commit()
     # Clear changelog
     conn.execute("DELETE FROM ChangeLog")

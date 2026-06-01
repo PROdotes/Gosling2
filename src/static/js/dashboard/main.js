@@ -108,6 +108,7 @@ const state = {
     successCount: 0,
     actionCount: 0,
     pendingCount: 0,
+    uploadPct: null,
     lastSearch: "",
     allowedExtensions: [],
     searchEngines: {},
@@ -846,15 +847,24 @@ function updateIngestBadges(counts = {}) {
     state.actionCount = counts.action ?? state.actionCount;
     state.pendingCount = counts.pending ?? state.pendingCount;
     if ("currentFile" in counts) state.ingestCurrentFile = counts.currentFile;
+    if ("uploadPct" in counts) state.uploadPct = counts.uploadPct;
 
     // Remove old badge container
     tab.querySelector(".ingest-badge-container")?.remove();
 
     const total = state.pendingCount + state.successCount + state.actionCount;
-    if (total === 0 && !state.ingestCurrentFile) return;
+    if (total === 0 && !state.ingestCurrentFile && state.uploadPct === null) return;
 
     const container = document.createElement("div");
     container.className = "ingest-badge-container";
+
+    if (state.uploadPct !== null) {
+        const b = document.createElement("span");
+        b.className = "ingest-badge uploading";
+        b.title = "Uploading files...";
+        b.textContent = `${state.uploadPct}%`;
+        container.appendChild(b);
+    }
 
     if (state.ingestCurrentFile) {
         const currentFile = state.ingestCurrentFile;
@@ -924,16 +934,24 @@ async function setupHeaderDropZone() {
         if (!items || items.length === 0) return;
 
         await handleIngestDrop(items, state.allowedExtensions, {
+            onCollected(count) {
+                updateIngestBadges({ pending: count, uploadPct: 0 });
+            },
+            onUploadProgress(loaded, total) {
+                const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+                updateIngestBadges({ uploadPct: pct });
+            },
             onEmpty() {
+                updateIngestBadges({ uploadPct: null });
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
+                updateIngestBadges({ uploadPct: null, currentFile: update.filename });
                 insertPendingCard(
                     INGEST_RESULTS_LIST_ID,
                     update.filename,
                     update.is_wav,
                 );
-                updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
                 updateIngestBadges({
@@ -971,6 +989,7 @@ async function setupHeaderDropZone() {
                 }
             },
             onError(err) {
+                updateIngestBadges({ uploadPct: null });
                 console.error("Ingestion failed:", err);
                 showToast("Ingestion failed: " + err.message, "error", 5000);
             },
@@ -1004,16 +1023,24 @@ async function setupSongsWorkspaceDropZone() {
         if (!items || items.length === 0) return;
 
         await handleIngestDrop(items, state.allowedExtensions, {
+            onCollected(count) {
+                updateIngestBadges({ pending: count, uploadPct: 0 });
+            },
+            onUploadProgress(loaded, total) {
+                const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+                updateIngestBadges({ uploadPct: pct });
+            },
             onEmpty() {
+                updateIngestBadges({ uploadPct: null });
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
+                updateIngestBadges({ uploadPct: null, currentFile: update.filename });
                 insertPendingCard(
                     INGEST_RESULTS_LIST_ID,
                     update.filename,
                     update.is_wav,
                 );
-                updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
                 updateIngestBadges({
@@ -1051,6 +1078,7 @@ async function setupSongsWorkspaceDropZone() {
                 }
             },
             onError(err) {
+                updateIngestBadges({ uploadPct: null });
                 console.error("Ingestion failed:", err);
                 showToast("Ingestion failed: " + err.message, "error", 5000);
             },

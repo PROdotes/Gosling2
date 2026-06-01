@@ -9,7 +9,7 @@ import {
     readNdjsonStream,
     resolveConflict,
     scanFolder,
-    uploadFiles,
+    uploadFilesWithProgress,
 } from "../api.js";
 import { openFilenameParserModal } from "../components/filename_parser_modal.js";
 import { showToast } from "../components/toast.js";
@@ -71,30 +71,39 @@ async function collectFilesFromItems(items, allowedExtensions) {
 }
 
 /**
- * Shared ingest drop pipeline: collect → upload → stream.
+ * Shared ingest drop pipeline: collect → upload (with progress) → stream NDJSON.
  * @param {DataTransferItemList} items
  * @param {string[]} allowedExtensions
- * @param {{ onStarted(update): void, onUpdate(update): void, onError(err): void, onEmpty(): void }} callbacks
+ * @param {{
+ *   onCollected?(count: number): void,
+ *   onUploadProgress?(loaded: number, total: number): void,
+ *   onStarted(update): void,
+ *   onUpdate(update): void,
+ *   onError(err): void,
+ *   onEmpty(): void
+ * }} callbacks
  */
-export async function handleIngestDrop(items, allowedExtensions, { onStarted, onUpdate, onError, onEmpty }) {
+export async function handleIngestDrop(items, allowedExtensions, { onCollected, onUploadProgress, onStarted, onUpdate, onError, onEmpty }) {
     const allFiles = await collectFilesFromItems(items, allowedExtensions);
     if (allFiles.length === 0) {
         onEmpty();
         return;
     }
+    onCollected?.(allFiles.length);
     try {
-        const response = await uploadFiles(allFiles);
-        if (!response.ok) throw new Error("Upload failed");
-        await readNdjsonStream(response, (update) => {
-            if (update.error) {
-                onError(new Error(update.error));
-                return;
-            }
-            if (update.started) {
-                onStarted(update);
-                return;
-            }
-            onUpdate(update);
+        await uploadFilesWithProgress(allFiles, {
+            onUploadProgress: onUploadProgress ?? (() => {}),
+            onLine(update) {
+                if (update.error) {
+                    onError(new Error(update.error));
+                    return;
+                }
+                if (update.started) {
+                    onStarted(update);
+                    return;
+                }
+                onUpdate(update);
+            },
         });
     } catch (err) {
         onError(err);
@@ -345,13 +354,21 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
 
         showLoading(true);
         await handleIngestDrop(items, allowedExtensions, {
+            onCollected(count) {
+                ctx.updateIngestBadges?.({ pending: count, uploadPct: 0 });
+            },
+            onUploadProgress(loaded, total) {
+                const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+                ctx.updateIngestBadges?.({ uploadPct: pct });
+            },
             onEmpty() {
+                ctx.updateIngestBadges?.({ uploadPct: null });
                 appendResult(resultsId, { status: "ERROR", message: "No audio files found in dropped folder(s)" }, "Drag and Drop", ctx);
                 showLoading(false);
             },
             onStarted(update) {
+                ctx.updateIngestBadges?.({ uploadPct: null, currentFile: update.filename });
                 insertPendingCard(resultsId, update.filename, update.is_wav);
-                ctx.updateIngestBadges?.({ currentFile: update.filename });
             },
             onUpdate(update) {
                 ctx.updateIngestBadges?.({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
@@ -363,6 +380,7 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                 }
             },
             onError(err) {
+                ctx.updateIngestBadges?.({ uploadPct: null });
                 console.error("Drop error:", err);
                 appendResult(resultsId, { status: "ERROR", message: err.message }, "Batch Upload", ctx);
             },

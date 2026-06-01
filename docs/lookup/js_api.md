@@ -237,6 +237,9 @@ Unlinks a publisher from an album.
 ### uploadFiles(files)
 Uploads multiple files to the staging area.
 
+### uploadFilesWithProgress(files, { onUploadProgress, onLine })
+Uploads files via XHR (not fetch) to expose upload-direction progress. `onUploadProgress(loaded, total)` fires during upload; `onLine(obj)` fires for each NDJSON line in the response stream. Returns a Promise that resolves when the full response is consumed.
+
 ### checkIngestion(filePath)
 Dry-run check for existing files or ghost records.
 

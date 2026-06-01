@@ -205,13 +205,71 @@ export async function getAcceptedFormats() {
     return result.extensions;
 }
 
-export function uploadFiles(files) {
-    const formData = new FormData();
-    const fileArray = Array.isArray(files) ? files : [files];
-    for (const file of fileArray) {
-        formData.append("files", file);
-    }
-    return fetch("/api/v1/ingest/upload", { method: "POST", body: formData });
+/**
+ * Upload files with upload progress reporting, then parse the NDJSON response incrementally.
+ * Uses XHR because fetch exposes no upload-direction progress.
+ * @param {File[]} files
+ * @param {{ onUploadProgress(loaded: number, total: number): void, onLine(obj: object): void }} callbacks
+ * @returns {Promise<void>} Resolves when the full response stream is consumed.
+ */
+export function uploadFilesWithProgress(files, { onUploadProgress, onLine }) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        const fileArray = Array.isArray(files) ? files : [files];
+        for (const file of fileArray) {
+            formData.append("files", file);
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/v1/ingest/upload");
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                onUploadProgress(e.loaded, e.total);
+            }
+        };
+
+        let parsedOffset = 0;
+        xhr.onprogress = () => {
+            const text = xhr.responseText;
+            const slice = text.slice(parsedOffset);
+            const lines = slice.split("\n");
+            // All but the last element are complete lines; the last may be partial.
+            for (let i = 0; i < lines.length - 1; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                try {
+                    onLine(JSON.parse(line));
+                } catch (e) {
+                    console.error("NDJSON parse error:", line, e);
+                }
+            }
+            parsedOffset += slice.length - lines[lines.length - 1].length;
+        };
+
+        xhr.onload = () => {
+            if (xhr.status < 200 || xhr.status >= 300) {
+                reject(new Error(`Upload failed: ${xhr.status}`));
+                return;
+            }
+            // Flush any remaining text after the last onprogress
+            const text = xhr.responseText;
+            const remaining = text.slice(parsedOffset);
+            for (const line of remaining.split("\n")) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                try {
+                    onLine(JSON.parse(trimmed));
+                } catch (e) {
+                    console.error("NDJSON parse error:", trimmed, e);
+                }
+            }
+            resolve();
+        };
+
+        xhr.onerror = () => reject(new Error("Upload network error"));
+        xhr.send(formData);
+    });
 }
 
 export function getIngestStatus() {

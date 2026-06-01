@@ -176,8 +176,12 @@ async def upload_files(files: list[UploadFile] = File(...)):
             continue
         staged_path = os.path.join(STAGING_DIR, f"{uuid4()}_{safe_filename}")
         try:
-            with open(staged_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+
+            def _copy(src=file.file, dst=staged_path):
+                with open(dst, "wb") as buf:
+                    shutil.copyfileobj(src, buf)
+
+            await run_in_threadpool(_copy)
             original_src = os.path.join(get_downloads_folder(), safe_filename)
             work_items.append((staged_path, original_src))
         except Exception as e:

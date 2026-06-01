@@ -63,6 +63,10 @@
     }
 }
 
+.ingest-badge.uploading {
+    background: #6366f1; /* Indigo — distinct from pending orange */
+}
+
 /* --- Orphaned Staging Files --- */
 .orphan-section {
     margin-top: 1.5rem;
