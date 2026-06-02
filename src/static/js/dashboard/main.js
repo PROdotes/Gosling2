@@ -221,6 +221,13 @@ const ctx = {
         state.activeSong = fresh;
 
         if (structuralChange) {
+            // Preserve which chip field was actively being edited so a structural
+            // re-render (e.g. after adding a credit) doesn't collapse it shut.
+            const openFieldKey =
+                document
+                    .querySelector("#editor-panel .chip-input--expanded")
+                    ?.closest("[data-chip-field]")?.dataset.chipField || null;
+
             // Full re-render to handle new cards/structure
             renderSongEditorV2(fresh, state.activeSongDiff, state.activeSongRawTags);
             state.chipHandles = wireChipInputs(
@@ -235,6 +242,7 @@ const ctx = {
                 state.validationRules,
                 () => ctx.refreshActiveSongV2(fresh.id),
             );
+            state.chipHandles.expandField(openFieldKey);
         }
 
         renderActionSidebar(fresh, {
