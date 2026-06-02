@@ -19,6 +19,10 @@ Single point of truth for all DB connections in `v3core`.
 
 Public connection accessor used by services for atomic transaction control.
 
+### write_connection(label: str) -> ContextManager[sqlite3.Connection]
+
+Context manager for write transactions. Generates a batch_id, yields the connection, flushes the audit batch and commits on success; rolls back on any exception. Use instead of get_connection() for all paths that modify the database.
+
 ---
 
 ## MediaSourceRepository
@@ -628,10 +632,6 @@ Return IDs of all active identities with no active song or album credits via any
 ### get_changelog(conn: sqlite3.Connection, limit: int = 500) -> list
 
 Retrieves audit log entries grouped by batch. Returns a list of batch dicts, each containing `batch_id`, `batch_label`, `timestamp`, and a `rows` list of individual field changes. Entries are ordered by `id` DESC. Supports pagination via `limit`.
-
-### flush_batch(batch_id: str, label: str, conn: sqlite3.Connection) -> None
-
-Updates all NULL `batch_id` rows in ChangeLog with the given `batch_id` and `batch_label`. Called by every write path (MutationCoordinator, IngestionService) before `conn.commit()`. Does NOT commit.
 
 ---
 

@@ -1,10 +1,8 @@
 import os
 import sqlite3
-import uuid
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from src.data.audit_repository import AuditRepository
 from src.data.song_repository import SongRepository
 from src.data.album_repository import AlbumRepository
 from src.data.song_credit_repository import SongCreditRepository
@@ -60,7 +58,6 @@ class IngestionService:
         self._tag_repo = tag_repo or TagRepository(db_path)
         self._identity_repo = identity_repo or IdentityRepository(db_path)
         self._staging_repo = StagingRepository(db_path)
-        self._audit_repo = AuditRepository(db_path)
 
         # Cross-service dependencies
         self._library_service = library_service or LibraryService(db_path)
@@ -270,29 +267,23 @@ class IngestionService:
         song = song.model_copy(
             update={"processing_status": ProcessingStatus.CONVERTING}
         )
-        batch_id = str(uuid.uuid4())
-        conn = self._song_repo.get_connection()
         try:
-            new_id = self._song_repo.insert(song, conn)
-            if original_path:
-                self._staging_repo.set_origin(new_id, original_path, conn)
-            hydrated_song = song.model_copy(update={"id": new_id})
-            self._audit_repo.flush_batch(batch_id, "ingest", conn)
-            conn.commit()
+            with self._song_repo.write_connection("ingest") as conn:
+                new_id = self._song_repo.insert(song, conn)
+                if original_path:
+                    self._staging_repo.set_origin(new_id, original_path, conn)
+                hydrated_song = song.model_copy(update={"id": new_id})
             logger.info(
                 f"[IngestionService] <- ingest_wav_as_converting(path='{staged_path}') INGESTED ID={new_id} (Status={ProcessingStatus.CONVERTING})"
             )
             return {"status": "CONVERTING", "song": hydrated_song}
         except Exception as e:
-            conn.rollback()
             logger.error(
                 f"[IngestionService] <- ingest_wav_as_converting() FAILED: {e}"
             )
             if os.path.exists(staged_path) and self._is_staged(staged_path):
                 os.remove(staged_path)
             return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
-        finally:
-            conn.close()
 
     def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> int:
         """
@@ -312,80 +303,62 @@ class IngestionService:
                 logger.info(
                     f"[IngestionService] <- finalize_wav_conversion(id={song_id}) GHOST: reactivating ID={existing['id']}"
                 )
-                batch_id = str(uuid.uuid4())
-                conn = self._song_repo.get_connection()
                 try:
-                    raw_meta = self._metadata_service.extract_metadata(mp3_path)
-                    parsed_song = self._metadata_parser.parse(raw_meta, mp3_path)
-                    reactivated = parsed_song.model_copy(
-                        update={
-                            "id": existing["id"],
-                            "source_path": mp3_path,
-                            "audio_hash": mp3_hash,
-                            "is_active": False,
-                            "processing_status": ProcessingStatus.NEEDS_REVIEW,
-                        }
-                    )
-                    self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
-                    self._song_repo.hard_delete(song_id, conn)
-                    self._audit_repo.flush_batch(batch_id, "ingest", conn)
-                    conn.commit()
+                    with self._song_repo.write_connection("ingest") as conn:
+                        raw_meta = self._metadata_service.extract_metadata(mp3_path)
+                        parsed_song = self._metadata_parser.parse(raw_meta, mp3_path)
+                        reactivated = parsed_song.model_copy(
+                            update={
+                                "id": existing["id"],
+                                "source_path": mp3_path,
+                                "audio_hash": mp3_hash,
+                                "is_active": False,
+                                "processing_status": ProcessingStatus.NEEDS_REVIEW,
+                            }
+                        )
+                        self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
+                        self._song_repo.hard_delete(song_id, conn)
                     return existing["id"]
                 except Exception as ex:
-                    conn.rollback()
                     logger.error(
                         f"[IngestionService] <- finalize_wav_conversion() reactivate failed: {ex}"
                     )
                     return song_id
-                finally:
-                    conn.close()
             else:
                 # Active duplicate — discard the new record
                 logger.warning(
                     f"[IngestionService] <- finalize_wav_conversion(id={song_id}) DUPLICATE: MP3 hash already owned by ID={existing['id']}, deleting new record"
                 )
-                batch_id = str(uuid.uuid4())
-                conn = self._song_repo.get_connection()
                 try:
-                    self._song_repo.hard_delete(song_id, conn)
-                    self._audit_repo.flush_batch(batch_id, "ingest", conn)
-                    conn.commit()
+                    with self._song_repo.write_connection("ingest") as conn:
+                        self._song_repo.hard_delete(song_id, conn)
                 except Exception as ex:
-                    conn.rollback()
                     logger.error(
                         f"[IngestionService] <- finalize_wav_conversion() hard_delete failed: {ex}"
                     )
-                finally:
-                    conn.close()
                 if os.path.exists(mp3_path):
                     os.remove(mp3_path)
                 return existing["id"]
 
-        batch_id = str(uuid.uuid4())
-        conn = self._song_repo.get_connection()
         try:
-            self._song_repo.update_scalars(
-                song_id,
-                {
-                    "source_path": mp3_path,
-                    "processing_status": ProcessingStatus.PENDING_ENRICHMENT,
-                    "audio_hash": mp3_hash,
-                },
-                conn,
-            )
-            self.enrich_metadata(song_id, conn)
-            self._audit_repo.flush_batch(batch_id, "ingest", conn)
-            conn.commit()
+            with self._song_repo.write_connection("ingest") as conn:
+                self._song_repo.update_scalars(
+                    song_id,
+                    {
+                        "source_path": mp3_path,
+                        "processing_status": ProcessingStatus.PENDING_ENRICHMENT,
+                        "audio_hash": mp3_hash,
+                    },
+                    conn,
+                )
+                self.enrich_metadata(song_id, conn)
             logger.info(
                 f"[IngestionService] <- finalize_wav_conversion(id={song_id}) Status now {ProcessingStatus.NEEDS_REVIEW}"
             )
             return song_id
         except Exception as e:
-            conn.rollback()
             logger.error(f"[IngestionService] <- finalize_wav_conversion() FAILED: {e}")
             return song_id
-        finally:
-            conn.close()
 
     def _is_staged(self, path: str) -> bool:
         try:
@@ -434,25 +407,21 @@ class IngestionService:
 
         # 2. Atomic Write
         song = check["song"]
-        batch_id = str(uuid.uuid4())
-        conn = self._song_repo.get_connection()
         try:
-            new_id = self._song_repo.insert(song, conn)
-            hydrated_song = song.model_copy(update={"id": new_id})
-            self.enrich_metadata(new_id, conn)
-            hydrated_song = hydrated_song.model_copy(
-                update={"processing_status": ProcessingStatus.NEEDS_REVIEW}
-            )
-            if original_path:
-                self._staging_repo.set_origin(new_id, original_path, conn)
-            self._audit_repo.flush_batch(batch_id, "ingest", conn)
-            conn.commit()
+            with self._song_repo.write_connection("ingest") as conn:
+                new_id = self._song_repo.insert(song, conn)
+                hydrated_song = song.model_copy(update={"id": new_id})
+                self.enrich_metadata(new_id, conn)
+                hydrated_song = hydrated_song.model_copy(
+                    update={"processing_status": ProcessingStatus.NEEDS_REVIEW}
+                )
+                if original_path:
+                    self._staging_repo.set_origin(new_id, original_path, conn)
             logger.info(
                 f"[IngestionService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
             )
             return {"status": "INGESTED", "song": hydrated_song}
         except Exception as e:
-            conn.rollback()
             # Catch hash conflict with ghost
             ghost_meta = self._song_repo.get_source_metadata_by_hash(song.audio_hash)
             if ghost_meta and ghost_meta["is_deleted"]:
@@ -472,8 +441,6 @@ class IngestionService:
                 "message": f"Ingestion failed: {str(e)}",
                 "staged_path": staged_path,
             }
-        finally:
-            conn.close()
 
     def resolve_conflict(
         self, ghost_id: int, staged_path: str, original_path: Optional[str] = None
@@ -496,38 +463,32 @@ class IngestionService:
             ProcessingStatus.CONVERTING if is_wav else ProcessingStatus.NEEDS_REVIEW
         )
 
-        batch_id = str(uuid.uuid4())
-        conn = self._song_repo.get_connection()
         try:
-            audio_hash = calculate_audio_hash(staged_path)
-            raw_meta = self._metadata_service.extract_metadata(staged_path)
-            parsed_song = self._metadata_parser.parse(raw_meta, staged_path)
+            with self._song_repo.write_connection("ingest") as conn:
+                audio_hash = calculate_audio_hash(staged_path)
+                raw_meta = self._metadata_service.extract_metadata(staged_path)
+                parsed_song = self._metadata_parser.parse(raw_meta, staged_path)
 
-            reactivated = parsed_song.model_copy(
-                update={
-                    "id": ghost_id,
-                    "source_path": staged_path,
-                    "audio_hash": audio_hash,
-                    "is_active": False,
-                    "processing_status": target_status,
-                }
-            )
-            self._song_repo.reactivate_ghost(ghost_id, reactivated, conn)
-            if original_path:
-                self._staging_repo.set_origin(ghost_id, original_path, conn)
-            self._audit_repo.flush_batch(batch_id, "ingest", conn)
-            conn.commit()
+                reactivated = parsed_song.model_copy(
+                    update={
+                        "id": ghost_id,
+                        "source_path": staged_path,
+                        "audio_hash": audio_hash,
+                        "is_active": False,
+                        "processing_status": target_status,
+                    }
+                )
+                self._song_repo.reactivate_ghost(ghost_id, reactivated, conn)
+                if original_path:
+                    self._staging_repo.set_origin(ghost_id, original_path, conn)
 
             status_label = "PENDING_CONVERT" if is_wav else "INGESTED"
             logger.info(f"[IngestionService] <- resolve_conflict OK ({status_label})")
             return {"status": status_label, "song": reactivated}
 
         except Exception as e:
-            conn.rollback()
             logger.error(f"[IngestionService] <- resolve_conflict FAILED: {e}")
             return {"status": "ERROR", "message": str(e)}
-        finally:
-            conn.close()
 
     def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
         """

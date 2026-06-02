@@ -138,7 +138,50 @@ def test_tripwire_raises_on_orphaned_null_rows(audit_db):
 
 
 # ---------------------------------------------------------------------------
-# 4. Null → Null — no audit entries for no-op updates
+# 4. write_connection — direct contract tests
+# ---------------------------------------------------------------------------
+
+
+def test_write_connection_flushes_and_commits(audit_db):
+    repo = BaseRepository(audit_db)
+    with repo.write_connection("test") as conn:
+        conn.execute("UPDATE Songs SET TempoBPM = 42 WHERE SourceID = 1")
+
+    check = sqlite3.connect(audit_db)
+    val = check.execute("SELECT TempoBPM FROM Songs WHERE SourceID = 1").fetchone()[0]
+    null_count = check.execute(
+        "SELECT COUNT(*) FROM ChangeLog WHERE batch_id IS NULL"
+    ).fetchone()[0]
+    check.close()
+    assert val == 42
+    assert null_count == 0
+
+
+def test_write_connection_rolls_back_on_exception(audit_db):
+    check = sqlite3.connect(audit_db)
+    original = check.execute(
+        "SELECT TempoBPM FROM Songs WHERE SourceID = 1"
+    ).fetchone()[0]
+    check.close()
+
+    repo = BaseRepository(audit_db)
+    with pytest.raises(ValueError):
+        with repo.write_connection("test") as conn:
+            conn.execute("UPDATE Songs SET TempoBPM = 999 WHERE SourceID = 1")
+            raise ValueError("simulated error")
+
+    check = sqlite3.connect(audit_db)
+    val = check.execute("SELECT TempoBPM FROM Songs WHERE SourceID = 1").fetchone()[0]
+    null_count = check.execute(
+        "SELECT COUNT(*) FROM ChangeLog WHERE batch_id IS NULL"
+    ).fetchone()[0]
+    check.close()
+    assert val == original
+    assert null_count == 0
+
+
+# ---------------------------------------------------------------------------
+# 5. Null → Null — no audit entries for no-op updates
 # ---------------------------------------------------------------------------
 
 

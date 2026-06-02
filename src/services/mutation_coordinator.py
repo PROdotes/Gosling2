@@ -1,9 +1,7 @@
 import sqlite3
-import uuid
 from pathlib import Path
 from typing import Any
 
-from src.data.audit_repository import AuditRepository
 from src.data.base_repository import BaseRepository
 from src.data.staging_repository import StagingRepository
 from src.engine.config import LIBRARY_ROOT, RENAME_RULES_PATH, STAGING_DIR
@@ -63,7 +61,6 @@ class MutationCoordinator:
         self._delete_mutator = DeleteMutator(db_path)
         self._identity_mutator = IdentityMutator(db_path)
         self._staging_repo = StagingRepository(db_path)
-        self._audit_repo = AuditRepository(db_path)
         self._id3_writer = MetadataWriter()
         self._filing = FilingService(RENAME_RULES_PATH)
 
@@ -101,69 +98,65 @@ class MutationCoordinator:
         }
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
-        batch_id = str(uuid.uuid4())
-        conn = self._conn_factory.get_connection()
         copied_files: list[tuple[str, str]] = []
+        deleted_songs = []
+        delete_file_ids: set[int] = set()
+        songs = []
+        warnings = []
         try:
-            touched_song_ids: set[int] = set()
+            with self._conn_factory.write_connection("ui") as conn:
+                touched_song_ids: set[int] = set()
 
-            deleted_songs = []
-            delete_file_ids: set[int] = set()
-            for item in body.delete or []:
-                if isinstance(item, DeleteOriginalFileItem):
-                    origin = self._staging_repo.get_origin(item.song_id, conn)
-                    if origin and Path(origin).exists():
-                        Path(origin).unlink()
-                        logger.info(
-                            f"[MutationCoordinator] Deleted original source: {origin}"
-                        )
-                    self._staging_repo.clear_origin(item.song_id, conn)
-                    continue
-                if isinstance(item, DeleteSongItem):
-                    song = self._library.get_song(item.id, conn)
-                    if song:
-                        deleted_songs.append(song)
-                    if item.delete_file and item.id:
-                        delete_file_ids.add(item.id)
-                self._delete_mutator.apply_within("delete", item, conn)
+                for item in body.delete or []:
+                    if isinstance(item, DeleteOriginalFileItem):
+                        origin = self._staging_repo.get_origin(item.song_id, conn)
+                        if origin and Path(origin).exists():
+                            Path(origin).unlink()
+                            logger.info(
+                                f"[MutationCoordinator] Deleted original source: {origin}"
+                            )
+                        self._staging_repo.clear_origin(item.song_id, conn)
+                        continue
+                    if isinstance(item, DeleteSongItem):
+                        song = self._library.get_song(item.id, conn)
+                        if song:
+                            deleted_songs.append(song)
+                        if item.delete_file and item.id:
+                            delete_file_ids.add(item.id)
+                    self._delete_mutator.apply_within("delete", item, conn)
 
-            for item in body.remove or []:
-                self._route(item, "remove", conn)
-                self._collect_touched(item, touched_song_ids)
+                for item in body.remove or []:
+                    self._route(item, "remove", conn)
+                    self._collect_touched(item, touched_song_ids)
 
-            for item in body.add or []:
-                self._route(item, "add", conn)
-                self._collect_touched(item, touched_song_ids)
+                for item in body.add or []:
+                    self._route(item, "add", conn)
+                    self._collect_touched(item, touched_song_ids)
 
-            for item in body.update or []:
-                self._route(item, "update", conn)
-                self._collect_touched(item, touched_song_ids)
+                for item in body.update or []:
+                    self._route(item, "update", conn)
+                    self._collect_touched(item, touched_song_ids)
 
-            for item in body.merge or []:
-                self._route(item, "merge", conn)
+                for item in body.merge or []:
+                    self._route(item, "merge", conn)
 
-            songs = []
-            warnings = []
-            for song_id in sorted(touched_song_ids):
-                post = self._library.get_song(song_id, conn)
-                if not post:
-                    continue
-                songs.append(post)
-                warnings += self._filing.write_id3_if_needed(post, self._id3_writer)
-                copy_warnings, new_path = self._filing.copy_if_needed(
-                    post, LIBRARY_ROOT
-                )
-                warnings += copy_warnings
-                if new_path:
-                    copied_files.append((post.source_path, new_path))
-                    self._song_mutator.apply_within(
-                        "update",
-                        UpdateSongItem(type="song", id=song_id, source_path=new_path),
-                        conn,
+                for song_id in sorted(touched_song_ids):
+                    post = self._library.get_song(song_id, conn)
+                    if not post:
+                        continue
+                    songs.append(post)
+                    warnings += self._filing.write_id3_if_needed(post, self._id3_writer)
+                    copy_warnings, new_path = self._filing.copy_if_needed(
+                        post, LIBRARY_ROOT
                     )
-
-            self._audit_repo.flush_batch(batch_id, "ui", conn)
-            conn.commit()
+                    warnings += copy_warnings
+                    if new_path:
+                        copied_files.append((post.source_path, new_path))
+                        self._song_mutator.apply_within(
+                            "update",
+                            UpdateSongItem(type="song", id=song_id, source_path=new_path),
+                            conn,
+                        )
 
             for song in deleted_songs:
                 if song.id in delete_file_ids:
@@ -189,7 +182,6 @@ class MutationCoordinator:
             return {"songs": [s.model_dump() for s in songs], "warnings": warnings}
 
         except Exception:
-            conn.rollback()
             for _, new_path in copied_files:
                 new = Path(new_path)
                 if new.exists():
@@ -198,8 +190,6 @@ class MutationCoordinator:
                         f"[MutationCoordinator] Deleted copy after rollback: {new}"
                     )
             raise
-        finally:
-            conn.close()
 
     def _route(self, item, action: str, conn: sqlite3.Connection) -> None:
         mutator = self._dispatch.get(type(item))

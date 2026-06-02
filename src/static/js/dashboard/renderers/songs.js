@@ -183,6 +183,7 @@ function renderSongRows(ctx, songs) {
         .map((song, index) => {
             const title = escapeHtml(song.display_title);
             const artist = escapeHtml(song.display_artist || "Unknown Artist");
+            const duration = escapeHtml(song.formatted_duration || "");
             const pills = (song.review_blockers || [])
                 .map((b) => `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`)
                 .join("");
@@ -194,6 +195,7 @@ function renderSongRows(ctx, songs) {
     <div class="row-artist">${artist}</div>
   </div>
   <div class="col-missing">${pills}</div>
+  <div class="col-time">${duration}</div>
 </div>`;
         })
         .join("");

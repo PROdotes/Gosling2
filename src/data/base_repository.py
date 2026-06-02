@@ -1,4 +1,6 @@
 import sqlite3
+import uuid
+from contextlib import contextmanager
 
 
 class BaseRepository:
@@ -26,9 +28,9 @@ class BaseRepository:
         """
         conn = self._open_connection()
 
-        # Audit integrity tripwire: detect any write path that committed without
-        # calling flush_batch. NULL rows here mean triggers fired but batch_id was
-        # never filled in — points directly at a missing flush_batch call.
+        # Tripwire: any committed NULL batch_id rows mean a write path bypassed
+        # write_connection() and called conn.commit() directly. Catches it on
+        # the next open so nothing silently escapes the audit log.
         try:
             count = conn.execute(
                 "SELECT COUNT(*) FROM ChangeLog WHERE batch_id IS NULL"
@@ -38,10 +40,32 @@ class BaseRepository:
         if count > 0:
             raise RuntimeError(
                 f"Audit integrity violation: {count} ChangeLog rows committed with "
-                f"NULL batch_id. A write path is missing flush_batch(). Fix before continuing."
+                f"NULL batch_id. A write path bypassed write_connection(). Fix before continuing."
             )
 
         return conn
+
+    @contextmanager
+    def write_connection(self, label: str):
+        """
+        Context manager for write transactions. Flushes audit batch and commits
+        on success; rolls back on any exception. Use instead of get_connection()
+        for all paths that modify the database.
+        """
+        batch_id = str(uuid.uuid4())
+        conn = self.get_connection()
+        try:
+            yield conn
+            conn.execute(
+                "UPDATE ChangeLog SET batch_id = ?, batch_label = ? WHERE batch_id IS NULL",
+                (batch_id, label),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _get_connection(self) -> sqlite3.Connection:
         """Internal connection factory for repository read methods."""

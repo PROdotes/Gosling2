@@ -250,6 +250,18 @@
     flex-shrink: 0;
 }
 
+#songs-workspace .col-time {
+    flex-shrink: 0;
+    min-width: 42px;
+    text-align: right;
+}
+
+#songs-workspace .song-row .col-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
 #songs-workspace .pill {
     background: var(--bg-element);
     padding: 2px 4px;
