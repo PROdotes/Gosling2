@@ -103,30 +103,26 @@ function renderAlbumSubCards(albums, songId) {
 
             return `
 <div class="album-sub-card" data-album-id="${albumId}">
-  <div class="editor-section-title">
-    <span>Linked Album</span>
-    <div class="album-sub-actions">
-      <button class="album-sub-star${album.is_primary ? " is-primary" : ""}" data-action="set-primary-album" data-song-id="${songId}" data-album-id="${albumId}" title="${album.is_primary ? "Primary album" : "Set as primary album"}" type="button">★</button>
-      <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync from song</button>
-      <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
+  <div class="album-sub-title-row">
+    <button class="album-sub-star${album.is_primary ? " is-primary" : ""}" data-action="set-primary-album" data-song-id="${songId}" data-album-id="${albumId}" title="${album.is_primary ? "Primary album" : "Set as primary album"}" type="button">&#9733;</button>
+    <div class="album-title-input-wrap">
+      <div class="editor-input-row">
+        <input class="editor-input" data-album-scalar="title" data-album-id="${albumId}" data-song-id="${songId}" type="text" value="${escapeHtml(title)}" readonly>
+        <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
+        <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
+      </div>
     </div>
-  </div>
-  <div class="editor-field">
-    <label class="editor-label">Album Title</label>
-    <div class="editor-input-row">
-      <input class="editor-input" data-album-scalar="title" data-album-id="${albumId}" data-song-id="${songId}" type="text" value="${escapeHtml(title)}" readonly>
-      <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
-      <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
-    </div>
+    <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" title="Sync metadata from song" type="button">&#8595;</button>
+    <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">&#10005;</button>
   </div>
 
   <div class="editor-field">
-    <label class="editor-label">Album Artist</label>
+    <label class="editor-label">Artist</label>
     <div class="album-sub-chips" data-album-chips="artist" data-album-id="${albumId}"></div>
   </div>
 
   <div class="editor-field">
-    <label class="editor-label">Album Publisher</label>
+    <label class="editor-label">Publisher</label>
     <div class="album-sub-chips" data-album-chips="publisher" data-album-id="${albumId}"></div>
   </div>
 
