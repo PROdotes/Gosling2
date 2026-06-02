@@ -1052,6 +1052,33 @@
     margin-bottom: 0;
 }
 
+#songs-workspace .album-sub-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#songs-workspace .album-sub-star {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    font-size: 13px;
+    color: var(--text-mut);
+    opacity: 0.5;
+}
+
+#songs-workspace .album-sub-star:hover {
+    opacity: 1;
+    color: #facc15;
+}
+
+#songs-workspace .album-sub-star.is-primary {
+    color: #facc15;
+    opacity: 1;
+}
+
 #songs-workspace .album-sub-remove {
     background: none;
     border: none;

@@ -101,8 +101,10 @@ class MetadataWriter:
                     tags.add(TXXX(encoding=3, desc=cat, text=unique_names))
 
             # 4. Albums / Media Meta
+            # ID3 holds a single album, so write the primary one (fall back to
+            # first if none is flagged). albums[0] is not primary-aware.
             if song.albums:
-                album = song.albums[0]
+                album = next((a for a in song.albums if a.is_primary), song.albums[0])
                 self._apply_frame(tags, "TALB", album.album_title)
                 if album.track_number:
                     self._apply_frame(tags, "TRCK", str(album.track_number))

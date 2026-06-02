@@ -564,7 +564,12 @@ function navigate(mode, query = "") {
     elements.searchInput.value = state.currentQuery;
     syncModeUi();
     ctx.hideDetailPanel();
-    performSearch(state.currentQuery);
+    if (mode === "songs") {
+        filterSidebar.load(state.currentQuery);
+        doSongSearch();
+    } else {
+        performSearch(state.currentQuery);
+    }
     elements.searchInput.focus();
 }
 

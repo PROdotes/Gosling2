@@ -104,7 +104,11 @@ function renderAlbumSubCards(albums, songId) {
 <div class="album-sub-card" data-album-id="${albumId}">
   <div class="editor-section-title">
     <span>Linked Album</span>
-    <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
+    <div class="album-sub-actions">
+      <button class="album-sub-star${album.is_primary ? " is-primary" : ""}" data-action="set-primary-album" data-song-id="${songId}" data-album-id="${albumId}" title="${album.is_primary ? "Primary album" : "Set as primary album"}" type="button">★</button>
+      <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync from song</button>
+      <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
+    </div>
   </div>
   <div class="editor-field">
     <label class="editor-label">Album Title</label>
@@ -143,7 +147,6 @@ function renderAlbumSubCards(albums, songId) {
       <input class="editor-input" data-album-link="track_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.track_number ?? ""}" readonly>
     </div>
   </div>
-  <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync metadata from song</button>
 </div>`;
         })
         .join("");
@@ -154,7 +157,21 @@ function updateAlbumSubSection(freshSong, refreshCallback) {
         `[data-album-sub-song="${freshSong.id}"]`,
     );
     if (el) {
-        el.innerHTML = renderAlbumSubCards(freshSong.albums, freshSong.id);
+        // Preserve the on-screen card order across in-place updates so toggling
+        // primary doesn't reorder cards under the cursor. The server returns
+        // albums primary-first (used on full load); here we freeze the existing
+        // order and append any newly-added albums at the end.
+        const domOrder = Array.from(
+            el.querySelectorAll(".album-sub-card"),
+        ).map((c) => c.dataset.albumId);
+        const ordered = [...(freshSong.albums || [])].sort((a, b) => {
+            const ai = domOrder.indexOf(String(a.album_id ?? a.id));
+            const bi = domOrder.indexOf(String(b.album_id ?? b.id));
+            return (
+                (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+            );
+        });
+        el.innerHTML = renderAlbumSubCards(ordered, freshSong.id);
         wireAlbumSubChips(freshSong, refreshCallback);
         wireAlbumScalarInputs(freshSong, refreshCallback);
     }
@@ -279,6 +296,8 @@ function wireAlbumSubChips(song, refresh) {
                     .map((c) => ({
                         id: c.name_id || c.credit_id || c.id,
                         label: c.display_name,
+                        _identityId: c.identity_id,
+                        _nameId: c.name_id,
                     }));
             };
 
@@ -307,11 +326,15 @@ function wireAlbumSubChips(song, refresh) {
                     await refresh();
                 },
                 allowCreate: true,
-                labelAttrs: (item) => ({
-                    "data-action": "open-edit-modal",
-                    "data-chip-type": "artist",
-                    "data-item-id": item.id,
-                }),
+                labelAttrs: (item) =>
+                    item._identityId
+                        ? {
+                              "data-action": "open-edit-modal",
+                              "data-chip-type": "credit",
+                              "data-item-id": item._nameId ?? "",
+                              "data-identity-id": item._identityId,
+                          }
+                        : null,
             });
         } else if (field === "publisher") {
             const getItems = (a) =>

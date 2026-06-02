@@ -52,6 +52,9 @@ Activates inline scalar editing.
 ### handleSetPrimaryTag(actionTarget)
 Sets a tag as primary.
 
+### handleSetPrimaryAlbum(actionTarget)
+Sets an album as the song's primary album.
+
 ### handleRemoveTag(actionTarget)
 Unlinks a tag.
 

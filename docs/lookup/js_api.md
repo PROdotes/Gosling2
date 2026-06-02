@@ -218,6 +218,9 @@ Unlinks a song from an album.
 ### updateSongAlbumLink(songId, albumId, trackNumber, discNumber)
 Updates track/disc position on an album link.
 
+### setPrimarySongAlbum(songId, albumId)
+Marks an album link as the primary album for a song (the one written to the single ID3 album frame).
+
 ### addAlbumCredit(albumId, displayName, roleName, identityId)
 Adds a credit to an album.
 

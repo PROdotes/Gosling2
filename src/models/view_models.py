@@ -82,6 +82,7 @@ class SongAlbumView(BaseModel):
     source_id: Optional[int] = None
     album_id: Optional[int] = None
     album_title: str
+    is_primary: bool = False
     track_number: Optional[int] = None
     disc_number: Optional[int] = None
     album_type: Optional[str] = None

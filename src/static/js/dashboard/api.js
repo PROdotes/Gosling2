@@ -479,6 +479,10 @@ export function updateSongAlbumLink(songId, albumId, trackNumber, discNumber) {
     return mutate({ update: [{ type: "song_album", song_id: songId, album_id: albumId, track_number: trackNumber, disc_number: discNumber }] });
 }
 
+export function setPrimarySongAlbum(songId, albumId) {
+    return mutate({ update: [{ type: "song_album", song_id: songId, album_id: albumId, is_primary: true }] });
+}
+
 export async function syncAlbumFromSong(albumId, songId) {
     const payload = await fetchJson(`/api/v1/albums/${albumId}/sync-from-song/${songId}`);
     if (!payload.add && !payload.update) return {};

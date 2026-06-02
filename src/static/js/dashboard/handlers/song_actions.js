@@ -22,6 +22,7 @@ import {
     removeSongPublisher,
     removeSongTag,
     resolveConflict,
+    setPrimarySongAlbum,
     setPrimarySongTag,
     syncAlbumFromSong,
     syncSongId3,
@@ -78,6 +79,7 @@ export class SongActionsHandler {
             "open-splitter-modal",
             "open-filename-parser-single",
             "set-primary-tag",
+            "set-primary-album",
             "remove-tag",
             "remove-credit",
             "remove-album",
@@ -547,6 +549,28 @@ export class SongActionsHandler {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
                     `Failed to set primary tag: ${err.message}`,
+                    "error",
+                );
+            }
+        }
+    }
+
+    async handleSetPrimaryAlbum(actionTarget) {
+        const { songId, albumId } = actionTarget.dataset;
+        try {
+            await setPrimarySongAlbum(songId, albumId);
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
+                await this.ctx.refreshActiveSongV2(songId);
+            } else {
+                this.ctx.refreshActiveDetail();
+            }
+        } catch (err) {
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(
+                    `Failed to set primary album: ${err.message}`,
                     "error",
                 );
             }

@@ -301,19 +301,34 @@ class TestWriteMetadataAlbums:
         tags = ID3(str(mp3))
         assert "TALB" not in tags, "Expected no TALB frame when albums list is empty"
 
-    def test_only_first_album_written(self, writer, mp3):
+    def test_primary_album_written_not_first(self, writer, mp3):
+        # ID3 holds one album; the primary flag decides which, regardless of order.
         song = _bare_song(
             mp3,
             albums=[
-                SongAlbum(album_title="First Album"),
-                SongAlbum(album_title="Second Album"),
+                SongAlbum(album_title="First Album", is_primary=False),
+                SongAlbum(album_title="Second Album", is_primary=True),
+            ],
+        )
+        writer.write_metadata(song)
+        tags = ID3(str(mp3))
+        assert (
+            str(tags["TALB"]) == "Second Album"
+        ), f"Expected primary album 'Second Album', got '{tags['TALB']}'"
+
+    def test_falls_back_to_first_when_no_primary(self, writer, mp3):
+        song = _bare_song(
+            mp3,
+            albums=[
+                SongAlbum(album_title="First Album", is_primary=False),
+                SongAlbum(album_title="Second Album", is_primary=False),
             ],
         )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert (
             str(tags["TALB"]) == "First Album"
-        ), f"Expected only first album 'First Album', got '{tags['TALB']}'"
+        ), f"Expected fallback to first album 'First Album', got '{tags['TALB']}'"
 
 
 # ---------------------------------------------------------------------------

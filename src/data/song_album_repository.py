@@ -16,6 +16,7 @@ class SongAlbumRepository(BaseRepository):
         FROM SongAlbums sa
         JOIN Albums a ON sa.AlbumID = a.AlbumID
         WHERE sa.SourceID IN ({placeholders})
+        ORDER BY sa.IsPrimary DESC, sa.AlbumID
     """
 
     def get_albums_for_songs(
