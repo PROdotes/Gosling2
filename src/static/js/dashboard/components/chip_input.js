@@ -17,6 +17,9 @@ import { ABORTED } from "../api.js";
 import { escapeHtml } from "./utils.js";
 import { createAutocomplete } from "./autocomplete.js";
 
+// Fields with more than this many chips auto-fold on initial render.
+const FOLD_THRESHOLD = 5;
+
 export function createChipInput({
     container,
     items: initialItems,
@@ -30,6 +33,7 @@ export function createChipInput({
     categoryColors = {},
     labelAttrs = null,
     extraChipButtons = null,
+    placeholder = "Search...",
 }) {
     let items = [...initialItems];
 
@@ -41,19 +45,152 @@ export function createChipInput({
     const chipsEl = document.createElement("div");
     chipsEl.className = "chip-input__chips";
 
+    // Folded one-liner: shows value text + overflow count. Click to unfold.
+    const previewEl = document.createElement("button");
+    previewEl.type = "button";
+    previewEl.className = "chip-input__preview";
+    previewEl.hidden = true;
+
+    // Collapsed-by-default "add" trigger. At rest the field is just chips + this
+    // faint worded stub ("+ Add composer"); clicking it reveals the search box.
+    // Keeps the editor calm with many empty fields while staying self-explanatory.
+    const stubEl = document.createElement("button");
+    stubEl.type = "button";
+    stubEl.className = "chip-input__stub";
+
     const inputEl = document.createElement("input");
     inputEl.type = "text";
     inputEl.className = "chip-input__text";
-    inputEl.placeholder = "Search…";
+    inputEl.placeholder = placeholder;
     inputEl.autocomplete = "off";
+    inputEl.hidden = true;
 
     const dropdownEl = document.createElement("div");
     dropdownEl.className = "chip-input__dropdown";
     dropdownEl.hidden = true;
 
     container.appendChild(chipsEl);
+    container.appendChild(previewEl);
+    container.appendChild(stubEl);
     container.appendChild(inputEl);
     container.appendChild(dropdownEl);
+
+    // ── Collapsed / expanded state ─────────────────────────────────────────────
+
+    let expanded = false;
+
+    function stubLabel() {
+        return items.length > 0 ? "+ add" : `+ ${placeholder}`;
+    }
+
+    function syncStub() {
+        if (!expanded) stubEl.textContent = stubLabel();
+    }
+
+    function expand() {
+        if (expanded) return;
+        expanded = true;
+        container.classList.add("chip-input--expanded");
+        stubEl.hidden = true;
+        inputEl.hidden = false;
+        inputEl.focus();
+    }
+
+    function collapse() {
+        if (!expanded) return;
+        expanded = false;
+        container.classList.remove("chip-input--expanded");
+        inputEl.value = "";
+        inputEl.hidden = true;
+        stubEl.hidden = false;
+        syncStub();
+    }
+
+    stubEl.addEventListener("click", expand);
+
+    inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            // Autocomplete also closes its dropdown on Escape; we additionally
+            // collapse the whole field back to the stub.
+            collapse();
+            inputEl.blur();
+        }
+    });
+
+    inputEl.addEventListener("blur", () => {
+        // Collapse only if focus truly left and nothing's half-typed. Option
+        // clicks use mousedown+preventDefault, so they never blur the input.
+        setTimeout(() => {
+            if (document.activeElement === inputEl) return;
+            if (inputEl.value.trim() === "") collapse();
+        }, 160);
+    });
+
+    // ── Fold state ────────────────────────────────────────────────────────────
+    // Fold is a separate axis from expand/collapse (which controls the add-input).
+    // Folded: chips hidden, one-liner preview shown. Expanded: add-input shown.
+
+    let folded = initialItems.length > FOLD_THRESHOLD;
+
+    function buildPreviewText() {
+        const shown = items.slice(0, 2).map((i) => escapeHtml(i.label)).join(", ");
+        if (items.length > 2) {
+            return `${shown}<span class="chip-input__preview-more"> +${items.length - 2} more</span>`;
+        }
+        return shown;
+    }
+
+    function applyFold() {
+        const hasFoldable = items.length > 0;
+        if (!hasFoldable) folded = false; // can't fold an empty field
+
+        const field = container.closest(".editor-field");
+        if (field) {
+            field.classList.toggle("foldable", hasFoldable);
+            field.classList.toggle("open", hasFoldable && !folded);
+        }
+
+        if (folded) {
+            // Force close the add-input when folding
+            if (expanded) {
+                expanded = false;
+                container.classList.remove("chip-input--expanded");
+                inputEl.value = "";
+                inputEl.hidden = true;
+                dropdownEl.hidden = true;
+            }
+            // Use inline style (not hidden attr) because display:contents ignores
+            // the hidden attribute in some browsers — inline style wins reliably.
+            chipsEl.style.display = "none";
+            stubEl.hidden = true;
+            previewEl.innerHTML = buildPreviewText();
+            previewEl.hidden = false;
+        } else {
+            chipsEl.style.display = "";
+            previewEl.hidden = true;
+            if (expanded) {
+                stubEl.hidden = true;
+            } else {
+                stubEl.hidden = false;
+                syncStub();
+            }
+        }
+    }
+
+    function fold() { folded = true; applyFold(); }
+    function unfold() { folded = false; applyFold(); }
+    function toggleFold() { if (folded) unfold(); else fold(); }
+
+    // Preview click → unfold to show chips + stub (does NOT auto-open search box)
+    previewEl.addEventListener("click", unfold);
+
+    // Label click is the primary fold toggle. Wire it self-contained here so
+    // song_editor.js doesn't need to know about fold.
+    const fieldEl = container.closest(".editor-field");
+    if (fieldEl) {
+        const labelEl = fieldEl.querySelector(".editor-label");
+        if (labelEl) labelEl.addEventListener("click", toggleFold);
+    }
 
     // ── Chip rendering ────────────────────────────────────────────────────────
 
@@ -119,6 +256,7 @@ export function createChipInput({
                     await onRemove(item.id);
                     items = items.filter((i) => i.id !== item.id || i.label !== item.label);
                     renderChips();
+                    applyFold();
                 } catch {
                     removeBtn.disabled = false;
                 }
@@ -127,6 +265,7 @@ export function createChipInput({
 
             chipsEl.appendChild(chip);
         }
+        syncStub();
     }
 
     // ── Dropdown rendering ─────────────────────────────────────────────────
@@ -164,6 +303,7 @@ export function createChipInput({
             if (newItem) {
                 items = [...items, newItem];
                 renderChips();
+                applyFold();
             }
         },
         renderItem,
@@ -175,11 +315,19 @@ export function createChipInput({
     // ── Init ─────────────────────────────────────────────────────────────────
 
     renderChips();
+    applyFold();
 
     return {
         setItems(newItems) {
             items = [...newItems];
             renderChips();
+            // Re-sync preview/fold state without re-auto-folding (preserve user's
+            // manual toggle for the life of this rendered editor).
+            applyFold();
         },
+        expand,
+        fold,
+        unfold,
+        toggleFold,
     };
 }

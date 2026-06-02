@@ -305,7 +305,7 @@
 #songs-workspace .editor-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px 32px 32px;
+    padding: 16px 24px 24px 24px;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: var(--bg-hover) transparent;
@@ -360,7 +360,7 @@
 }
 
 #songs-workspace .editor-section {
-    margin-bottom: 28px;
+    margin-bottom: 18px;
 }
 
 /* .editor-section-title visuals live in base.css (shared section-title primitive). */
@@ -368,7 +368,7 @@
 #songs-workspace .editor-row {
     display: flex;
     gap: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 0;
 }
 
 #songs-workspace .editor-col {
@@ -385,7 +385,49 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+}
+
+/* ── Two-column grid for editor fields inside sections ─────────────────────
+   Scoped to direct children of .editor-section (or one level inside
+   .editor-row > .editor-col) so album sub-card fields are unaffected.     */
+
+#songs-workspace .editor-section > .editor-field,
+#songs-workspace .editor-section > .editor-row > .editor-col > .editor-field {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    gap: 6px 10px;
+    padding: 7px 0;
+    margin-bottom: 0;
+    align-items: start;
+}
+
+/* Column 1: the label — centered against the data cell height */
+#songs-workspace .editor-section > .editor-field > .editor-label,
+#songs-workspace .editor-section > .editor-field > .editor-label-row,
+#songs-workspace .editor-section > .editor-row > .editor-col > .editor-field > .editor-label {
+    grid-column: 1;
+    text-align: left;
+    align-self: center;
+}
+
+/* Album field is tall — pin its label to the top so it doesn't dangle */
+#songs-workspace .editor-section > [data-chip-field="album"] > .editor-label {
+    align-self: start;
+    padding-top: 8px;
+}
+
+/* Column 2: all other direct children (chip-wrap, input-row, error div, etc.) */
+#songs-workspace .editor-section > .editor-field > :not(.editor-label):not(.editor-label-row),
+#songs-workspace .editor-section > .editor-row > .editor-col > .editor-field > :not(.editor-label) {
+    grid-column: 2;
+}
+
+/* Hairlines between consecutive fields (and between row and field) */
+#songs-workspace .editor-section > .editor-field + .editor-field,
+#songs-workspace .editor-section > .editor-row + .editor-field,
+#songs-workspace .editor-section > .editor-field + .editor-row {
+    border-top: 1px solid var(--border);
 }
 
 #songs-workspace .editor-label-row {
@@ -394,28 +436,39 @@
     gap: 8px;
 }
 
+/* Label-row in column 1: left-align (label + quick-create button). */
+#songs-workspace .editor-section > .editor-field > .editor-label-row {
+    justify-content: flex-start;
+}
+
+/* Give section titles a small bottom gap so first field's padding isn't the
+   only thing separating them. */
+#songs-workspace .editor-section > .editor-section-title {
+    margin-bottom: 2px;
+}
+
 #songs-workspace .editor-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-mut);
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
 }
 
 #songs-workspace .editor-quick-create-btn {
     background: none;
     border: none;
-    color: var(--text-mut);
-    font-size: 16px;
+    color: var(--text-mute);
+    font-size: 11px;
+    font-family: inherit;
     cursor: pointer;
-    line-height: 1;
-    padding: 0 4px;
-    transition: color 0.15s ease, transform 0.1s ease;
+    padding: 4px 0 0;
+    text-align: left;
+    transition: color 0.12s ease;
 }
 
 #songs-workspace .editor-quick-create-btn:hover {
-    color: var(--accent-red, #f43f5e);
-    transform: scale(1.2);
+    color: var(--accent);
 }
 
 #songs-workspace .editor-quick-create-btn.loading {
@@ -423,8 +476,55 @@
     pointer-events: none;
 }
 
+/* Wrapper so album sub-cards + search + create-single all sit in grid col 2 */
+#songs-workspace .album-field-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Required-but-empty: label pulses gently between neutral and soft red.
+   Slow enough not to be distracting, clear enough to read as "needs attention". */
 #songs-workspace .editor-field.missing .editor-label {
-    color: var(--accent-red);
+    animation: missing-pulse 2.4s ease-in-out infinite;
+}
+
+#songs-workspace .editor-field.missing .editor-label:hover {
+    animation-play-state: paused;
+    color: var(--text);
+}
+
+@keyframes missing-pulse {
+    0%, 100% { color: var(--text-dim); }
+    50%       { color: #ffaaaa; }
+}
+
+/* Fold caret: CSS border triangle on foldable chip fields.
+   ::before rotates when the field is open. No unicode chars. */
+#songs-workspace .editor-field.foldable .editor-label {
+    cursor: pointer;
+}
+
+#songs-workspace .editor-field.foldable .editor-label::before {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--text-mute);
+    margin-right: 6px;
+    vertical-align: middle;
+    transition: transform 0.12s ease;
+    flex-shrink: 0;
+}
+
+#songs-workspace .editor-field.open .editor-label::before {
+    transform: rotate(90deg);
+}
+
+#songs-workspace .editor-field.foldable .editor-label:hover {
+    color: var(--text);
 }
 
 #songs-workspace .drift-dot {
@@ -446,7 +546,7 @@
     color: var(--text);
     font-size: 13px;
     font-family: inherit;
-    padding: 7px 10px;
+    padding: 4px 8px;
     outline: none;
     width: 100%;
     box-sizing: border-box;
@@ -656,19 +756,95 @@
 }
 
 #songs-workspace .chip-input__text {
-    background: transparent;
-    border: none;
+    /* Break onto its own line, full width, so it reads as a real "add" input. */
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-top: 2px;
     color: var(--text-pure);
     font-size: 12px;
     font-family: inherit;
     outline: none;
-    min-width: 80px;
-    flex: 1;
-    padding: 3px 4px;
+    background: rgba(255, 255, 255, 0.03)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E")
+        no-repeat 9px center;
+    background-size: 13px 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 8px 5px 30px;
+}
+
+#songs-workspace .chip-input__text:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-strong);
+}
+
+#songs-workspace .chip-input__text:focus {
+    border-color: var(--accent);
+    background-color: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 #songs-workspace .chip-input__text::placeholder {
-    color: var(--text-muted);
+    color: var(--text-mut);
+}
+
+/* Add affordance — one reserved signal everywhere: dashed ghost pill.
+   Low-chroma at rest, brightens to accent on hover (boss-test findable). */
+#songs-workspace .chip-input__stub {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    border: 1px dashed rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-mute);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 3px 9px;
+    text-align: left;
+    line-height: 1.4;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+#songs-workspace .chip-input__stub:hover {
+    border-color: var(--accent-border);
+    color: var(--accent-hover);
+    background: var(--accent-soft);
+}
+
+#songs-workspace .chip-input__text[hidden],
+#songs-workspace .chip-input__stub[hidden],
+#songs-workspace .chip-input__preview[hidden] {
+    display: none;
+}
+
+/* Folded one-liner: shows first two names + overflow count.
+   Takes full width of the data column; click to unfold. */
+#songs-workspace .chip-input__preview {
+    flex: 1 1 100%;
+    background: none;
+    border: none;
+    color: var(--text-mute);
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    padding: 2px 0;
+    line-height: 1.4;
+    transition: color 0.1s ease;
+}
+
+#songs-workspace .chip-input__preview:hover {
+    color: var(--text-dim);
+}
+
+#songs-workspace .chip-input__preview-more {
+    color: var(--text-mute);
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0.75;
 }
 
 #songs-workspace .chip-input__dropdown {
@@ -1147,9 +1323,7 @@
 }
 
 #songs-workspace .album-search-wrap {
-    margin-top: 10px;
-    border-top: 1px solid var(--border-subtle);
-    padding-top: 8px;
+    margin-top: 4px;
 }
 
 #songs-workspace {

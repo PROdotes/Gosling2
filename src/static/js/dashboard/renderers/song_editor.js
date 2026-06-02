@@ -47,8 +47,9 @@ function renderScalarField(
     inputId,
     type = "text",
     extraButtons = "",
+    required = true,
 ) {
-    const missing = value == null || value === "";
+    const missing = required && (value == null || value === "");
     return `
 <div class="editor-field${missing ? " missing" : ""}">
   <label class="editor-label" for="${inputId}">${escapeHtml(label)}</label>
@@ -326,6 +327,7 @@ function wireAlbumSubChips(song, refresh) {
                     await refresh();
                 },
                 allowCreate: true,
+                placeholder: "Add album artist",
                 labelAttrs: (item) =>
                     item._identityId
                         ? {
@@ -359,6 +361,7 @@ function wireAlbumSubChips(song, refresh) {
                     await refresh();
                 },
                 allowCreate: true,
+                placeholder: "Add album publisher",
                 labelAttrs: (item) => ({
                     "data-action": "open-edit-modal",
                     "data-chip-type": "publisher",
@@ -639,6 +642,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 await removeSongCredit(song.id, creditId);
                 await refresh();
             },
+            placeholder: `Add ${role.toLowerCase()}`,
             onSplit: onSplit
                 ? (item) =>
                       onSplit({
@@ -712,6 +716,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 await refresh();
             },
             allowCreate: true,
+            placeholder: "Add tag",
             tagMode: true,
             categoryColors,
             getCreateLabel: (q) => {
@@ -768,6 +773,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 await refresh();
             },
             allowCreate: true,
+            placeholder: "Add publisher",
             onSplit: onSplitPublisher
                 ? (item) => onSplitPublisher({ songId: song.id, text: item.label, publisherId: item.id })
                 : null,
@@ -792,7 +798,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
             // Re-use createChipInput with no initial items — it gives us a
             // search input + dropdown for free. We suppress chip rendering
             // (items always stays empty; cards are the display).
-            createChipInput({
+            handles.album = createChipInput({
                 container: searchWrap,
                 items: [],
                 onSearch: async (q) => {
@@ -816,6 +822,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 },
                 onRemove: async () => {}, // removal handled by card × buttons
                 allowCreate: true,
+                placeholder: "Add album / release",
                 getCreateLabel: (q) => `+ Create "${q}"`,
             });
         }
@@ -840,6 +847,13 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
             handle.setItems(items);
             syncMissing(key, items);
             updateListRowBlockers(freshSong.id, freshSong.review_blockers);
+        },
+        // Re-open a field's add-input after a structural re-render so the user
+        // can keep adding (e.g. several composers) without re-clicking the stub.
+        expandField(fieldKey) {
+            if (!fieldKey) return;
+            const handle = handles[String(fieldKey).toLowerCase()];
+            if (handle && handle.expand) handle.expand();
         },
     };
 }
@@ -987,41 +1001,28 @@ export function renderSongEditorV2(song, diff = null, rawTags = null) {
     );
 
     scroll.innerHTML = `
-<div class="editor-song-id">ID: ${escapeHtml(String(song.id ?? "?"))}</div>
 <div class="editor-section">
   <div class="editor-section-title">Required Metadata</div>
-  <div class="editor-row">
-    <div class="editor-col col-8">
-      ${renderScalarField("Title", song.media_name, "ef-title", "text", renderCaseButtons(song.id, "media_name"))}
-    </div>
-    <div class="editor-col col-4">
-      ${renderScalarField("Year", song.year, "ef-year", "number")}
-    </div>
-  </div>
+  ${renderScalarField("Title", song.media_name, "ef-title", "text", renderCaseButtons(song.id, "media_name"))}
+  ${renderScalarField("Year", song.year, "ef-year", "number")}
   ${REQUIRED_ROLES.map((role) => renderChipField(role, creditsByRole[role], `No ${role.toLowerCase()}s`, true, role.toLowerCase())).join("")}
   ${renderChipField("Tags", tags, "No tags", true, "tags")}
   ${renderChipField("Publisher", publishers, "No publisher", true, "publisher")}
   <div class="editor-field${song.albums.length === 0 ? " missing" : ""}" data-chip-field="album">
-    <div class="editor-label-row">
-      <label class="editor-label">Album / Release</label>
-      <button class="editor-quick-create-btn" data-action="quick-create-album" data-song-id="${song.id}" title="Quick create album from title">♥</button>
+    <label class="editor-label">Album</label>
+    <div class="album-field-body">
+      <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
+      <div class="album-search-wrap"></div>
+      <button class="editor-quick-create-btn" data-action="quick-create-album" data-song-id="${song.id}" title="Quick-create a Single album from this song's title">+ Create single</button>
     </div>
-    <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
-    <div class="album-search-wrap"></div>
   </div>
 </div>
 
 <div class="editor-section">
   <div class="editor-section-title">Additional Data</div>
   ${OPTIONAL_ROLES.map((role) => renderChipField(role, creditsByRole[role], `No ${role.toLowerCase()}s`, false, role.toLowerCase())).join("")}
-  <div class="editor-row">
-    <div class="editor-col col-4">
-      ${renderScalarField("BPM", song.bpm, "ef-bpm", "number")}
-    </div>
-    <div class="editor-col col-4">
-      ${renderScalarField("ISRC", song.isrc, "ef-isrc")}
-    </div>
-  </div>
+  ${renderScalarField("BPM", song.bpm, "ef-bpm", "number", "", false)}
+  ${renderScalarField("ISRC", song.isrc, "ef-isrc", "text", "", false)}
 </div>
 
 ${(() => {
