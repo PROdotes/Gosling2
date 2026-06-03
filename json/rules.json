@@ -24,7 +24,8 @@
                 "electronic",
                 "funk",
                 "blues",
-                "reggae"
+                "reggae",
+				"latin"
             ],
             "target_path": "{genre}/{artist} - {title}"
         },

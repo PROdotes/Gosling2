@@ -14,6 +14,7 @@ from src.models.exceptions import ReingestionConflictError
 from src.data.staging_repository import StagingRepository
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
+from src.services.audio_repair import needs_xing_repair, repair_xing_header
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
 from src.services.filing_service import FilingService
@@ -126,6 +127,23 @@ class IngestionService:
             return
         cls._session_success = 0
         cls._session_action = 0
+
+    def _repair_staged_audio(self, staged_path: str) -> None:
+        """
+        Ensure a staged MP3 has a valid Xing header before it is hashed and read.
+
+        VBR files without a Xing header report a wrong duration (and break browser
+        seeking). Repairing here, before calculate_audio_hash and metadata
+        extraction, keeps the stored hash and duration consistent with the filed
+        file. Failure is non-fatal: ingestion proceeds with the estimated duration.
+        """
+        try:
+            if needs_xing_repair(staged_path):
+                repair_xing_header(staged_path)
+        except Exception as e:
+            logger.warning(
+                f"[IngestionService] Xing repair skipped for '{staged_path}': {e}"
+            )
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """
@@ -316,7 +334,9 @@ class IngestionService:
                                 "processing_status": ProcessingStatus.NEEDS_REVIEW,
                             }
                         )
-                        self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
+                        self._song_repo.reactivate_ghost(
+                            existing["id"], reactivated, conn
+                        )
                         self._song_repo.hard_delete(song_id, conn)
                     return existing["id"]
                 except Exception as ex:
@@ -375,6 +395,9 @@ class IngestionService:
         logger.debug(
             f"[IngestionService] -> ingest_file(path='{staged_path}', original='{original_path}')"
         )
+
+        # 0. Repair a missing Xing header before hashing/reading metadata.
+        self._repair_staged_audio(staged_path)
 
         # 1. Validation check
         check = self.check_ingestion(staged_path)
@@ -462,6 +485,9 @@ class IngestionService:
         target_status = (
             ProcessingStatus.CONVERTING if is_wav else ProcessingStatus.NEEDS_REVIEW
         )
+
+        if not is_wav:
+            self._repair_staged_audio(staged_path)
 
         try:
             with self._song_repo.write_connection("ingest") as conn:

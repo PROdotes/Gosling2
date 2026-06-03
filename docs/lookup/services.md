@@ -460,6 +460,22 @@ Converts a WAV file to MP3 using FFmpeg.
 
 ---
 
+## AudioRepair
+*Location: `src/services/audio_repair.py`*
+
+**Responsibility**: Repairs MP3s missing a valid Xing/Info header. Without that header a VBR file reports a wrong duration (mutagen/browsers estimate from the first frame's bitrate) and seeks incorrectly. Used by ingestion before hashing and by `tools/repair_xing_headers.py` for backfill.
+
+### needs_xing_repair(file_path: str) -> bool
+True when an MP3 has `BitrateMode.UNKNOWN` (no valid Xing/Info header). Non-MP3 or unreadable files return False.
+
+### has_trailing_junk(file_path: str) -> bool
+True when the audio region is far larger than the ffmpeg-decoded duration can account for at the 320 kbps ceiling — i.e. a truncated/corrupt source padded with junk. `repair_xing_header` refuses such files (re-muxing would fold the junk into the Xing byte_count and yield a header players reject).
+
+### repair_xing_header(file_path: str) -> float
+Re-muxes the MP3 with FFmpeg (`-map 0:a -map_metadata -1 -c copy -write_xing 1`) to add a Xing header without re-encoding, re-applies the original ID3 block byte-faithfully via mutagen (FFmpeg mangles multi-value frames), and atomically replaces the original. Returns the corrected duration. Raises RuntimeError on failure, leaving the original untouched.
+
+---
+
 ## WaveformService
 *Location: `src/services/waveform_service.py`*
 

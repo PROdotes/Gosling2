@@ -255,6 +255,37 @@ class MediaSourceRepository(BaseRepository):
         cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (source_id,))
         logger.info(f"[MediaSourceRepository] <- hard_delete(id={source_id}) DONE")
 
+    def update_audio_fingerprint(
+        self,
+        source_id: int,
+        duration_s: float,
+        audio_hash: str,
+        conn: sqlite3.Connection,
+    ) -> int:
+        """
+        Update the duration and audio hash for a source after its audio bytes
+        change (e.g. a Xing-header repair re-muxes the frames). Returns rowcount.
+        """
+        logger.debug(
+            f"[MediaSourceRepository] -> update_audio_fingerprint(id={source_id}, "
+            f"duration={duration_s:.2f})"
+        )
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE MediaSources
+            SET SourceDuration = ?,
+                AudioHash = ?
+            WHERE SourceID = ?
+            """,
+            (duration_s, audio_hash, source_id),
+        )
+        logger.debug(
+            f"[MediaSourceRepository] <- update_audio_fingerprint(id={source_id}) "
+            f"rows={cursor.rowcount}"
+        )
+        return cursor.rowcount
+
     def reactivate_source(
         self, source_id: int, model: MediaSource, conn: sqlite3.Connection
     ) -> None:

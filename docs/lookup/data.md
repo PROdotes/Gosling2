@@ -54,6 +54,10 @@ Soft-delete a MediaSource by setting `IsDeleted = 1`. Returns `True` if a record
 
 Restores a previously soft-deleted record by setting `IsDeleted = 0`. Returns `True` if successful.
 
+### update_audio_fingerprint(source_id: int, duration_s: float, audio_hash: str, conn: sqlite3.Connection) -> int
+
+Updates `SourceDuration` and `AudioHash` after a file's audio bytes change (e.g. a Xing-header repair re-muxes the frames, shifting the hash). Returns rowcount. Does NOT commit.
+
 ### hard_delete(source_id: int, conn: sqlite3.Connection) -> None
 
 Hard-delete (destructive) a MediaSource and its specialized child (Song, etc.). Forces DB Cascade to clear all links. Used for discarding failed conversions or merging duplicates. Does NOT commit.
