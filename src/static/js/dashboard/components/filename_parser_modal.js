@@ -209,6 +209,9 @@ if (_elementsPresent) {
             }));
 
             const payload = await applyFilenameParsing(items, pattern);
+            if (!payload.add?.length && !payload.update?.length) {
+                throw new Error("No actionable fields extracted. Use tokens: Artist, Title, Year, BPM, ISRC, Genre, Publisher.");
+            }
             await mutate(payload);
             closeFilenameParserModal();
             if (onApply) await onApply();

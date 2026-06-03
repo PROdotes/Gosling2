@@ -102,6 +102,14 @@ async def add_request_id_middleware(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     msgs = [e.get("msg", "validation error") for e in exc.errors()]
+    try:
+        body = await request.body()
+        logger.warning(
+            f"[EngineServer] 422 {request.method} {request.url.path} "
+            f"errors={msgs} body={body.decode('utf-8', errors='replace')[:500]}"
+        )
+    except Exception:
+        logger.warning(f"[EngineServer] 422 {request.method} {request.url.path} errors={msgs}")
     return JSONResponse(status_code=422, content={"detail": "; ".join(msgs)})
 
 

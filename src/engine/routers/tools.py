@@ -1,4 +1,3 @@
-import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Literal, Optional
@@ -6,8 +5,7 @@ from src.services.tokenizer import tokenize_credits, resolve_names
 from src.services.filename_parser import parse_with_pattern
 from src.services.catalog_service import CatalogService
 from src.services.casing_service import CasingService
-
-logger = logging.getLogger(__name__)
+from src.services.logger import logger
 
 router = APIRouter(prefix="/api/v1/tools", tags=["Tools"])
 
@@ -143,9 +141,10 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
     update = []
 
     for item in body.items:
-        metadata = parse_with_pattern(item.filename, body.pattern)
-        if not metadata:
+        raw = parse_with_pattern(item.filename, body.pattern)
+        if not raw:
             continue
+        metadata = {k.title(): v for k, v in raw.items()}
 
         scalars = {}
         if "Title" in metadata:
@@ -157,15 +156,15 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
                 logger.warning(
                     f"[tools] Non-numeric Year for song {item.song_id}: {metadata['Year']!r}"
                 )
-        if "BPM" in metadata:
+        if "Bpm" in metadata:
             try:
-                scalars["bpm"] = int(metadata["BPM"])
+                scalars["bpm"] = int(metadata["Bpm"])
             except ValueError:
                 logger.warning(
-                    f"[tools] Non-numeric BPM for song {item.song_id}: {metadata['BPM']!r}"
+                    f"[tools] Non-numeric BPM for song {item.song_id}: {metadata['Bpm']!r}"
                 )
-        if "ISRC" in metadata:
-            scalars["isrc"] = metadata["ISRC"]
+        if "Isrc" in metadata:
+            scalars["isrc"] = metadata["Isrc"]
 
         if scalars:
             update.append({"type": "song", "id": item.song_id, **scalars})
@@ -204,6 +203,10 @@ def filename_parser_apply(body: FilenameApplyRequest) -> dict:
         result["add"] = add
     if update:
         result["update"] = update
+    logger.debug(
+        f"[FilenameParser] apply: pattern={body.pattern!r} items={len(body.items)} "
+        f"-> add={len(add)} update={len(update)} payload={result}"
+    )
     return result
 
 
