@@ -62,7 +62,11 @@ import {
     wireDriftIndicators,
     wireScalarInputs,
 } from "./renderers/song_editor.js";
-import { renderSongs } from "./renderers/songs.js";
+import {
+    renderSongs,
+    patchSongRow,
+    setActiveStatusFilters,
+} from "./renderers/songs.js";
 import { renderAuditLog } from "./renderers/audit_log.js";
 import {
     renderTagDetailComplete,
@@ -219,6 +223,11 @@ const ctx = {
             fresh.publishers?.length !== old.publishers?.length;
 
         state.activeSong = fresh;
+
+        // Keep the list row (badges, artist, title) in sync with the edit. The
+        // row reads from the slim cache, which a full re-fetch would otherwise
+        // be needed to refresh; patchSongRow copies the changed fields across.
+        patchSongRow(ctx, fresh);
 
         if (structuralChange) {
             // Preserve which chip field was actively being edited so a structural
@@ -392,6 +401,9 @@ webSearchHandler.setupListeners();
 
 async function doSongSearch() {
     const { filters, mode, liveOnly, hasOriginal } = filterSidebar.getState();
+    // Mirror the active status filters so an edit that moves a song out of the
+    // current bucket can tombstone its row (see patchSongRow).
+    setActiveStatusFilters(filters.statuses || [], mode);
     const result = filterSongs(filters, mode, liveOnly, hasOriginal, state.currentQuery);
     try {
         const items = await result;

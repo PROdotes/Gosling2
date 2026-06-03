@@ -284,6 +284,61 @@
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
+/* Tombstone: an edited song that left the active status filter. It holds its
+   slot, dimmed, until swept (so the list doesn't shift under the user). */
+#songs-workspace .song-row.tombstoned {
+    opacity: 0.4;
+}
+
+/* One-shot flash when a row first leaves the filter, settling into the dim. */
+#songs-workspace .song-row.flash-done {
+    animation: songRowFlashDone 0.9s ease-out;
+}
+
+@keyframes songRowFlashDone {
+    0% {
+        background: rgba(16, 185, 129, 0.35);
+        opacity: 1;
+    }
+    55% {
+        background: rgba(16, 185, 129, 0.18);
+        opacity: 1;
+    }
+    100% {
+        background: transparent;
+        opacity: 0.4;
+    }
+}
+
+/* Sweep: the flashy exit when tombstoned rows are flushed (pointer left the
+   list). Slide-fade left, then collapse the slot. Duration is tracked by the
+   320ms timer in flushTombstones (songs.js). */
+#songs-workspace .song-row.sweeping {
+    overflow: hidden;
+    pointer-events: none;
+    animation: songRowSweep 0.32s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes songRowSweep {
+    0% {
+        max-height: 80px;
+        opacity: 0.4;
+        transform: translateX(0);
+    }
+    35% {
+        opacity: 0.22;
+        transform: translateX(-28px);
+    }
+    100% {
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-bottom-width: 0;
+        opacity: 0;
+        transform: translateX(-28px);
+    }
+}
+
 /* ── PANE 3: EDITOR ─────────────────────────────────────────────────────── */
 
 /* #editor-panel visuals live in base.css (shared detail-pane primitive). */
@@ -1214,29 +1269,6 @@
 
 /* ── Album sub-cards ────────────────────────────────────────────────────────── */
 
-#songs-workspace [data-album-sub-song] {
-    background: linear-gradient(
-        168deg,
-        transparent 0%,
-        rgba(186, 230, 253, 0.03) 7%,
-        rgba(224, 242, 254, 0.07) 10%,
-        rgba(186, 230, 253, 0.03) 13%,
-        transparent 22%,
-        rgba(0, 0, 0, 0.03) 32%,
-        transparent 44%,
-        rgba(186, 230, 253, 0.03) 47%,
-        rgba(224, 242, 254, 0.07) 50%,
-        rgba(186, 230, 253, 0.03) 53%,
-        transparent 62%,
-        rgba(0, 0, 0, 0.03) 70%,
-        transparent 80%,
-        rgba(186, 230, 253, 0.03) 87%,
-        rgba(224, 242, 254, 0.07) 90%,
-        rgba(186, 230, 253, 0.03) 93%,
-        transparent 100%
-    );
-}
-
 #songs-workspace .album-sub-card {
     display: flex;
     flex-direction: column;
@@ -1245,7 +1277,20 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     margin-top: 6px;
-    background: transparent;
+    background: linear-gradient(
+        168deg,
+        transparent 0%,
+        rgba(186, 230, 253, 0.03) 8%,
+        rgba(224, 242, 254, 0.07) 12%,
+        rgba(186, 230, 253, 0.03) 16%,
+        transparent 30%,
+        rgba(0, 0, 0, 0.12) 50%,
+        transparent 65%,
+        rgba(186, 230, 253, 0.03) 79%,
+        rgba(224, 242, 254, 0.07) 83%,
+        rgba(186, 230, 253, 0.03) 87%,
+        transparent 100%
+    );
 }
 
 #songs-workspace .album-sub-title-row {

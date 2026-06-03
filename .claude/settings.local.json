@@ -47,7 +47,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\src\\\\services\" -Filter \"*service.py\")",
       "Bash(Select-Object Name)",
       "Bash(black)",
-      "Bash(ruff check *)"
+      "Bash(ruff check *)",
+      "Bash(git log *)"
     ]
   }
 }
