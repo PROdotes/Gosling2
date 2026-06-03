@@ -511,19 +511,24 @@
 }
 
 #songs-workspace .editor-quick-create-btn {
+    align-self: flex-start;
     background: none;
-    border: none;
+    border: 1px dashed var(--border, rgba(255, 255, 255, 0.12));
+    border-radius: 6px;
     color: var(--text-mute);
     font-size: 11px;
     font-family: inherit;
     cursor: pointer;
-    padding: 4px 0 0;
+    padding: 6px 10px;
+    margin-top: 2px;
     text-align: left;
-    transition: color 0.12s ease;
+    transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
 #songs-workspace .editor-quick-create-btn:hover {
     color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 #songs-workspace .editor-quick-create-btn.loading {

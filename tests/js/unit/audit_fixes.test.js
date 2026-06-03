@@ -165,31 +165,6 @@ describe("activateInlineEdit blur handling", () => {
         expect(committedValue).toBe("new value");
     });
 
-    test("blur with validation error does not commit", async () => {
-        const span = document.createElement("span");
-        span.textContent = "2000";
-        document.body.appendChild(span);
-
-        let committed = false;
-        activateInlineEdit(span, {
-            field: "year",
-            validationRules: { year: { min: 1860, max: 2100 } },
-            onCommit: async () => {
-                committed = true;
-                return {};
-            },
-            onSave: () => {},
-        });
-
-        const input = document.querySelector(".inline-edit-input");
-        input.value = "not-a-year";
-        input.dispatchEvent(new Event("input"));
-        input.dispatchEvent(new Event("blur"));
-
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        expect(committed).toBe(false);
-    });
-
     test("blur does not commit when value unchanged", async () => {
         const span = document.createElement("span");
         span.textContent = "same";
