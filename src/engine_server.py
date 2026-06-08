@@ -109,7 +109,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             f"errors={msgs} body={body.decode('utf-8', errors='replace')[:500]}"
         )
     except Exception:
-        logger.warning(f"[EngineServer] 422 {request.method} {request.url.path} errors={msgs}")
+        logger.warning(
+            f"[EngineServer] 422 {request.method} {request.url.path} errors={msgs}"
+        )
     return JSONResponse(status_code=422, content={"detail": "; ".join(msgs)})
 
 

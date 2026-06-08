@@ -824,24 +824,33 @@ class IdentityRepository(BaseRepository):
         self, identity_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:
         """Active albums credited to ANY alias of this identity."""
+        return self.get_album_ids_by_identities([identity_id], conn=conn)
+
+    def get_album_ids_by_identities(
+        self, identity_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
+        """Active albums credited to ANY alias of any of the given identities."""
+        if not identity_ids:
+            return []
         logger.debug(
-            f"[IdentityRepository] -> get_album_ids_by_identity(id={identity_id})"
+            f"[IdentityRepository] -> get_album_ids_by_identities(ids={identity_ids})"
         )
-        query = """
+        placeholders = ",".join("?" * len(identity_ids))
+        query = f"""
             SELECT DISTINCT ac.AlbumID FROM AlbumCredits ac
             JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
             JOIN Albums a ON ac.AlbumID = a.AlbumID
-            WHERE an.OwnerIdentityID = ? AND a.IsDeleted = 0
+            WHERE an.OwnerIdentityID IN ({placeholders}) AND a.IsDeleted = 0
         """
         if conn:
-            rows = conn.execute(query, (identity_id,)).fetchall()
+            rows = conn.execute(query, identity_ids).fetchall()
             return [row[0] for row in rows]
 
         with self._get_connection() as new_conn:
-            rows = new_conn.execute(query, (identity_id,)).fetchall()
+            rows = new_conn.execute(query, identity_ids).fetchall()
             result = [row[0] for row in rows]
             logger.debug(
-                f"[IdentityRepository] <- get_album_ids_by_identity() count={len(result)}"
+                f"[IdentityRepository] <- get_album_ids_by_identities() count={len(result)}"
             )
             return result
 

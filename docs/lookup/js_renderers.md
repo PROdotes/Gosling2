@@ -25,6 +25,12 @@ Renders a standardized delete button section for the detail panel.
 ### renderSongs(songs, selectedId)
 Renders the list of song cards. Highlights the selected song.
 
+### setActiveStatusFilters(statuses, mode)
+Mirrors the sidebar's active status filters into the songs renderer so patchSongRow can decide list membership without coupling to the sidebar.
+
+### patchSongRow(ctx, fresh)
+Surgically updates a single song row in the rendered list and the cached song object, without a full re-render. Returns true if the row was found.
+
 ---
 
 ## Song Editor V2

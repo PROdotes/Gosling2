@@ -585,6 +585,10 @@ Find all active song IDs credited to ANY alias belonging to this identity. Suppo
 
 Find all active album IDs credited to ANY alias belonging to this identity. Supports optional shared connection.
 
+### get_album_ids_by_identities(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[int]
+
+Batch version of get_album_ids_by_identity. Returns all active album IDs credited to ANY alias of ANY of the given identities in a single query. Returns empty list for empty input.
+
 ### get_aliases_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[ArtistName]]
 
 Batch-fetch aliases (ArtistNames) for multiple identities. Supports optional shared connection.

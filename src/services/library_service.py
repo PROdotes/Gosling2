@@ -277,11 +277,11 @@ class LibraryService:
             for group in groups_by_id.get(identity.id, []):
                 related_ids.add(group.id)
 
-            album_ids: set = set()
-            for rid in related_ids:
-                album_ids.update(
-                    self._identity_repo.get_album_ids_by_identity(rid, conn=conn)
+            album_ids = set(
+                self._identity_repo.get_album_ids_by_identities(
+                    list(related_ids), conn=conn
                 )
+            )
 
             rows = self._album_repo_dir.get_slim_by_ids(list(album_ids), conn=conn)
             logger.debug(

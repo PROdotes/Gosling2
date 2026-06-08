@@ -33,4 +33,3 @@ class AuditRepository(BaseRepository):
             b["rows"].reverse()
             result.append(b)
         return result
-

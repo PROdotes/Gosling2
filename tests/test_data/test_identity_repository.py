@@ -281,6 +281,44 @@ class TestGetGroupIdsForMembers:
         assert group_ids == {2, 3}, f"Expected {{2, 3}}, got {group_ids}"
 
 
+class TestGetAlbumIdsByIdentities:
+    """IdentityRepository.get_album_ids_by_identities contracts."""
+
+    def test_single_identity(self, populated_db):
+        """Nirvana (ID=2) is credited on Nevermind (100)."""
+        repo = IdentityRepository(populated_db)
+        result = repo.get_album_ids_by_identities([2])
+        assert result == [100], f"Expected [100], got {result}"
+
+    def test_multiple_identities_returns_all_albums(self, populated_db):
+        """Nirvana(2) -> Album 100, Foo Fighters(3) -> Album 200; both returned in one call."""
+        repo = IdentityRepository(populated_db)
+        result = set(repo.get_album_ids_by_identities([2, 3]))
+        assert result == {100, 200}, f"Expected {{100, 200}}, got {result}"
+
+    def test_identity_with_no_album_credits(self, populated_db):
+        """Dave Grohl (ID=1) has no direct AlbumCredits."""
+        repo = IdentityRepository(populated_db)
+        result = repo.get_album_ids_by_identities([1])
+        assert result == [], f"Expected [], got {result}"
+
+    def test_empty_input_returns_empty(self, populated_db):
+        repo = IdentityRepository(populated_db)
+        result = repo.get_album_ids_by_identities([])
+        assert result == [], f"Expected [], got {result}"
+
+    def test_nonexistent_identity_returns_empty(self, populated_db):
+        repo = IdentityRepository(populated_db)
+        result = repo.get_album_ids_by_identities([999])
+        assert result == [], f"Expected [], got {result}"
+
+    def test_backwards_compat_single_method(self, populated_db):
+        """get_album_ids_by_identity delegates to the batch method correctly."""
+        repo = IdentityRepository(populated_db)
+        assert repo.get_album_ids_by_identity(2) == [100]
+        assert repo.get_album_ids_by_identity(999) == []
+
+
 class TestGetAliasesBatch:
     """IdentityRepository.get_aliases_batch contracts."""
 

@@ -154,7 +154,9 @@ class MutationCoordinator:
                         copied_files.append((post.source_path, new_path))
                         self._song_mutator.apply_within(
                             "update",
-                            UpdateSongItem(type="song", id=song_id, source_path=new_path),
+                            UpdateSongItem(
+                                type="song", id=song_id, source_path=new_path
+                            ),
                             conn,
                         )
 
