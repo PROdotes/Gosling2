@@ -157,6 +157,11 @@ class SongCreditRepository(BaseRepository):
                     "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
                     (row[2],),
                 )
+                # Also revive the primary name if it was deleted alongside the identity
+                cursor.execute(
+                    "UPDATE ArtistNames SET IsDeleted = 0 WHERE OwnerIdentityID = ? AND IsPrimaryName = 1 AND IsDeleted = 1",
+                    (row[2],),
+                )
             return name_id
 
         # No ArtistName found — check if an Identity with this LegalName exists
