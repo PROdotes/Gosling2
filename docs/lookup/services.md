@@ -17,6 +17,19 @@ Parses the filename (stem) using tokens like {Artist}, {Title}, and {Ignore}.
 
 ---
 
+## MultiEditService
+*Location: `src/services/multi_edit_service.py`*
+Multi-song editing: collapses a selection into one virtual `SongView` (read); will also own the packer that expands single-song-shaped ops into per-song mutation items (write). See `docs/specs/multiedit.md`.
+
+### get_multi_view(song_ids: List[int]) -> SongView
+Fetches (`SongRepository.get_by_ids`) and hydrates all songs, then collapses:
+- Scalars (`media_name`, `bpm`, `year`, `isrc`, `notes`): agreed value passes through; disagreements become null and are listed in `SongView.mixed_fields` with their distinct values.
+- M2M (credits/tags/publishers/albums): union; entries on all songs get `universal=True`, partial entries `universal=False`. Credits keyed by `(name_id, role_name)`.
+- Virtual song has `id=None`, empty `source_path`, zero duration.
+- Raises `LookupError` if any ID is missing; duplicate IDs are deduped.
+
+---
+
 ## IdentityService
 *Location: `src/services/identity_service.py`*
 

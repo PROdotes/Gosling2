@@ -180,10 +180,6 @@
     flex-shrink: 0;
 }
 
-#songs-workspace .list-header .col-check {
-    flex-shrink: 0;
-}
-
 #songs-workspace .list-header .col-label {
     flex: 1;
     display: flex;
@@ -237,11 +233,13 @@
 
 /* .song-row base styling lives in base.css (shared list-row primitive). */
 
-/* .row-title / .row-artist / .row-id / .col-info / .col-check typography
+/* .row-title / .row-artist / .row-id / .col-info typography
    lives in base.css as a shared row primitive. */
 
-#songs-workspace .col-check input {
-    accent-color: var(--bg-active);
+/* Focus cursor: navigational only, distinct from the selected highlight */
+#songs-workspace .song-row.focused {
+    outline: 1px dashed var(--accent-border);
+    outline-offset: -1px;
 }
 
 #songs-workspace .col-missing {
@@ -367,6 +365,28 @@
 }
 
 /* .editor-empty-state visuals live in base.css (shared empty-state primitive). */
+
+/* ── MULTI-EDIT PREVIEW ─────────────────────────────────────────────────── */
+
+#songs-workspace .editor-multi-banner {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-window);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* Entries present on some but not all selected songs: visible, not editable */
+#songs-workspace .editor-multi-preview .chip-partial {
+    opacity: 0.5;
+}
+
+#songs-workspace .editor-multi-preview .editor-chip.chip-partial,
+#songs-workspace .editor-multi-preview .chip-input__chip.chip-partial {
+    border-style: dashed;
+}
 
 /* ── ACTION SIDEBAR ─────────────────────────────────────────────────────── */
 

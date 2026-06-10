@@ -89,6 +89,7 @@ class SongAlbumView(BaseModel):
     release_year: Optional[int] = None
     album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
+    universal: bool = True  # Multi-edit: False = on some but not all selected songs
 
     @computed_field
     @property
@@ -260,6 +261,10 @@ class SongView(BaseModel):
     needs_organization: bool = False
     estimated_original_path: Optional[str] = None
     original_exists: bool = False
+
+    # Multi-edit: scalar fields that disagree across the selection, mapped to
+    # their distinct values (None = empty on some songs). Empty for single songs.
+    mixed_fields: Dict[str, List] = {}
 
     # Computed backend fields for frontend logic
     @computed_field

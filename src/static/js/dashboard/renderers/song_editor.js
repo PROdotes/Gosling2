@@ -28,6 +28,7 @@ import {
     updateSongAlbumLink,
 } from "../api.js";
 import { createChipInput } from "../components/chip_input.js";
+import { showToast } from "../components/toast.js";
 import { PROCESSING_STATUS } from "../constants.js";
 import { parseTagInput } from "../utils/tag_input.js";
 import { escapeHtml } from "../components/utils.js";
@@ -961,12 +962,121 @@ ${deleteOriginalBtn}
 `;
 }
 
+// The scroll container survives re-renders, so multi-preview state attached to
+// it (class + capture-phase save guard) must be stripped whenever the editor
+// re-renders as anything else.
+function clearMultiPreview(scroll) {
+    scroll.classList.remove("editor-multi-preview");
+    if (scroll._multiGuard) {
+        scroll.removeEventListener("click", scroll._multiGuard, true);
+        scroll.removeEventListener("mousedown", scroll._multiGuard, true);
+        delete scroll._multiGuard;
+    }
+}
+
+const MULTI_SCALAR_INPUTS = {
+    media_name: "ef-title",
+    year: "ef-year",
+    bpm: "ef-bpm",
+    isrc: "ef-isrc",
+    notes: "ef-notes",
+};
+
+function mixedPlaceholder(values) {
+    const parts = values.map((v) => (v == null || v === "" ? "(empty)" : String(v)));
+    const text = parts.join(", ");
+    return text.length > 60 ? "Mixed" : `Mixed: ${text}`;
+}
+
+export function renderSongEditorMulti(view, count, validationRules = null) {
+    renderSongEditorV2(view, null, null);
+    const panel = document.getElementById("editor-panel");
+    const scroll = panel?.querySelector(".editor-scroll");
+    if (!scroll) return;
+
+    scroll.classList.add("editor-multi-preview");
+    scroll.insertAdjacentHTML(
+        "afterbegin",
+        `<div class="editor-multi-banner">Editing ${count} songs</div>`,
+    );
+
+    // The visible chip UI (chips, category styling, add stubs, folding) is
+    // built by the chip-input component, not the static markup — wire it so
+    // the preview matches the single-song editor pixel for pixel.
+    wireChipInputs(view, null, null, validationRules, null);
+
+    // Interim save guard until multi-mutate exists: the wired handlers above
+    // are single-song saves keyed on the virtual song's null id, so block
+    // every mutating control at capture phase. Fold/expand stay live.
+    const blockMutations = (e) => {
+        if (
+            e.target.closest(
+                ".chip-input__chip-remove, .chip-input__chip-split, .chip-input__option, [data-action]",
+            )
+        ) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.type === "click")
+                showToast("Multi-edit saving not wired yet", "error", 3000);
+        }
+    };
+    scroll.addEventListener("click", blockMutations, true);
+    // Autocomplete options commit on mousedown, not click
+    scroll.addEventListener("mousedown", blockMutations, true);
+    scroll._multiGuard = blockMutations;
+
+    // Mixed scalars: empty input + ghost text listing the conflicting values
+    for (const [field, values] of Object.entries(view.mixed_fields || {})) {
+        const input = document.getElementById(MULTI_SCALAR_INPUTS[field] || "");
+        if (input) input.placeholder = mixedPlaceholder(values);
+    }
+    const notes = document.getElementById("ef-notes");
+    if (notes) notes.setAttribute("readonly", "");
+
+    // Partial chips: dim entries that exist on some but not all selected songs
+    const partialByField = {
+        tags: new Set(
+            (view.tags || []).filter((t) => !t.universal).map((t) => t.name),
+        ),
+        publisher: new Set(
+            (view.publishers || [])
+                .filter((p) => !p.universal)
+                .map((p) => p.name),
+        ),
+    };
+    for (const c of view.credits || []) {
+        if (c.universal) continue;
+        const role = c.role_name.toLowerCase();
+        (partialByField[role] = partialByField[role] || new Set()).add(
+            c.display_name,
+        );
+    }
+    scroll.querySelectorAll("[data-chip-field]").forEach((fieldEl) => {
+        const partial = partialByField[fieldEl.dataset.chipField];
+        if (!partial) return;
+        fieldEl.querySelectorAll(".chip-input__chip").forEach((chip) => {
+            const label = chip.querySelector(
+                ".chip-input__chip-label",
+            )?.textContent;
+            if (partial.has(label)) chip.classList.add("chip-partial");
+        });
+    });
+
+    // Album sub-cards render in view.albums order; dim the partial ones
+    const cards = scroll.querySelectorAll("[data-album-sub-song] > *");
+    (view.albums || []).forEach((album, i) => {
+        if (!album.universal && cards[i]) cards[i].classList.add("chip-partial");
+    });
+}
+
 export function renderSongEditorMultiSelect(count) {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
-    if (scroll)
+    if (scroll) {
+        clearMultiPreview(scroll);
         scroll.innerHTML = `<div class="editor-empty-state">${count} songs selected</div>`;
+    }
     const sidebar = panel.querySelector(".action-sidebar");
     if (sidebar) sidebar.innerHTML = "";
 }
@@ -975,8 +1085,10 @@ export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
-    if (scroll)
+    if (scroll) {
+        clearMultiPreview(scroll);
         scroll.innerHTML = `<div class="editor-empty-state">Select a song to edit</div>`;
+    }
     const sidebar = panel.querySelector(".action-sidebar");
     if (sidebar) sidebar.innerHTML = "";
 }
@@ -986,6 +1098,7 @@ export function renderSongEditorV2(song, diff = null, rawTags = null) {
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
     if (!scroll) return;
+    clearMultiPreview(scroll);
 
     const REQUIRED_ROLES = ["Performer", "Composer"];
     const OPTIONAL_ROLES = ["Lyricist", "Producer"];

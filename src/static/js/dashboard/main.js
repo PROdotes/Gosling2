@@ -11,6 +11,7 @@ import {
     getArtistSongs,
     getArtistTree,
     getCatalogSong,
+    getMultiView,
     getIngestStatus,
     getPublisherDetail,
     getPublisherSongs,
@@ -56,6 +57,7 @@ import {
 import {
     renderActionSidebar,
     renderSongEditorEmpty,
+    renderSongEditorMulti,
     renderSongEditorMultiSelect,
     renderSongEditorV2,
     wireChipInputs,
@@ -100,7 +102,9 @@ const state = {
     debounceTimer: null,
     currentQuery: "",
     totalLibraryCount: 0,
-    selectedIndex: -1,
+    selectedIndex: -1, // focus cursor: last clicked/arrowed-to row
+    selectedSongIds: new Set(), // selection: highlighted rows (songs mode)
+    selectionAnchor: -1, // range anchor: last non-shift selection action
     isDeep: false,
     validationRules: null,
     id3Frames: null,
@@ -370,6 +374,15 @@ const ctx = {
     navigate,
     getActiveList,
     openSelectedResult,
+    applySongSelection,
+    selectAllSongs,
+    clearSongEditor() {
+        state.multiSelectIds = null;
+        state.activeSong = null;
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
+        renderSongEditorEmpty();
+    },
     updateSelection,
     updateIngestBadges,
     updateCachedIngestResult(stagedPath, patch) {
@@ -484,7 +497,11 @@ function updateSelection() {
     if (songListPanel && songsWorkspaceActive) {
         const rows = songListPanel.querySelectorAll("[data-selectable='true']");
         rows.forEach((row, index) => {
-            row.classList.toggle("selected", index === state.selectedIndex);
+            row.classList.toggle(
+                "selected",
+                state.selectedSongIds.has(Number(row.dataset.id)),
+            );
+            row.classList.toggle("focused", index === state.selectedIndex);
         });
         if (state.selectedIndex >= 0 && state.selectedIndex < rows.length) {
             rows[state.selectedIndex].scrollIntoView({ block: "nearest" });
@@ -562,6 +579,8 @@ async function switchMode(mode) {
     state.currentMode = mode;
     state.currentQuery = "";
     state.selectedIndex = -1;
+    state.selectedSongIds = new Set();
+    state.selectionAnchor = -1;
 
     elements.searchInput.value = "";
     syncModeUi();
@@ -581,6 +600,8 @@ function navigate(mode, query = "") {
     state.currentMode = mode;
     state.currentQuery = String(query || "").trim();
     state.selectedIndex = -1;
+    state.selectedSongIds = new Set();
+    state.selectionAnchor = -1;
     elements.searchInput.value = state.currentQuery;
     syncModeUi();
     ctx.hideDetailPanel();
@@ -737,6 +758,16 @@ async function openSelectedResult(index) {
         state.currentMode === "songs" &&
         document.getElementById("songs-workspace")?.classList.contains("active")
     ) {
+        state.multiSelectIds = null;
+        // Keep the highlighted selection in step when opened outside the
+        // selection flow (e.g. programmatic refresh paths)
+        if (
+            state.selectedSongIds.size !== 1 ||
+            !state.selectedSongIds.has(selected.id)
+        ) {
+            state.selectedSongIds = new Set([selected.id]);
+            updateSelection();
+        }
         const request = beginDetailRequest("songs", selected.id);
         const result = await getCatalogSong(selected.id, {
             signal: request.signal,
@@ -1111,23 +1142,84 @@ async function setupSongsWorkspaceDropZone() {
     });
 }
 
-document.addEventListener("checkchange", () => {
-    if (state.currentMode !== "songs") return;
-    const panel = document.getElementById("song-list-panel");
-    if (!panel) return;
-    const checked = panel.querySelectorAll(
-        ".col-check input[type=checkbox]:checked",
-    );
-    if (checked.length > 1) {
-        renderSongEditorMultiSelect(checked.length);
-    } else if (checked.length === 0) {
+// ── Song list selection (general-table semantics) ──────────────────────────
+// Selection (highlighted set) drives the editor; focus (cursor) is purely
+// navigational. kind: "set" = collapse to row, "toggle" = ctrl, "range" = shift.
+function applySongSelection(index, kind = "set") {
+    const items = state.displayedItems || [];
+    if (index < 0 || index >= items.length) return;
+    const id = items[index].id;
+
+    if (kind === "toggle") {
+        if (state.selectedSongIds.has(id)) state.selectedSongIds.delete(id);
+        else state.selectedSongIds.add(id);
+        state.selectionAnchor = index;
+    } else if (kind === "range") {
+        const anchor = state.selectionAnchor >= 0 ? state.selectionAnchor : index;
+        const lo = Math.min(anchor, index);
+        const hi = Math.max(anchor, index);
+        state.selectedSongIds = new Set(
+            items.slice(lo, hi + 1).map((s) => s.id),
+        );
+    } else {
+        state.selectedSongIds = new Set([id]);
+        state.selectionAnchor = index;
+    }
+
+    state.selectedIndex = index;
+    updateSelection();
+    syncSongSelectionEditor();
+}
+
+function selectAllSongs() {
+    const items = state.displayedItems || [];
+    if (!items.length) return;
+    state.selectedSongIds = new Set(items.map((s) => s.id));
+    updateSelection();
+    syncSongSelectionEditor();
+}
+
+function syncSongSelectionEditor() {
+    const songIds = Array.from(state.selectedSongIds);
+    if (songIds.length > 1) {
+        renderSongEditorMultiSelect(songIds.length);
+        state.multiSelectIds = songIds;
+        state.activeSong = null;
+        state.activeSongDiff = null;
+        state.activeSongRawTags = null;
+        abortDetailRequest();
+        getMultiView(songIds)
+            .then((view) => {
+                // Selection may have changed while the request was in flight
+                if (
+                    state.multiSelectIds &&
+                    state.multiSelectIds.join() === songIds.join()
+                ) {
+                    renderSongEditorMulti(
+                        view,
+                        songIds.length,
+                        state.validationRules,
+                    );
+                }
+            })
+            .catch((err) => {
+                console.error("Multi-view failed:", err);
+                showToast("Multi-view failed: " + err.message, "error", 5000);
+            });
+    } else if (songIds.length === 1) {
+        state.multiSelectIds = null;
+        const cachedList = getActiveList();
+        const actualIndex = cachedList.findIndex((s) => s.id === songIds[0]);
+        if (actualIndex >= 0) openSelectedResult(actualIndex);
+    } else {
+        state.multiSelectIds = null;
+        abortDetailRequest();
         renderSongEditorEmpty();
         state.activeSong = null;
         state.activeSongDiff = null;
         state.activeSongRawTags = null;
     }
-    // If exactly 1 checked, the row click already opened the editor — do nothing
-});
+}
 
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");

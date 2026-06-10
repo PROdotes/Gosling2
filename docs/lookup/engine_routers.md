@@ -302,6 +302,21 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ---
 
+## Multi-Edit Router
+*Location: `src/engine/routers/multi_edit.py`*
+**Responsibility**: Multi-song editing — collapsed read view (and later, fan-out writes).
+
+### class MultiViewRequest
+- Request body: `song_ids: List[int]` (min 2).
+
+### async def multi_view(body: MultiViewRequest) -> SongView
+**HTTP**: `POST /api/v1/songs/multi-view`
+- Returns a virtual `SongView` collapsing the selection (see `docs/specs/multiedit.md`).
+- Mixed scalars are null and listed in `SongView.mixed_fields`; M2M entries carry `universal`.
+- 404 if any song ID does not exist.
+
+---
+
 ## Metabolic Router
 *Location: `src/engine/routers/metabolic.py`*
 **Responsibility**: File-system inspection and comparison logic.

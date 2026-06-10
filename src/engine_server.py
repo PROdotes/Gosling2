@@ -17,6 +17,7 @@ from src.engine.routers.spotify import router as spotify_router
 from src.engine.routers.tools import router as tools_router
 from src.engine.routers.mutations import router as mutations_router
 from src.engine.routers.audit import router as audit_router
+from src.engine.routers.multi_edit import router as multi_edit_router
 import uuid
 from src.services.logger import logger, request_id_var
 from src.engine.config import TRUSTED_ORIGINS, get_db_path
@@ -156,6 +157,7 @@ app.include_router(spotify_router)
 app.include_router(tools_router)
 app.include_router(mutations_router)
 app.include_router(audit_router)
+app.include_router(multi_edit_router)
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),

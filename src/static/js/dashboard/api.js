@@ -118,6 +118,15 @@ export function getCatalogSong(id, options = {}) {
     return fetchJson(`/api/v1/songs/${id}`, options);
 }
 
+export function getMultiView(songIds, options = {}) {
+    return fetchJson("/api/v1/songs/multi-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_ids: songIds }),
+        ...options,
+    });
+}
+
 export function getSongWebSearch(id, engine = null) {
     let url = `/api/v1/songs/${id}/web-search`;
     if (engine) {

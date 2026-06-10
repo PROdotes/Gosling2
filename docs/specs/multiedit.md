@@ -1,4 +1,23 @@
-# Multi-Edit Spec
+# Multi-Edit Spec (v2)
+
+## Core idea
+
+The song detail view never knows it's editing multiple songs. It renders a
+**virtual song** built by collapsing the selection, and sends the same shaped
+edits it sends today. Multi-ness is hidden entirely behind the interface: the
+multi-edit service is a deep module whose interface is "one song's worth of
+view and edits, plus a `song_ids` list," and whose implementation absorbs all
+the fan-out, conflict detection, and per-song ID resolution. Two parts:
+
+- **Collapser (read)**: merges N songs into one view, flagging disagreements.
+- **Packer (write)**: takes one single-song-shaped operation plus a list of
+  `song_ids`, expands it into per-song mutation items, and hands the batch to
+  the existing `MutationCoordinator`. The coordinator is unchanged — it already
+  applies a batch of items in one transaction with full rollback.
+
+The seam stays at the existing HTTP interface; the frontend learns two new
+endpoints and zero new concepts. Deletion test: remove this module and every
+caller re-grows collapse/fan-out/ID-resolution logic — it earns its keep.
 
 ## Scope
 
@@ -8,98 +27,124 @@ Songs only (v1). Triggered when 2+ songs are selected in the song list.
 
 ## Read: Collapsed View
 
-**New endpoint**: `POST /api/v1/songs/multi-view`  
+**New endpoint**: `POST /api/v1/songs/multi-view`
 **Body**: `{ "song_ids": [1, 2, 3] }`
 
-The service fetches all songs via `SongRepository.get_by_ids`, hydrates each, then collapses into a `MultiSongView`. All collapsing logic lives in the service layer — no logic in the frontend.
+**Response: a plain `SongView`** — no new view models. The virtual song IS a
+`SongView`; the detail view renders it with the exact code it has today. The
+multi-ness is carried by two small extensions to existing models:
 
-### Scalar fields
+- `SongView.mixed_fields: dict[str, list] = {}` — keys are the scalar fields
+  that disagree across the selection; values are the distinct values present
+  (null = some songs empty). Empty dict for single songs.
+- `universal: bool = True` on `SongCredit`, `Tag`, `Publisher`, `SongAlbum` —
+  defaults `True`, so every existing single-song path serializes unchanged.
 
-Each editable scalar (`media_name`, `bpm`, `year`, `isrc`, `notes`) is represented as:
+Service fetches all songs (`SongRepository.get_by_ids`), hydrates each, and
+collapses. All collapsing logic lives in the service layer — the frontend
+only reads the two flags.
 
-```json
-{ "value": 2025, "mixed": false }
-{ "value": null, "mixed": true }
-```
+### Scalar fields (`media_name`, `bpm`, `year`, `isrc`, `notes`)
 
-- All songs agree → `value` = that value, `mixed: false`
-- Any disagreement → `value: null`, `mixed: true`
+- All songs agree → field carries the value, not in `mixed_fields`.
+- Any disagreement → field is `null`, and `mixed_fields["year"] = [1999, 2001]`.
+- Frontend renders mixed as an empty input with `placeholder` ghost text —
+  `Mixed: 1999, 2001` (or just `Mixed` where values are long, e.g. notes).
+  `placeholder` accepts text even on number inputs, so no type juggling.
+- Mixed scalars **are editable** — typing a value overwrites it on all
+  selected songs (covers the "one of them is a typo" case). An untouched
+  mixed field is simply not included in the save payload (`exclude_none`
+  contract, same as single-song edit).
 
 ### M2M fields (credits, tags, publishers, albums)
 
-Union of all entries across selected songs. Each entry is tagged:
+Union of all entries across selected songs, in the normal `SongView` lists.
+Each entry's `universal` flag:
 
-- `universal: true` — present on **all** selected songs
-- `universal: false` — present on **some** but not all (partial)
+- `universal: true` — present on **all** songs. Rendered as a normal chip,
+  removable.
+- `universal: false` — present on **some** songs. Rendered as a **locked
+  chip**: dimmed/striped, no remove control. Visible for feedback, not
+  editable in multi-edit. Not a new component — the existing chip with a
+  locked state driven by the flag.
 
-A credit entry is identified by `(name_id, role_name)` — Artist B as Performer and Artist B as Composer are two separate entries.
-
-```json
-"credits": [
-  { "name_id": 2, "display_name": "Artist B", "role": "Performer", "universal": true },
-  { "name_id": 1, "display_name": "Artist A", "role": "Performer", "universal": false },
-  { "name_id": 3, "display_name": "Artist C", "role": "Performer", "universal": false }
-]
-```
-
-The frontend uses `universal` only for display state — no logic.
+A credit entry is identified by `(name_id, role_name)` — Artist B as Performer
+and Artist B as Composer are two separate entries. Union entries carry the
+first song's per-song row IDs (`credit_id`, `source_id`); these are
+meaningless across the selection and the multi-mutate path never uses them.
 
 ---
 
-## UX: Display Rules
+## Write: the Packer
 
-- **Scalar, agreed**: show the value normally
-- **Scalar, mixed**: show blank input with ghost text `Mixed values`; if the user doesn't touch it, it is not included in the save payload
-- **M2M, universal**: show entry normally
-- **M2M, partial**: show entry with a visual indicator (e.g. dimmed, striped) — it exists on some songs but not all
+**New endpoint**: `POST /api/v1/songs/multi-mutate`
+**Body**: `{ "song_ids": [...], <single-song-shaped op without song_id> }`
+(exact body shape per op mirrors the existing mutate item models)
+
+The packer is **not a mutator** and adds **no new item types**. It is a pure
+expansion step: turn the op into one existing mutation item per song
+(`UpdateSongItem`, `AddTagItem`, `RemoveCreditItem`, ...), build a single
+`MutationRequest`, call `MutationCoordinator.apply()`. The coordinator, its
+dispatch table, and the mutators are untouched — they already loop items in
+one transaction and run the per-touched-song ID3/filing pass afterward.
+
+### Scalars
+
+One `UpdateSongItem` per song, carrying only the fields the user touched.
+
+### M2M deltas (server-side, in the packer)
+
+- **Add** (tag/credit/publisher/album): songs that already have it → skip
+  (idempotent); songs that don't → add item. Adding always targets **all**
+  selected songs.
+- **Remove**: only offered for `universal: true` entries, so every song has
+  it. The packer resolves per-song row IDs internally (e.g. each song's
+  `CreditID` for a `(name_id, role)` pair) and emits one remove item per song.
+- Album links added via multi-edit default to `track_number=0, disc_number=0`
+  (the packer sets these explicitly — `AddAlbumItem` does not default them).
+
+The frontend never loops over songs and never sees per-song IDs.
 
 ---
 
-## Write: Scalars
+## Selection model (general-table semantics)
 
-**New endpoint**: `PATCH /api/v1/songs/bulk-scalars`  
-**Body**: `{ "song_ids": [1, 2, 3], "fields": { "bpm": 120 } }`
+Checkboxes are removed. The song list behaves like a native list widget
+(Explorer/Finder): selection is row-level, with two pieces of state —
 
-- Only fields the user explicitly changed are included — same `exclude_none` contract as single-song edit
-- Service loops through `song_ids` and calls existing `EditService.update_song_scalars` per song
-- **Full rollback** if any song fails — all-or-nothing (required for future audit UUID)
-- All editable scalar fields are in scope: `media_name`, `bpm`, `year`, `isrc`, `notes`
-- No exclusions — bulk-setting title or ISRC is the user's responsibility
+- **Selection**: the set of highlighted rows. Drives the editor panel:
+  1 selected = single-song editor, 2+ = collapsed multi view.
+- **Focus (cursor)**: exactly one row, the last clicked/arrowed-to row.
+  Drawn as a thin outline; purely navigational, never drives the editor
+  by itself.
 
----
+Bindings:
 
-## Write: M2M (credits, tags, publishers, albums)
-
-Reuse existing single-song endpoints. The server applies the delta to each song individually.
-
-**New endpoints** (bulk wrappers):
-
-Each credit entry in the collapsed view is identified by `(name_id, role_name)` — the unique natural key across the `SongCredits` table. The service resolves the per-song `CreditID` internally.
-
-| Action | Endpoint |
+| Input | Effect |
 |---|---|
-| Add credit | `POST /api/v1/songs/bulk/credits` |
-| Remove credit | `DELETE /api/v1/songs/bulk/credits` body: `{ song_ids, name_id, role_name }` |
-| Add tag | `POST /api/v1/songs/bulk/tags` |
-| Remove tag | `DELETE /api/v1/songs/bulk/tags/{tag_id}` |
-| Add publisher | `POST /api/v1/songs/bulk/publishers` |
-| Remove publisher | `DELETE /api/v1/songs/bulk/publishers/{publisher_id}` |
-| Add album | `POST /api/v1/songs/bulk/albums` |
-| Remove album | `DELETE /api/v1/songs/bulk/albums/{album_id}` |
+| Click | select that row only (collapse selection), focus it |
+| Ctrl+Click | toggle row in/out of selection, focus it |
+| Shift+Click | select range from anchor to row |
+| Up/Down | move focus, collapse selection to focused row |
+| Shift+Up/Down | move focus, extend range from anchor |
+| Ctrl+Up/Down | move focus only, selection untouched |
+| Ctrl+Space | toggle focused row in/out of selection |
+| Ctrl+A | select all displayed rows |
+| Escape | clear selection, blank the editor |
 
-All bulk M2M bodies include `song_ids: List[int]` plus the same fields as the single-song equivalent. Album links added via multi-edit default to `track_number=0, disc_number=0`.
+Plain click/arrow collapsing a multi-row selection is accepted standard
+behavior (Ctrl variants exist to preserve it). The anchor is set by the
+last non-shift selection action.
 
-### Delta logic for M2M (server-side, in service layer)
+## UX summary
 
-When adding an entry:
-- Songs that already have it → skip (idempotent)
-- Songs that don't → add it
-
-When removing an entry:
-- Songs that have it → remove it
-- Songs that don't → skip (no-op)
-
-**Full rollback** on any failure — all-or-nothing.
+| State | Display | Editable |
+|---|---|---|
+| Scalar, agreed | normal value | yes — overwrites all |
+| Scalar, mixed | blank + ghost `Mixed: <values>` | yes — overwrites all; untouched = excluded |
+| M2M, universal | normal chip | removable |
+| M2M, partial | locked chip (dimmed, no remove) | no |
+| M2M, add | normal add flow | adds to all songs |
 
 ---
 
@@ -107,6 +152,8 @@ When removing an entry:
 
 | File | Purpose |
 |---|---|
-| `src/models/multi_edit_models.py` | `MultiSongView`, `ScalarField`, `MultiCreditEntry`, etc. |
-| `src/engine/routers/multi_edit.py` | New router for all multi-edit endpoints |
-| `src/services/multi_edit_service.py` | Collapsing logic (read) and bulk apply logic (write) |
+| `src/engine/routers/multi_edit.py` | `multi-view` + `multi-mutate` endpoints (request models live here, same pattern as `mutation_models.py`) |
+| `src/services/multi_edit_service.py` | Collapser (read) + Packer (write → MutationCoordinator) |
+
+No new view models: `SongView` gains `mixed_fields`, and the four M2M models
+gain `universal` (default `True`).

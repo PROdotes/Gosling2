@@ -44,6 +44,9 @@ Renders the full V2 editor grid for a single song.
 ### renderSongEditorMultiSelect(container, songs)
 Renders a specialized editor view for bulk editing common fields across multiple songs.
 
+### renderSongEditorMulti(view, count, validationRules)
+Renders the multi-edit preview: the collapsed virtual SongView through renderSongEditorV2 plus banner, mixed-scalar ghost placeholders, partial-chip dimming, and a capture-phase guard that blocks all mutations until multi-mutate exists.
+
 ### renderSongEditorEmpty(container)
 Renders the placeholder view when no song is selected.
 

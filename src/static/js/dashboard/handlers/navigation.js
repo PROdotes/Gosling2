@@ -90,11 +90,22 @@ export class NavigationHandler {
     }
 
     async handleSelectResult(actionTarget, event) {
-        if (event.target.type === "checkbox") return;
         event.preventDefault();
         const { index } = actionTarget.dataset;
         const state = this.ctx.getState();
-        state.selectedIndex = Number.isNaN(Number(index)) ? -1 : Number(index);
+        const rowIndex = Number.isNaN(Number(index)) ? -1 : Number(index);
+
+        if (state.currentMode === "songs") {
+            const kind = event.shiftKey
+                ? "range"
+                : event.ctrlKey || event.metaKey
+                  ? "toggle"
+                  : "set";
+            this.ctx.applySongSelection?.(rowIndex, kind);
+            return;
+        }
+
+        state.selectedIndex = rowIndex;
         this.ctx.updateSelection?.();
 
         const selected = state.displayedItems?.[state.selectedIndex];
@@ -242,7 +253,8 @@ export class NavigationHandler {
 
             if (
                 event.key === "Escape" &&
-                this.ctx.getState().activeSong &&
+                (this.ctx.getState().activeSong ||
+                    this.ctx.getState().selectedSongIds?.size) &&
                 !modalOpen
             ) {
                 this.ctx.abortDetailRequest?.();
@@ -255,7 +267,11 @@ export class NavigationHandler {
                 }
 
                 state.selectedIndex = -1;
+                state.selectedSongIds?.clear();
+                state.selectionAnchor = -1;
                 this.ctx.updateSelection?.();
+                if (state.currentMode === "songs")
+                    this.ctx.clearSongEditor?.();
                 return;
             }
 
@@ -279,13 +295,29 @@ export class NavigationHandler {
             const items = this.ctx.getState().displayedItems;
             if (!items.length) return;
 
-            if (event.key === "ArrowDown") {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
                 const state = this.ctx.getState();
-                state.selectedIndex = Math.min(
-                    state.selectedIndex + 1,
-                    items.length - 1,
-                );
+                const newIndex =
+                    event.key === "ArrowDown"
+                        ? Math.min(state.selectedIndex + 1, items.length - 1)
+                        : Math.max(state.selectedIndex - 1, 0);
+
+                if (state.currentMode === "songs") {
+                    if (event.ctrlKey || event.metaKey) {
+                        // Move focus only; selection untouched
+                        state.selectedIndex = newIndex;
+                        this.ctx.updateSelection?.();
+                    } else {
+                        this.ctx.applySongSelection?.(
+                            newIndex,
+                            event.shiftKey ? "range" : "set",
+                        );
+                    }
+                    return;
+                }
+
+                state.selectedIndex = newIndex;
                 this.ctx.updateSelection?.();
 
                 const cachedList = this.ctx.getActiveList?.();
@@ -300,21 +332,25 @@ export class NavigationHandler {
                 return;
             }
 
-            if (event.key === "ArrowUp") {
+            if (
+                event.key === " " &&
+                (event.ctrlKey || event.metaKey) &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 event.preventDefault();
                 const state = this.ctx.getState();
-                state.selectedIndex = Math.max(state.selectedIndex - 1, 0);
-                this.ctx.updateSelection?.();
+                if (state.selectedIndex >= 0)
+                    this.ctx.applySongSelection?.(state.selectedIndex, "toggle");
+                return;
+            }
 
-                const cachedList = this.ctx.getActiveList?.();
-                const selected = items[state.selectedIndex];
-                if (selected) {
-                    const actualIndex = cachedList?.findIndex(
-                        (item) => item.id === selected.id,
-                    );
-                    if (actualIndex >= 0)
-                        this.ctx.openSelectedResult?.(actualIndex);
-                }
+            if (
+                (event.key === "a" || event.key === "A") &&
+                (event.ctrlKey || event.metaKey) &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
+                event.preventDefault();
+                this.ctx.selectAllSongs?.();
                 return;
             }
 

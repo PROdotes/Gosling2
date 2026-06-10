@@ -39,6 +39,7 @@ class SongCredit(DomainModel):
     role_name: str  # Hydrated from Roles table
     display_name: str  # Hydrated from ArtistNames table
     is_primary: bool = False  # Is this the Identity's primary stage name?
+    universal: bool = True  # Multi-edit: False = on some but not all selected songs
 
 
 class AlbumCredit(DomainModel):
@@ -61,6 +62,7 @@ class Publisher(DomainModel):
     parent_id: Optional[int] = None
     parent_name: Optional[str] = None
     sub_publishers: List["Publisher"] = []
+    universal: bool = True  # Multi-edit: False = on some but not all selected songs
 
 
 class Tag(DomainModel):
@@ -71,6 +73,7 @@ class Tag(DomainModel):
     category: Optional[str] = None
     is_primary: bool = False
     song_count: int = 0
+    universal: bool = True  # Multi-edit: False = on some but not all selected songs
 
 
 class SongAlbum(DomainModel):

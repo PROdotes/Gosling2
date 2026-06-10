@@ -204,30 +204,33 @@ function applySortAndRender(ctx, field, direction) {
     const sorted = field
         ? sortSongs(currentSongs, field, direction)
         : currentSongs;
-    ctx.setState({ displayedItems: sorted });
+    // Selection is id-based and survives re-sorting; the focus cursor is
+    // index-based and must be remapped to follow its row.
+    const state = ctx.getState();
+    const focusId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+    const newIndex =
+        focusId == null ? -1 : sorted.findIndex((s) => s.id === focusId);
+    ctx.setState({ displayedItems: sorted, selectedIndex: newIndex });
     renderSongRows(ctx, sorted);
 }
 
 function clearSort(ctx) {
-    currentSort = { field: null, direction: null };
-    saveSort(null, null);
-    ctx.setState({ displayedItems: currentSongs });
-    renderSongRows(ctx, currentSongs);
+    applySortAndRender(ctx, null, null);
 }
 
 // Single source of truth for a song-list row's markup. Used by the full
 // render (renderSongRows) and by surgical single-row updates (patchSongRow).
-function buildSongRowHtml(song, index, selectedId) {
+function buildSongRowHtml(song, index, selectedIds, focusId) {
     const title = escapeHtml(song.display_title);
     const artist = escapeHtml(song.display_artist || "Unknown Artist");
     const duration = escapeHtml(song.formatted_duration || "");
     const pills = (song.review_blockers || [])
         .map((b) => `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`)
         .join("");
-    const selectedClass = song.id === selectedId ? " selected" : "";
+    const selectedClass = selectedIds?.has(song.id) ? " selected" : "";
+    const focusedClass = song.id === focusId ? " focused" : "";
     const tombstonedClass = tombstonedIds.has(song.id) ? " tombstoned" : "";
-    return `<div class="song-row${selectedClass}${tombstonedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
-  <div class="col-check"><input type="checkbox" data-song-id="${song.id}" title="Select"></div>
+    return `<div class="song-row${selectedClass}${focusedClass}${tombstonedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
   <div class="col-info">
     <div class="row-title">${title}<span class="row-id"> #${song.id}</span></div>
     <div class="row-artist">${artist}</div>
@@ -242,10 +245,13 @@ function renderSongRows(ctx, songs) {
     if (!panel) return;
 
     const state = ctx.getState();
-    const selectedId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+    const selectedIds = state.selectedSongIds;
+    const focusId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
 
     panel.innerHTML = songs
-        .map((song, index) => buildSongRowHtml(song, index, selectedId))
+        .map((song, index) =>
+            buildSongRowHtml(song, index, selectedIds, focusId),
+        )
         .join("");
 
     // Wire sort dropdown
@@ -255,10 +261,7 @@ function renderSongRows(ctx, songs) {
         sortSelect._v2Handler = (e) => {
             const val = e.target.value;
             if (val === "default") {
-                currentSort = { field: null, direction: null };
-                saveSort(null, null);
-                ctx.setState({ displayedItems: currentSongs });
-                renderSongRows(ctx, currentSongs);
+                clearSort(ctx);
             } else {
                 const [field, dir] = val.split("-");
                 const fieldMap = {
@@ -266,12 +269,7 @@ function renderSongRows(ctx, songs) {
                     artist: "display_artist",
                     id: "id",
                 };
-                const sortField = fieldMap[field] || field;
-                currentSort = { field: sortField, direction: dir };
-                saveSort(sortField, dir);
-                const sorted = sortSongs(currentSongs, sortField, dir);
-                ctx.setState({ displayedItems: sorted });
-                renderSongRows(ctx, sorted);
+                applySortAndRender(ctx, fieldMap[field] || field, dir);
             }
         };
         sortSelect.addEventListener("change", sortSelect._v2Handler);
@@ -291,32 +289,6 @@ function renderSongRows(ctx, songs) {
         }
     }
 
-    // Wire select-all checkbox
-    const selectAll = document.getElementById("song-list-select-all");
-    if (selectAll) {
-        selectAll.removeEventListener("change", selectAll._v2Handler);
-        selectAll._v2Handler = (e) => {
-            panel
-                .querySelectorAll(".col-check input[type=checkbox]")
-                .forEach((cb) => {
-                    cb.checked = e.target.checked;
-                });
-            panel.dispatchEvent(
-                new CustomEvent("checkchange", { bubbles: true }),
-            );
-        };
-        selectAll.addEventListener("change", selectAll._v2Handler);
-    }
-
-    // Wire individual checkboxes to fire checkchange without triggering row select
-    panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
-        cb.addEventListener("click", (e) => e.stopPropagation());
-        cb.addEventListener("change", () => {
-            panel.dispatchEvent(
-                new CustomEvent("checkchange", { bubbles: true }),
-            );
-        });
-    });
 }
 
 export function renderSongs(ctx, songs) {
@@ -337,7 +309,12 @@ export function renderSongs(ctx, songs) {
     }
 
     if (!songs.length) {
-        ctx.setState({ selectedIndex: -1, displayedItems: [] });
+        ctx.setState({
+            selectedIndex: -1,
+            selectedSongIds: new Set(),
+            selectionAnchor: -1,
+            displayedItems: [],
+        });
         if (panel) {
             panel.innerHTML = `<div class="editor-empty-state">No songs found</div>`;
         }
@@ -348,7 +325,12 @@ export function renderSongs(ctx, songs) {
     const displaySongs = currentSort.field
         ? sortSongs(songs, currentSort.field, currentSort.direction)
         : songs;
-    ctx.setState({ selectedIndex: -1, displayedItems: displaySongs });
+    ctx.setState({
+        selectedIndex: -1,
+        selectedSongIds: new Set(),
+        selectionAnchor: -1,
+        displayedItems: displaySongs,
+    });
     renderSongRows(ctx, displaySongs);
 }
 
@@ -398,9 +380,14 @@ export function patchSongRow(ctx, fresh) {
     }
 
     const state = ctx.getState();
-    const selectedId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+    const focusId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
     const index = Number(node.dataset.index);
-    node.outerHTML = buildSongRowHtml(cached, index, selectedId);
+    node.outerHTML = buildSongRowHtml(
+        cached,
+        index,
+        state.selectedSongIds,
+        focusId,
+    );
 
     if (newlyTombstoned) {
         // Re-query: outerHTML replaced the node. Flash class is added imperatively
@@ -425,15 +412,17 @@ function flushTombstones(ctx) {
         return;
     }
 
-    // The selected row is never swept — it stays (dimmed) until selection moves
-    // off it, so the song the user is on never vanishes under them. It sweeps on
-    // a later flush once it's no longer selected.
+    // Selected rows are never swept — they stay (dimmed) until selection moves
+    // off them, so a song the user is on never vanishes under them. They sweep
+    // on a later flush once no longer selected.
     const state = ctx.getState();
-    const selectedId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+    const focusId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+    const keepIds = new Set(state.selectedSongIds || []);
+    if (focusId != null) keepIds.add(focusId);
 
     const swept = new Set();
     for (const id of tombstonedIds) {
-        if (id !== selectedId) swept.add(id);
+        if (!keepIds.has(id)) swept.add(id);
     }
     if (!swept.size) return; // only the selected tombstone remains; keep it
     for (const id of swept) tombstonedIds.delete(id);

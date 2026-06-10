@@ -528,12 +528,6 @@ input:checked + .slider:before {
 }
 
 /* Row internals: shared across song-row wherever it appears */
-.col-check {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-
 .col-info {
     flex: 1;
     min-width: 0;
