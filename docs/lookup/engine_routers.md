@@ -304,7 +304,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ## Multi-Edit Router
 *Location: `src/engine/routers/multi_edit.py`*
-**Responsibility**: Multi-song editing — collapsed read view (and later, fan-out writes).
+**Responsibility**: Multi-song editing — collapsed read view + fan-out writes.
 
 ### class MultiViewRequest
 - Request body: `song_ids: List[int]` (min 2).
@@ -314,6 +314,26 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns a virtual `SongView` collapsing the selection (see `docs/specs/multiedit.md`).
 - Mixed scalars are null and listed in `SongView.mixed_fields`; M2M entries carry `universal`.
 - 404 if any song ID does not exist.
+
+### class MultiUpdateOp
+- Collapsed scalars only (`media_name`, `bpm`, `year`, `isrc`, `notes`); unset fields are excluded (exclude_unset semantics).
+
+### class MultiAddOp
+- Single-song add shape minus `song_id` (type credit/tag/publisher/album); per-field validation happens when the packer builds the real `Add*Item` models.
+
+### class MultiRemoveOp
+- `type` + `id`: entity id for tag/publisher/album, or the virtual view's `credit_id` for credits.
+
+### class MultiMutateRequest
+- Request body: `song_ids` (min 2) + optional `update` / `add` / `remove` ops.
+
+### at_least_one_change()
+- Validator: the request must contain at least one op.
+
+### async def multi_mutate(body: MultiMutateRequest) -> dict
+**HTTP**: `POST /api/v1/songs/multi-mutate`
+- Expands ops to per-song items via `MultiEditService.multi_mutate` (the packer) and applies one `MutationRequest`; returns the coordinator's `{songs, warnings}`.
+- Errors mirror `/mutate`: 404 `LookupError`, 409 `MergeRequiredError`, 400 `ValueError` (includes non-universal removes and invalid item shapes).
 
 ---
 

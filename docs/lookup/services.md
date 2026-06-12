@@ -19,7 +19,7 @@ Parses the filename (stem) using tokens like {Artist}, {Title}, and {Ignore}.
 
 ## MultiEditService
 *Location: `src/services/multi_edit_service.py`*
-Multi-song editing: collapses a selection into one virtual `SongView` (read); will also own the packer that expands single-song-shaped ops into per-song mutation items (write). See `docs/specs/multiedit.md`.
+Multi-song editing: collapses a selection into one virtual `SongView` (read) and packs single-song-shaped ops into per-song mutation items (write). See `docs/specs/multiedit.md`.
 
 ### get_multi_view(song_ids: List[int]) -> SongView
 Fetches (`SongRepository.get_by_ids`) and hydrates all songs, then collapses:
@@ -27,6 +27,13 @@ Fetches (`SongRepository.get_by_ids`) and hydrates all songs, then collapses:
 - M2M (credits/tags/publishers/albums): union; entries on all songs get `universal=True`, partial entries `universal=False`. Credits keyed by `(name_id, role_name)`.
 - Virtual song has `id=None`, empty `source_path`, zero duration.
 - Raises `LookupError` if any ID is missing; duplicate IDs are deduped.
+
+### multi_mutate(song_ids, update=None, add=None, remove=None) -> dict
+The packer: expands ops (dicts, no `song_id`) into existing per-song mutation items and applies them as one `MutationRequest` via `MutationCoordinator` (one transaction, full rollback; coordinator's touched-song ID3/filing pass runs as usual). Returns the coordinator's `{songs, warnings}` payload.
+- `update`: collapsed scalars only (exclude_unset semantics); other fields raise `ValueError`. One `UpdateSongItem` per song.
+- `add`: blind clone per song (credit/tag/publisher/album only) — mutator add paths are idempotent (get-or-create + INSERT OR IGNORE). Album links get explicit `track_number=0, disc_number=0`.
+- `remove`: entry must be universal across the selection (`ValueError` otherwise, `LookupError` if absent). Credits arrive as the virtual view's `credit_id`; resolved to `(name_id, role_name)` and re-found per song.
+- No expanded items (e.g. empty update dict) returns `{"songs": [], "warnings": []}` without touching the coordinator.
 
 ---
 

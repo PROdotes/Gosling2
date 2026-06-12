@@ -44,8 +44,8 @@ Renders the full V2 editor grid for a single song.
 ### renderSongEditorMultiSelect(container, songs)
 Renders a specialized editor view for bulk editing common fields across multiple songs.
 
-### renderSongEditorMulti(view, count, validationRules)
-Renders the multi-edit preview: the collapsed virtual SongView through renderSongEditorV2 plus banner, mixed-scalar ghost placeholders, partial-chip dimming, and a capture-phase guard that blocks all mutations until multi-mutate exists.
+### renderSongEditorMulti(view, songIds, validationRules)
+Renders the multi-edit editor: the collapsed virtual SongView through renderSongEditorV2 plus banner, mixed-scalar ghost placeholders, and partial-chip dimming. Tags `view._multiIds` so wireScalarInputs/wireChipInputs route saves through multiMutate; every save re-fetches the collapsed view and re-renders. A capture-phase guard still blocks actions with no multi path (`[data-action]`, splitters: album-card internals, primary stars, edit modals).
 
 ### renderSongEditorEmpty(container)
 Renders the placeholder view when no song is selected.

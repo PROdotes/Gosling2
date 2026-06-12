@@ -1,13 +1,28 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.data.song_repository import SongRepository
 from src.engine.config import get_db_path
+from pydantic import TypeAdapter, ValidationError
+
+from src.engine.routers.mutation_models import (
+    AddItem,
+    MutationRequest,
+    RemoveAlbumItem,
+    RemoveCreditItem,
+    RemovePublisherItem,
+    RemoveTagItem,
+    UpdateSongItem,
+)
 from src.models.domain import Song, SongCredit
 from src.models.view_models import SongAlbumView, SongView
 from src.services.library_service import LibraryService
+from src.services.mutation_coordinator import MutationCoordinator
 
 # Editable scalar fields collapsed across the selection.
 COLLAPSED_SCALARS = ("media_name", "bpm", "year", "isrc", "notes")
+
+# Validates a song-targeted add op dict into the discriminated AddItem union.
+_ADD_ITEM: TypeAdapter = TypeAdapter(AddItem)
 
 
 class MultiEditService:
@@ -21,14 +36,17 @@ class MultiEditService:
         self._song_repo = SongRepository(db_path)
         self._library = LibraryService(db_path)
 
-    def get_multi_view(self, song_ids: List[int]) -> SongView:
+    def _load_songs(self, song_ids: List[int]) -> List[Song]:
         unique_ids = list(dict.fromkeys(song_ids))
         songs = self._song_repo.get_by_ids(unique_ids)
         if len(songs) != len(unique_ids):
             found = {s.id for s in songs}
             missing = [i for i in unique_ids if i not in found]
             raise LookupError(f"Songs not found: {missing}")
-        songs = self._library.hydrate_songs(songs)
+        return self._library.hydrate_songs(songs)
+
+    def get_multi_view(self, song_ids: List[int]) -> SongView:
+        songs = self._load_songs(song_ids)
 
         scalars, mixed_fields = self._collapse_scalars(songs)
         return SongView(
@@ -118,3 +136,126 @@ class MultiEditService:
             SongAlbumView(**album.model_dump(), universal=counts[key] == len(songs))
             for key, album in first_seen.items()
         ]
+
+    # ------------------------------------------------------------------
+    # Packer (write)
+    # ------------------------------------------------------------------
+
+    def multi_mutate(
+        self,
+        song_ids: List[int],
+        update: Optional[Dict] = None,
+        add: Optional[List[Dict]] = None,
+        remove: Optional[List[Dict]] = None,
+    ) -> Dict[str, Any]:
+        """Expands single-song-shaped ops into per-song mutation items and
+        applies them as one MutationRequest (one transaction, full rollback).
+        Ops carry no song_id; update fields use exclude_unset semantics."""
+        songs = self._load_songs(song_ids)
+
+        update_items: List[Any] = []
+        if update:
+            unknown = set(update) - set(COLLAPSED_SCALARS)
+            if unknown:
+                raise ValueError(f"Fields not multi-editable: {sorted(unknown)}")
+            try:
+                update_items = [
+                    UpdateSongItem(type="song", id=s.id, **update) for s in songs
+                ]
+            except ValidationError as e:
+                msgs = "; ".join(err["msg"] for err in e.errors())
+                raise ValueError(msgs) from e
+
+        # Adds are blind clones, one item per song: every mutator add path is
+        # idempotent (get-or-create + INSERT OR IGNORE on the link tables).
+        add_items: List[Any] = []
+        for op in add or []:
+            if op.get("type") not in ("credit", "tag", "publisher", "album"):
+                raise ValueError(f"Op not multi-editable: {op.get('type')!r}")
+            if op.get("type") == "album":
+                # Album links via multi-edit are explicit 0/0, never inherited.
+                op = {**op, "track_number": 0, "disc_number": 0}
+            add_items.extend(
+                _ADD_ITEM.validate_python({**op, "song_id": s.id}) for s in songs
+            )
+
+        remove_items: List[Any] = []
+        for op in remove or []:
+            remove_items.extend(self._expand_remove(op, songs))
+
+        if not (update_items or add_items or remove_items):
+            # Every add was already present on every song: a valid no-op.
+            return {"songs": [], "warnings": []}
+
+        return MutationCoordinator(self._db_path).apply(
+            MutationRequest(
+                add=add_items or None,
+                update=update_items or None,
+                remove=remove_items or None,
+            )
+        )
+
+    def _expand_remove(self, op: Dict, songs: List[Song]) -> List[Any]:
+        kind = op["type"]
+        if kind == "credit":
+            return self._expand_remove_credit(op["id"], songs)
+        if kind == "tag":
+            return self._remove_universal(
+                op, songs, "tags", lambda t: t.id, RemoveTagItem
+            )
+        if kind == "publisher":
+            return self._remove_universal(
+                op, songs, "publishers", lambda p: p.id, RemovePublisherItem
+            )
+        return self._remove_universal(
+            op, songs, "albums", lambda a: a.album_id, RemoveAlbumItem
+        )
+
+    @staticmethod
+    def _expand_remove_credit(credit_id: int, songs: List[Song]) -> List[Any]:
+        # The view carries one song's credit_id for the union entry; resolve
+        # it to (name_id, role_name) and re-find each song's own row.
+        key = next(
+            (
+                (c.name_id, c.role_name)
+                for s in songs
+                for c in s.credits
+                if c.credit_id == credit_id
+            ),
+            None,
+        )
+        if key is None:
+            raise LookupError(f"Credit {credit_id} not found in selection")
+        items = []
+        for song in songs:
+            match = next(
+                (c for c in song.credits if (c.name_id, c.role_name) == key), None
+            )
+            if match is None:
+                raise ValueError(
+                    "Credit is not universal across the selection; remove is only offered for universal entries"
+                )
+            items.append(
+                RemoveCreditItem(type="credit", song_id=song.id, id=match.credit_id)
+            )
+        return items
+
+    @staticmethod
+    def _remove_universal(
+        op: Dict,
+        songs: List[Song],
+        attr: str,
+        key_fn: Callable[[Any], Optional[int]],
+        item_cls,
+    ) -> List[Any]:
+        kind, entry_id = op["type"], op["id"]
+        present = [
+            s for s in songs if any(key_fn(e) == entry_id for e in getattr(s, attr))
+        ]
+        if not present:
+            raise LookupError(f"{kind} {entry_id} not found in selection")
+        if len(present) != len(songs):
+            raise ValueError(
+                f"{kind} {entry_id} is not universal across the selection; remove is only offered for universal entries"
+            )
+        return [item_cls(type=kind, song_id=s.id, id=entry_id) for s in songs]

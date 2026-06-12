@@ -17,6 +17,7 @@ import {
     rejectSong,
     removeAlbumCredit,
     removeAlbumPublisher,
+    multiMutate,
     removeSongAlbum,
     removeSongCredit,
     removeSongPublisher,
@@ -609,15 +610,26 @@ export class SongActionsHandler {
 
     async handleRemoveAlbum(actionTarget) {
         const { songId, albumId } = actionTarget.dataset;
+        const multiIds = this.ctx.getState().multiSelectIds;
         try {
-            await removeSongAlbum(songId, albumId);
-            if (
-                this.ctx.refreshActiveSongV2 &&
-                this.ctx.getState().currentMode === "songs"
-            ) {
-                await this.ctx.refreshActiveSongV2(songId);
+            if (multiIds) {
+                await multiMutate(multiIds, {
+                    remove: [{ type: "album", id: Number(albumId) }],
+                });
+                const { getMultiView } = await import("../api.js");
+                const { renderSongEditorMulti } = await import("../renderers/song_editor.js");
+                const fresh = await getMultiView(multiIds);
+                renderSongEditorMulti(fresh, multiIds, this.ctx.getState().validationRules);
             } else {
-                this.ctx.refreshActiveDetail();
+                await removeSongAlbum(songId, albumId);
+                if (
+                    this.ctx.refreshActiveSongV2 &&
+                    this.ctx.getState().currentMode === "songs"
+                ) {
+                    await this.ctx.refreshActiveSongV2(songId);
+                } else {
+                    this.ctx.refreshActiveDetail();
+                }
             }
         } catch (err) {
             if (this.ctx.showBanner) {

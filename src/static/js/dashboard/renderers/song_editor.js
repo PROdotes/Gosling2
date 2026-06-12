@@ -12,6 +12,8 @@ import {
     addSongPublisher,
     addSongTag,
     getCatalogSong,
+    getMultiView,
+    multiMutate,
     patchSongScalars,
     removeAlbumCredit,
     removeAlbumPublisher,
@@ -32,6 +34,15 @@ import { showToast } from "../components/toast.js";
 import { PROCESSING_STATUS } from "../constants.js";
 import { parseTagInput } from "../utils/tag_input.js";
 import { escapeHtml } from "../components/utils.js";
+
+// Per the filing warnings contract: mutate responses are 200 even when the
+// post-commit ID3/file pass failed; surface those warnings to the user.
+function notifyMutateWarnings(result) {
+    if (result?.warnings?.length) {
+        const msg = result.warnings.map((w) => w.error || w.kind).join("; ");
+        showToast(`Saved, but file operation failed: ${msg}`, "warning", 5000);
+    }
+}
 
 function renderChips(items, emptyLabel) {
     if (!items || items.length === 0) {
@@ -392,6 +403,9 @@ function updateListRowBlockers(songId, reviewBlockers) {
  */
 export function wireScalarInputs(song, validationRules, onUpdated) {
     const blurSaves = validationRules?.blur_saves_scalars ?? true;
+    // Multi-edit: the virtual song carries the selection; saves fan out
+    // server-side via multi-mutate and overwrite the field on all songs.
+    const multiIds = song._multiIds || null;
 
     for (const { inputId, field, numeric } of SCALAR_FIELDS) {
         const input = document.getElementById(inputId);
@@ -447,6 +461,17 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             saving = true;
             input.disabled = true;
             try {
+                if (multiIds) {
+                    const result = await multiMutate(multiIds, {
+                        update: { [field]: payload },
+                    });
+                    committedValue = raw;
+                    // The field now agrees across the selection
+                    input.placeholder = "";
+                    notifyMutateWarnings(result);
+                    if (onUpdated) onUpdated(null);
+                    return;
+                }
                 const fresh = await patchSongScalars(song.id, { [field]: payload });
                 committedValue = raw;
                 updateListRowBlockers(song.id, fresh.review_blockers);
@@ -576,6 +601,10 @@ function appendDot(labelEl, title) {
 export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSplitPublisher) {
     const handles = {};
     const getItemsByField = {};
+    // Multi-edit: the virtual song carries the selection; chip saves fan out
+    // server-side via multi-mutate (adds target all songs, removes only
+    // universal entries).
+    const multiIds = song._multiIds || null;
 
     function syncMissing(fieldKey, items) {
         const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
@@ -584,6 +613,13 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
     }
 
     async function refresh() {
+        if (multiIds) {
+            // The collapsed view must be rebuilt (universal flags shift);
+            // onUpdated re-renders the whole multi editor from it.
+            const fresh = await getMultiView(multiIds);
+            if (onUpdated) onUpdated(fresh);
+            return fresh;
+        }
         const fresh = await getCatalogSong(song.id);
         updateListRowBlockers(song.id, fresh.review_blockers);
         for (const [key, getItems] of Object.entries(getItemsByField)) {
@@ -591,6 +627,14 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
         }
         if (onUpdated) onUpdated(fresh);
         return fresh;
+    }
+
+    async function saveChipOp(ops, singleCall) {
+        if (multiIds) {
+            notifyMutateWarnings(await multiMutate(multiIds, ops));
+            return;
+        }
+        notifyMutateWarnings(await singleCall());
     }
 
     function getContainer(fieldKey) {
@@ -631,12 +675,18 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 }));
             },
             onAdd: async (opt) => {
-                await addSongCredit(song.id, opt.label, role, opt.id);
+                await saveChipOp(
+                    { add: [{ type: "credit", name: opt.label, id: opt.id ?? null, role }] },
+                    () => addSongCredit(song.id, opt.label, role, opt.id),
+                );
                 const fresh = await refresh();
                 handle.setItems(getItems(fresh));
             },
             onRemove: async (creditId) => {
-                await removeSongCredit(song.id, creditId);
+                await saveChipOp(
+                    { remove: [{ type: "credit", id: creditId }] },
+                    () => removeSongCredit(song.id, creditId),
+                );
                 await refresh();
             },
             placeholder: `Add ${role.toLowerCase()}`,
@@ -699,17 +749,27 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 const { name, category } = opt.id
                     ? opt
                     : parseTagInput(opt.label, tagRules);
-                await addSongTag(
-                    song.id,
-                    name,
-                    category ?? null,
-                    opt.id ?? null,
+                await saveChipOp(
+                    {
+                        add: [
+                            {
+                                type: "tag",
+                                name,
+                                category: category ?? null,
+                                id: opt.id ?? null,
+                            },
+                        ],
+                    },
+                    () => addSongTag(song.id, name, category ?? null, opt.id ?? null),
                 );
                 const fresh = await refresh();
                 handle.setItems(getItems(fresh));
             },
             onRemove: async (tagId) => {
-                await removeSongTag(song.id, tagId);
+                await saveChipOp(
+                    { remove: [{ type: "tag", id: tagId }] },
+                    () => removeSongTag(song.id, tagId),
+                );
                 await refresh();
             },
             allowCreate: true,
@@ -761,12 +821,18 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 return r.map((p) => ({ id: p.id, label: p.name }));
             },
             onAdd: async (opt) => {
-                await addSongPublisher(song.id, opt.label, opt.id);
+                await saveChipOp(
+                    { add: [{ type: "publisher", name: opt.label, id: opt.id ?? null }] },
+                    () => addSongPublisher(song.id, opt.label, opt.id),
+                );
                 const fresh = await refresh();
                 handle.setItems(getItems(fresh));
             },
             onRemove: async (pubId) => {
-                await removeSongPublisher(song.id, pubId);
+                await saveChipOp(
+                    { remove: [{ type: "publisher", id: pubId }] },
+                    () => removeSongPublisher(song.id, pubId),
+                );
                 await refresh();
             },
             allowCreate: true,
@@ -807,15 +873,28 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                     }));
                 },
                 onAdd: async (opt) => {
-                    await addSongAlbum(
-                        song.id,
-                        opt.id ?? null,
-                        opt.id ? null : opt.label,
-                        null,
-                        null,
+                    await saveChipOp(
+                        {
+                            add: [
+                                {
+                                    type: "album",
+                                    id: opt.id ?? null,
+                                    name: opt.id ? null : opt.label,
+                                },
+                            ],
+                        },
+                        () =>
+                            addSongAlbum(
+                                song.id,
+                                opt.id ?? null,
+                                opt.id ? null : opt.label,
+                                null,
+                                null,
+                            ),
                     );
                     const fresh = await refresh();
-                    updateAlbumSubSection(fresh, refresh);
+                    // Multi re-renders the whole editor via onUpdated
+                    if (!multiIds) updateAlbumSubSection(fresh, refresh);
                 },
                 onRemove: async () => {}, // removal handled by card × buttons
                 allowCreate: true,
@@ -825,9 +904,12 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
         }
     }
 
-    // Wire nested chips and scalar inputs for existing albums
+    // Album artist/publisher chips are album-level; always wire them.
+    // Track/disc scalar inputs are per-song-link; skip in multi mode.
     wireAlbumSubChips(song, refresh);
-    wireAlbumScalarInputs(song, refresh);
+    if (!multiIds) {
+        wireAlbumScalarInputs(song, refresh);
+    }
 
     return {
         updateField(fieldKey, freshSong) {
@@ -988,36 +1070,47 @@ function mixedPlaceholder(values) {
     return text.length > 60 ? "Mixed" : `Mixed: ${text}`;
 }
 
-export function renderSongEditorMulti(view, count, validationRules = null) {
+export function renderSongEditorMulti(view, songIds, validationRules = null) {
     renderSongEditorV2(view, null, null);
     const panel = document.getElementById("editor-panel");
     const scroll = panel?.querySelector(".editor-scroll");
     if (!scroll) return;
 
     scroll.classList.add("editor-multi-preview");
-    scroll.insertAdjacentHTML(
-        "afterbegin",
-        `<div class="editor-multi-banner">Editing ${count} songs</div>`,
-    );
+    const sidebar = panel.querySelector(".action-sidebar");
+    if (sidebar) sidebar.innerHTML = `<div class="multi-edit-count">Editing ${songIds.length} songs</div>`;
+
+    // The virtual song carries the selection: wire* fan saves out through
+    // multi-mutate, and any save re-collapses the view and re-renders here.
+    view._multiIds = songIds;
+    const rerender = (freshView) => {
+        if (freshView) {
+            renderSongEditorMulti(freshView, songIds, validationRules);
+            return;
+        }
+        // Scalar saves don't carry a view; re-fetch the collapsed state.
+        getMultiView(songIds)
+            .then((v) => renderSongEditorMulti(v, songIds, validationRules))
+            .catch((err) =>
+                showToast("Multi-view refresh failed: " + err.message, "error", 5000),
+            );
+    };
 
     // The visible chip UI (chips, category styling, add stubs, folding) is
     // built by the chip-input component, not the static markup — wire it so
-    // the preview matches the single-song editor pixel for pixel.
-    wireChipInputs(view, null, null, validationRules, null);
+    // the editor matches the single-song editor pixel for pixel.
+    wireChipInputs(view, rerender, null, validationRules, null);
+    wireScalarInputs(view, validationRules, rerender);
 
-    // Interim save guard until multi-mutate exists: the wired handlers above
-    // are single-song saves keyed on the virtual song's null id, so block
-    // every mutating control at capture phase. Fold/expand stay live.
+    // Actions that still have no multi path (album-card internals, splitters,
+    // primary stars, edit modals) stay blocked at capture phase.
     const blockMutations = (e) => {
-        if (
-            e.target.closest(
-                ".chip-input__chip-remove, .chip-input__chip-split, .chip-input__option, [data-action]",
-            )
-        ) {
+        const t = e.target.closest(".chip-input__chip-split, [data-action]");
+        if (t && t.dataset.action !== "remove-album") {
             e.preventDefault();
             e.stopPropagation();
             if (e.type === "click")
-                showToast("Multi-edit saving not wired yet", "error", 3000);
+                showToast("Not supported in multi-edit yet", "error", 3000);
         }
     };
     scroll.addEventListener("click", blockMutations, true);
@@ -1030,8 +1123,6 @@ export function renderSongEditorMulti(view, count, validationRules = null) {
         const input = document.getElementById(MULTI_SCALAR_INPUTS[field] || "");
         if (input) input.placeholder = mixedPlaceholder(values);
     }
-    const notes = document.getElementById("ef-notes");
-    if (notes) notes.setAttribute("readonly", "");
 
     // Partial chips: dim entries that exist on some but not all selected songs
     const partialByField = {
@@ -1069,17 +1160,6 @@ export function renderSongEditorMulti(view, count, validationRules = null) {
     });
 }
 
-export function renderSongEditorMultiSelect(count) {
-    const panel = document.getElementById("editor-panel");
-    if (!panel) return;
-    const scroll = panel.querySelector(".editor-scroll");
-    if (scroll) {
-        clearMultiPreview(scroll);
-        scroll.innerHTML = `<div class="editor-empty-state">${count} songs selected</div>`;
-    }
-    const sidebar = panel.querySelector(".action-sidebar");
-    if (sidebar) sidebar.innerHTML = "";
-}
 
 export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");

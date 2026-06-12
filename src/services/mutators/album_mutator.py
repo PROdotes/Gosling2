@@ -48,6 +48,13 @@ class AlbumMutator:
                 title_search=normalize_for_search(item.name),
             )
 
+        # Idempotent: re-adding an existing link must not disturb the primary
+        # flag (the blind clear_primary below would demote a primary album).
+        if self._song_album_repo.get_link(item.song_id, album_id, conn):
+            if item.make_primary:
+                self._song_album_repo.set_primary(item.song_id, album_id, conn)
+            return
+
         has_primary = self._song_album_repo.has_primary(item.song_id, conn)
         self._song_album_repo.add_album(
             item.song_id, album_id, item.track_number, item.disc_number, conn

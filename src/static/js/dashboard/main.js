@@ -58,7 +58,6 @@ import {
     renderActionSidebar,
     renderSongEditorEmpty,
     renderSongEditorMulti,
-    renderSongEditorMultiSelect,
     renderSongEditorV2,
     wireChipInputs,
     wireDriftIndicators,
@@ -1182,7 +1181,6 @@ function selectAllSongs() {
 function syncSongSelectionEditor() {
     const songIds = Array.from(state.selectedSongIds);
     if (songIds.length > 1) {
-        renderSongEditorMultiSelect(songIds.length);
         state.multiSelectIds = songIds;
         state.activeSong = null;
         state.activeSongDiff = null;
@@ -1195,11 +1193,7 @@ function syncSongSelectionEditor() {
                     state.multiSelectIds &&
                     state.multiSelectIds.join() === songIds.join()
                 ) {
-                    renderSongEditorMulti(
-                        view,
-                        songIds.length,
-                        state.validationRules,
-                    );
+                    renderSongEditorMulti(view, songIds, state.validationRules);
                 }
             })
             .catch((err) => {

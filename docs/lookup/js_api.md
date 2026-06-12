@@ -52,7 +52,10 @@ Fetches tags matching query.
 Fetches basic catalog song data.
 
 ### getMultiView(songIds)
-POSTs `{song_ids}` to `POST /api/v1/songs/multi-view`; returns the collapsed virtual SongView (`mixed_fields` + per-entry `universal` flags) for the multi-edit preview.
+POSTs `{song_ids}` to `POST /api/v1/songs/multi-view`; returns the collapsed virtual SongView (`mixed_fields` + per-entry `universal` flags) for the multi-edit editor.
+
+### multiMutate(songIds, ops)
+POSTs `{song_ids, ...ops}` to `POST /api/v1/songs/multi-mutate`; ops are single-song-shaped (`update` scalars, `add`/`remove` lists without song_id) and fan out server-side via the packer. Returns the coordinator's `{songs, warnings}`.
 
 ### getSongDetail(dbSong, options)
 POSTs the caller's SongView to `POST /api/v1/metabolic/inspect-file`. Returns `{diff, raw_tags}` — diff is `{field_key: {db, file}}` (empty = in sync), raw_tags are unmapped ID3 frames. Result stored in `state.activeSongDiff` + `state.activeSongRawTags`.

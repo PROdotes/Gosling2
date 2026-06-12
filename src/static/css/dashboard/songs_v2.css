@@ -368,12 +368,8 @@
 
 /* ── MULTI-EDIT PREVIEW ─────────────────────────────────────────────────── */
 
-#songs-workspace .editor-multi-banner {
+#songs-workspace .multi-edit-count {
     padding: 8px 12px;
-    margin-bottom: 12px;
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    background: var(--bg-window);
     color: var(--text-secondary);
     font-size: 12px;
 }
@@ -386,6 +382,11 @@
 #songs-workspace .editor-multi-preview .editor-chip.chip-partial,
 #songs-workspace .editor-multi-preview .chip-input__chip.chip-partial {
     border-style: dashed;
+}
+
+/* Partial entries are locked: visible for feedback, never removable */
+#songs-workspace .editor-multi-preview .chip-input__chip.chip-partial .chip-input__chip-remove {
+    display: none;
 }
 
 /* ── ACTION SIDEBAR ─────────────────────────────────────────────────────── */

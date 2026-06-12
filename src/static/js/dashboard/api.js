@@ -362,6 +362,14 @@ export function mutate(command) {
     });
 }
 
+export function multiMutate(songIds, ops) {
+    return fetchJson("/api/v1/songs/multi-mutate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_ids: songIds, ...ops }),
+    });
+}
+
 export function formatText(text, type) {
     return fetchJson("/api/v1/tools/format-text", {
         method: "POST",

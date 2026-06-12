@@ -127,6 +127,49 @@ class TestAlbumMutatorAdd:
         match = next(r for r in links if r["AlbumID"] == 100)
         assert match["IsPrimary"] == 1
 
+    def test_re_add_existing_link_is_noop(self, mutator, conn):
+        # Song 1 already has album 100 as primary (track 1); re-adding must
+        # not demote the primary flag or touch the link.
+        item = AddAlbumItem.model_validate(
+            {
+                "type": "album",
+                "song_id": 1,
+                "id": 100,
+                "name": "Nevermind",
+                "track_number": 7,
+                "disc_number": 2,
+            }
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+        links = _get_song_albums(conn, 1)
+        match = next(r for r in links if r["AlbumID"] == 100)
+        assert match["IsPrimary"] == 1
+        assert match["TrackNumber"] == 1
+        assert len([r for r in links if r["AlbumID"] == 100]) == 1
+
+    def test_re_add_with_make_primary_promotes(self, mutator, conn):
+        # Give song 1 a second, non-primary album, then re-add it with
+        # make_primary: it must take over the primary flag.
+        first = AddAlbumItem.model_validate(
+            {"type": "album", "song_id": 1, "id": 200, "name": "TCATS"}
+        )
+        mutator.apply_within("add", first, conn)
+        again = AddAlbumItem.model_validate(
+            {
+                "type": "album",
+                "song_id": 1,
+                "id": 200,
+                "name": "TCATS",
+                "make_primary": True,
+            }
+        )
+        mutator.apply_within("add", again, conn)
+        conn.commit()
+        links = {r["AlbumID"]: r for r in _get_song_albums(conn, 1)}
+        assert links[200]["IsPrimary"] == 1
+        assert links[100]["IsPrimary"] == 0
+
     def test_add_make_primary_promotes_and_demotes_existing(self, mutator, conn):
         # Song 1 already has album 100 as primary — add 200 with make_primary=true
         item = AddAlbumItem.model_validate(
