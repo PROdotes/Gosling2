@@ -276,7 +276,7 @@ header::after {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 0 12px 0 40px;
+    padding: 0 34px 0 40px;
     border-radius: var(--radius);
     font-size: 13px;
     outline: none;
@@ -297,7 +297,7 @@ header::after {
     color: var(--text-mut);
 }
 
-.search-input-wrapper svg {
+.search-input-wrapper > svg {
     position: absolute;
     left: 14px;
     top: 50%;
@@ -305,6 +305,39 @@ header::after {
     width: 16px;
     height: 16px;
     color: var(--text-mut);
+}
+
+.search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-mut);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color 0.12s ease, background 0.12s ease;
+}
+
+.search-clear[hidden] {
+    display: none;
+}
+
+.search-clear svg {
+    width: 14px;
+    height: 14px;
+}
+
+.search-clear:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 #searchInput {

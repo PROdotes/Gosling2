@@ -37,7 +37,7 @@ import { escapeHtml } from "../components/utils.js";
 
 // Per the filing warnings contract: mutate responses are 200 even when the
 // post-commit ID3/file pass failed; surface those warnings to the user.
-function notifyMutateWarnings(result) {
+export function notifyMutateWarnings(result) {
     if (result?.warnings?.length) {
         const msg = result.warnings.map((w) => w.error || w.kind).join("; ");
         showToast(`Saved, but file operation failed: ${msg}`, "warning", 5000);

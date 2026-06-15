@@ -278,7 +278,7 @@ class SongView(BaseModel):
         """True if the song's source_path is in the staging directory."""
         from src.engine.config import STAGING_DIR
 
-        return self.source_path and str(self.source_path).lower().startswith(
+        return bool(self.source_path) and str(self.source_path).lower().startswith(
             str(STAGING_DIR).lower()
         )
 

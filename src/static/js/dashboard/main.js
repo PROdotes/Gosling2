@@ -77,6 +77,7 @@ import {
 
 const elements = {
     searchInput: document.getElementById("searchInput"),
+    searchClear: document.getElementById("searchClear"),
     resultsContainer: document.getElementById("results-container"),
     detailPanel: document.getElementById("detail-panel"),
     totalCount: document.getElementById("total-count"),
@@ -582,6 +583,7 @@ async function switchMode(mode) {
     state.selectionAnchor = -1;
 
     elements.searchInput.value = "";
+    syncSearchClear();
     syncModeUi();
     ctx.hideDetailPanel();
     filterSidebar.load("");
@@ -602,6 +604,7 @@ function navigate(mode, query = "") {
     state.selectedSongIds = new Set();
     state.selectionAnchor = -1;
     elements.searchInput.value = state.currentQuery;
+    syncSearchClear();
     syncModeUi();
     ctx.hideDetailPanel();
     if (mode === "songs") {
@@ -1256,9 +1259,14 @@ document.addEventListener("click", async (event) => {
     }
 });
 
+function syncSearchClear() {
+    elements.searchClear.hidden = elements.searchInput.value.length === 0;
+}
+
 elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
+    syncSearchClear();
     state.debounceTimer = setTimeout(() => {
         if (state.currentMode === "songs") {
             doSongSearch();
@@ -1267,6 +1275,20 @@ elements.searchInput.addEventListener("input", (event) => {
         }
         filterSidebar.load(state.currentQuery);
     }, 250);
+});
+
+elements.searchClear.addEventListener("click", () => {
+    clearTimeout(state.debounceTimer);
+    elements.searchInput.value = "";
+    state.currentQuery = "";
+    syncSearchClear();
+    if (state.currentMode === "songs") {
+        doSongSearch();
+    } else {
+        performSearch("");
+    }
+    filterSidebar.load("");
+    elements.searchInput.focus();
 });
 
 elements.deepSearchToggle.addEventListener("change", (event) => {
