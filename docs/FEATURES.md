@@ -209,24 +209,62 @@ The system identifies which fields must be completed before a song can be approv
 
 ## What's Missing?
 
-Areas to consider for future expansion:
+**Product direction:** Gosling2 is being built library-first. Nailing library
+management is the current priority; full radio-automation (on-air playout) is the
+long-term destination. The sections below reflect that ordering.
 
-- **Collaborative** — Multi-user support, shared libraries, user accounts
-- **Cloud Sync** — Backup and sync metadata to cloud storage
-- **Smart Recommendations** — Suggest new music or related artists based on library
-- **Playlists** — Create and manage dynamic/static playlists
-- **Advanced Search** — Full-text search improvements, saved searches
-- **Artwork** — Cover art management, display, and extraction from files
-- **Lyrics** — Store and search song lyrics
-- **Statistics** — Library analytics, listening history, trends, most-played
-- **Mobile** — Native mobile app or responsive mobile UI
-- **API Webhooks** — Notifications for library changes
-- **Batch Metadata Editor** — Edit multiple songs at once (Multi-Edit)
-- **Smart Renaming** — Auto-rename files on disk based on metadata
-- **Import Presets** — Save and reuse metadata extraction patterns
-- **External Data Sources** — MusicBrainz, AcousticBrainz, Last.fm integration
-- **Genre Hierarchies** — Standardized genre taxonomy support
-- **Mood/Energy Analysis** — Auto-detect mood/energy from audio
+### Shipped or in progress (no longer gaps)
+
+These were previously listed as missing but now exist in some form:
+
+- **Smart Renaming** — Auto-rename/file songs on disk by metadata. Done, via the
+  genre-routing rules (`json/rules.json`) + filing service.
+- **Import Presets** — Reusable metadata-extraction patterns. Backed by
+  `json/parser_presets.json` for the filename parser.
+- **Genre Hierarchies** — Hierarchical tag categories (e.g. `Genre::Rock`) already
+  supported via the `::` delimiter.
+- **Mood / Energy** — `mood` and `energy` are live song fields. (Only *auto-detection
+  from audio* remains — see below.)
+- **Batch Metadata Editor (Multi-Edit)** — In progress: collapsed read-view shipped,
+  fan-out write path built. See `docs/specs/multiedit.md`.
+
+### Near-term gaps (library management)
+
+The remaining work to call library management "complete":
+
+- **Settings screen** — UI for the runtime config currently hardcoded in `config.py`
+  (library root, DB/log paths, auto-rename, write-to-tags, transcoding, WAV
+  auto-convert, etc.). Planned as JSON-file backed. (Parity with old exe.)
+- **Renaming Rules editor** — In-UI CRUD for `json/rules.json`: ordered,
+  first-match-wins genre→path rules with a token palette and reorder. (Parity with old
+  exe.)
+- **Artwork** — Cover-art extraction, storage, and display.
+- **Advanced Search** — Saved searches and full-text improvements.
+- **Statistics** — Library analytics (counts, coverage, gaps).
+- **Lyrics** — Store and search song lyrics.
+- **External Data Sources** — MusicBrainz / AcousticBrainz / Last.fm enrichment.
+- **Mood/Energy Analysis** — Auto-detect mood/energy from audio (fields already exist).
+
+### Long-term: radio automation (playout)
+
+The old PyQt app was a radio auto-player; v3 has streaming playback but not the
+on-air automation engine. This is the eventual product axis, deferred until library
+management is solid:
+
+- **Playlists / Queue** — Build and manage playout playlists.
+- **Arming & Playback Control** — Arm media for on-air, playback control surface.
+- **Rotation Rules** — Automated scheduling/rotation across the library.
+- **Separation Rules** — Artist/title separation constraints during automation.
+
+### Out of scope (single-user local app)
+
+Not planned given the local, single-user design:
+
+- Multi-user / collaborative libraries, user accounts
+- Cloud sync / backup
+- Smart recommendations
+- Native mobile app
+- API webhooks
 
 ---
 

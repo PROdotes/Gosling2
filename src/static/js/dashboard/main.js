@@ -383,6 +383,12 @@ const ctx = {
         state.activeSongRawTags = null;
         renderSongEditorEmpty();
     },
+    async refreshMultiEditor() {
+        const songIds = state.multiSelectIds;
+        if (!songIds) return;
+        const fresh = await getMultiView(songIds);
+        renderSongEditorMulti(fresh, songIds, state.validationRules);
+    },
     updateSelection,
     updateIngestBadges,
     updateCachedIngestResult(stagedPath, patch) {

@@ -10,7 +10,7 @@ def count_lines(root="."):
             d
             for d in dirnames
             if not d.startswith(".")
-            and d not in ("node_modules", "__pycache__", ".venv", "venv", "tests")
+            and d not in ("node_modules", "__pycache__", ".venv", "venv", "tests", "tools")
         ]
         for filename in filenames:
             if filename.endswith((".py", ".js")):

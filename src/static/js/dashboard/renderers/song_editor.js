@@ -401,11 +401,13 @@ function updateListRowBlockers(songId, reviewBlockers) {
  * @param {object} validationRules - state.validationRules
  * @param {function} onUpdated - called with fresh song after a successful save
  */
-export function wireScalarInputs(song, validationRules, onUpdated) {
+export function wireScalarInputs(song, validationRules, onUpdated, onSave = null) {
     const blurSaves = validationRules?.blur_saves_scalars ?? true;
-    // Multi-edit: the virtual song carries the selection; saves fan out
-    // server-side via multi-mutate and overwrite the field on all songs.
-    const multiIds = song._multiIds || null;
+    const doSave = onSave || (async (field, payload) => {
+        const fresh = await patchSongScalars(song.id, { [field]: payload });
+        updateListRowBlockers(song.id, fresh.review_blockers);
+        return fresh;
+    });
 
     for (const { inputId, field, numeric } of SCALAR_FIELDS) {
         const input = document.getElementById(inputId);
@@ -461,20 +463,9 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             saving = true;
             input.disabled = true;
             try {
-                if (multiIds) {
-                    const result = await multiMutate(multiIds, {
-                        update: { [field]: payload },
-                    });
-                    committedValue = raw;
-                    // The field now agrees across the selection
-                    input.placeholder = "";
-                    notifyMutateWarnings(result);
-                    if (onUpdated) onUpdated(null);
-                    return;
-                }
-                const fresh = await patchSongScalars(song.id, { [field]: payload });
+                const fresh = await doSave(field, payload);
                 committedValue = raw;
-                updateListRowBlockers(song.id, fresh.review_blockers);
+                input.placeholder = "";
                 if (onUpdated) onUpdated(fresh);
             } catch (err) {
                 input.value = committedValue;
@@ -598,13 +589,9 @@ function appendDot(labelEl, title) {
     labelEl.appendChild(dot);
 }
 
-export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSplitPublisher) {
+export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSplitPublisher, multiOps = null) {
     const handles = {};
     const getItemsByField = {};
-    // Multi-edit: the virtual song carries the selection; chip saves fan out
-    // server-side via multi-mutate (adds target all songs, removes only
-    // universal entries).
-    const multiIds = song._multiIds || null;
 
     function syncMissing(fieldKey, items) {
         const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
@@ -613,10 +600,8 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
     }
 
     async function refresh() {
-        if (multiIds) {
-            // The collapsed view must be rebuilt (universal flags shift);
-            // onUpdated re-renders the whole multi editor from it.
-            const fresh = await getMultiView(multiIds);
+        if (multiOps) {
+            const fresh = await multiOps.refresh();
             if (onUpdated) onUpdated(fresh);
             return fresh;
         }
@@ -630,11 +615,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
     }
 
     async function saveChipOp(ops, singleCall) {
-        if (multiIds) {
-            notifyMutateWarnings(await multiMutate(multiIds, ops));
-            return;
-        }
-        notifyMutateWarnings(await singleCall());
+        notifyMutateWarnings(await (multiOps ? multiOps.save(ops) : singleCall()));
     }
 
     function getContainer(fieldKey) {
@@ -893,8 +874,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                             ),
                     );
                     const fresh = await refresh();
-                    // Multi re-renders the whole editor via onUpdated
-                    if (!multiIds) updateAlbumSubSection(fresh, refresh);
+                    if (!multiOps) updateAlbumSubSection(fresh, refresh);
                 },
                 onRemove: async () => {}, // removal handled by card × buttons
                 allowCreate: true,
@@ -907,7 +887,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
     // Album artist/publisher chips are album-level; always wire them.
     // Track/disc scalar inputs are per-song-link; skip in multi mode.
     wireAlbumSubChips(song, refresh);
-    if (!multiIds) {
+    if (!multiOps) {
         wireAlbumScalarInputs(song, refresh);
     }
 
@@ -1080,15 +1060,11 @@ export function renderSongEditorMulti(view, songIds, validationRules = null) {
     const sidebar = panel.querySelector(".action-sidebar");
     if (sidebar) sidebar.innerHTML = `<div class="multi-edit-count">Editing ${songIds.length} songs</div>`;
 
-    // The virtual song carries the selection: wire* fan saves out through
-    // multi-mutate, and any save re-collapses the view and re-renders here.
-    view._multiIds = songIds;
     const rerender = (freshView) => {
         if (freshView) {
             renderSongEditorMulti(freshView, songIds, validationRules);
             return;
         }
-        // Scalar saves don't carry a view; re-fetch the collapsed state.
         getMultiView(songIds)
             .then((v) => renderSongEditorMulti(v, songIds, validationRules))
             .catch((err) =>
@@ -1096,11 +1072,20 @@ export function renderSongEditorMulti(view, songIds, validationRules = null) {
             );
     };
 
-    // The visible chip UI (chips, category styling, add stubs, folding) is
-    // built by the chip-input component, not the static markup — wire it so
-    // the editor matches the single-song editor pixel for pixel.
-    wireChipInputs(view, rerender, null, validationRules, null);
-    wireScalarInputs(view, validationRules, rerender);
+    const multiOps = {
+        save: async (ops) => {
+            const result = await multiMutate(songIds, ops);
+            notifyMutateWarnings(result);
+        },
+        refresh: () => getMultiView(songIds),
+    };
+
+    wireChipInputs(view, rerender, null, validationRules, null, multiOps);
+    wireScalarInputs(view, validationRules, rerender, async (field, payload) => {
+        const result = await multiMutate(songIds, { update: { [field]: payload } });
+        notifyMutateWarnings(result);
+        return null;
+    });
 
     // Actions that still have no multi path (album-card internals, splitters,
     // primary stars, edit modals) stay blocked at capture phase.

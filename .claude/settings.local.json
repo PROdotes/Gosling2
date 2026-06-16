@@ -50,5 +50,29 @@
       "Bash(ruff check *)",
       "Bash(git log *)"
     ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/hooks/diary_capture.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/hooks/diary_compact_marker.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

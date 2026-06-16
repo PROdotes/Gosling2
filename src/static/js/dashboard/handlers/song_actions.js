@@ -613,15 +613,10 @@ export class SongActionsHandler {
         const multiIds = this.ctx.getState().multiSelectIds;
         try {
             if (multiIds) {
-                const result = await multiMutate(multiIds, {
+                await multiMutate(multiIds, {
                     remove: [{ type: "album", id: Number(albumId) }],
                 });
-                const { getMultiView } = await import("../api.js");
-                const { renderSongEditorMulti, notifyMutateWarnings } =
-                    await import("../renderers/song_editor.js");
-                notifyMutateWarnings(result);
-                const fresh = await getMultiView(multiIds);
-                renderSongEditorMulti(fresh, multiIds, this.ctx.getState().validationRules);
+                await this.ctx.refreshMultiEditor();
             } else {
                 await removeSongAlbum(songId, albumId);
                 if (
