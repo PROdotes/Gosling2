@@ -952,3 +952,18 @@ input:checked + .slider:before {
 }
 
 .audit-state-error { color: var(--danger); }
+
+#db-integrity-banner {
+    background: #7f1d1d;
+    color: #fca5a5;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    padding: 0.5rem 1.25rem;
+    text-align: center;
+    letter-spacing: 0.01em;
+    border-bottom: 1px solid #b91c1c;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}

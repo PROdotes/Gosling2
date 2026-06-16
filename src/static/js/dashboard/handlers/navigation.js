@@ -148,6 +148,7 @@ export class NavigationHandler {
                 this.ctx,
                 identityId,
                 actionTarget.textContent.trim(),
+                state?.activeSong?.id ?? null,
             );
         }
     }

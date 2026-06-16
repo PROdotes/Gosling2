@@ -346,8 +346,10 @@ export function removeSongCredit(songId, creditId) {
     return mutate({ remove: [{ type: "credit", song_id: songId, id: creditId }] });
 }
 
-export function updateCreditName(nameId, displayName) {
-    return mutate({ update: [{ type: "credit", id: nameId, display_name: displayName }] });
+export function updateCreditName(nameId, displayName, songId = null) {
+    const item = { type: "credit", id: nameId, display_name: displayName };
+    if (songId != null) item.song_id = songId;
+    return mutate({ update: [item] });
 }
 
 export function patchSongScalars(songId, fields) {
@@ -658,4 +660,8 @@ export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal
         }
     }
     return runSearch("songs", `/api/v1/songs/filter?${params.toString()}`);
+}
+
+export async function getAuditIntegrity() {
+    return fetchJson("/api/v1/audit/integrity");
 }

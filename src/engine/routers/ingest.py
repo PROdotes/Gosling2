@@ -102,6 +102,10 @@ async def _stream_ingestion(service, work_items):
                 if res.get("song"):
                     res["song"] = SongView.from_domain(res["song"])
 
+            if res["status"] == "ERROR":
+                logger.error(
+                    f"[IngestRouter] ingest_file ERROR '{Path(staged_path).name}': {res.get('message')}"
+                )
             completed = service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
 

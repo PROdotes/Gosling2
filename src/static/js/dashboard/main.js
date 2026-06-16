@@ -2,6 +2,7 @@ import {
     ABORTED,
     abortAllSearches,
     fetchAppConfig,
+    getAuditIntegrity,
     fetchId3Frames,
     fetchRoles,
     fetchValidationRules,
@@ -1329,6 +1330,32 @@ setupSongsWorkspaceDropZone();
 filterLoadPromise.then(() => {
     doSongSearch();
 });
+
+function syncIntegrityBanner(nullCount) {
+    const banner = document.getElementById("db-integrity-banner");
+    if (!banner) return;
+    if (nullCount === 0) {
+        banner.style.display = "none";
+        banner.textContent = "";
+        return;
+    }
+    banner.style.display = "";
+    banner.textContent =
+        `DB LOCKED: ${nullCount} ChangeLog row${nullCount === 1 ? "" : "s"} with NULL batch_id detected. ` +
+        `A write path bypassed write_connection(). Manual DB inspection required before the app will accept writes.`;
+}
+
+async function checkAuditIntegrity() {
+    try {
+        const result = await getAuditIntegrity();
+        syncIntegrityBanner(result.null_batch_rows ?? 0);
+    } catch (e) {
+        console.error("Audit integrity check failed:", e);
+    }
+}
+
+checkAuditIntegrity();
+setInterval(checkAuditIntegrity, 30000);
 
 // Restore in-progress badges on page reload
 (async () => {

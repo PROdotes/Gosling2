@@ -365,7 +365,7 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
 
 // ─── ENTITY EDITING (EDIT MODAL) ─────────────────────────────────────────────
 
-export async function manageArtist(ctx, artistId, artistName) {
+export async function manageArtist(ctx, artistId, artistName, songId = null) {
     const identity = await getArtistTree(artistId);
     if (!identity) return;
 
@@ -389,7 +389,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             onSave: async (val) => {
                 await withMergeConfirm(
                     async () => {
-                        await updateCreditName(primary.id, val);
+                        await updateCreditName(primary.id, val, songId);
                         if (ctx.refreshLayout) ctx.refreshLayout();
                     },
                     (collisionId) => mergeIdentity(primary.id, collisionId),
@@ -435,7 +435,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             },
             onRename: async (item, newName) => {
                 await withMergeConfirm(
-                    () => updateCreditName(item.id, newName),
+                    () => updateCreditName(item.id, newName, songId),
                     (collisionId) => mergeIdentity(item.id, collisionId),
                     `"${newName}" already exists. Merge into existing identity?`,
                     "Merge Identity",

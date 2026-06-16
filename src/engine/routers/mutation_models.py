@@ -248,6 +248,7 @@ class UpdateCreditEntityItem(BaseModel):
     type: Literal["credit"]
     id: int
     display_name: Optional[str] = None
+    song_id: Optional[int] = None
 
     @field_validator("display_name")
     @classmethod
