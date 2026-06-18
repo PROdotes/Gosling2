@@ -299,8 +299,9 @@ class TestWavUploadApi:
     ):
         """When WAV_AUTO_CONVERT=True, uploading a WAV yields INGESTED (not PENDING_CONVERT)."""
         import src.engine.routers.ingest as ingest_mod
+        from src.services.config_service import settings as live_settings
 
-        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", True)
+        monkeypatch.setattr(live_settings, "wav_auto_convert", True)
 
         # Stub convert_to_mp3 so no real ffmpeg call is needed.
         # It copies the WAV to a .mp3 path and returns that path.
@@ -339,9 +340,9 @@ class TestWavUploadApi:
         self, client, tmp_path, monkeypatch
     ):
         """When WAV_AUTO_CONVERT=False, uploading a WAV yields PENDING_CONVERT."""
-        import src.engine.routers.ingest as ingest_mod
+        from src.services.config_service import settings as live_settings
 
-        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", False)
+        monkeypatch.setattr(live_settings, "wav_auto_convert", False)
 
         wav_file = self._make_wav(tmp_path, stem="pending_wav")
         with open(wav_file, "rb") as f:
@@ -365,11 +366,12 @@ class TestWavUploadApi:
     ):
         """When WAV_AUTO_CONVERT=True and conversion fails, result is ERROR (not a crash)."""
         import src.engine.routers.ingest as ingest_mod
+        from src.services.config_service import settings as live_settings
 
         def _raise(_p):
             raise RuntimeError("ffmpeg not found")
 
-        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", True)
+        monkeypatch.setattr(live_settings, "wav_auto_convert", True)
         monkeypatch.setattr(ingest_mod, "convert_to_mp3", _raise)
 
         wav_file = self._make_wav(tmp_path, stem="broken_wav")

@@ -22,6 +22,7 @@ from src.models.domain import (
 from src.services.logger import logger
 from src.services.filing_service import FilingService
 from src.engine import config
+from src.services.config_service import settings
 from src.utils.text import normalize_for_search
 
 
@@ -35,7 +36,7 @@ class LibraryService:
         library_root: Optional[Path] = None,
     ):
         self._db_path = db_path
-        self._library_root = library_root or config.LIBRARY_ROOT
+        self._library_root = library_root or Path(settings.library_root)
         self._song_repo = SongRepository(db_path)
         self._album_repo_dir = AlbumRepository(db_path)
         self._album_repo = SongAlbumRepository(db_path)

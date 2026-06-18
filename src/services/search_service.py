@@ -15,14 +15,10 @@ class SearchService:
     """
     SearchService generates external search URLs (Spotify, Google) for Song domain models.
     Centralizing this logic on the backend ensures consistency across all consumer frontends.
-    """
 
-    ENGINES = {
-        "spotify": "Spotify",
-        "google": "Google",
-        "youtube": "YouTube",
-        "musicbrainz": "MusicBrainz",
-    }
+    The canonical engine set lives on the SearchEngine enum in config_service.py;
+    display labels are in SEARCH_ENGINE_LABELS there.
+    """
 
     def get_search_url(self, song: Song, engine: str = "spotify") -> str:
         """

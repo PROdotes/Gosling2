@@ -1063,7 +1063,6 @@ class TestFileMoveOnApprove:
 
     def _setup(self, populated_db, monkeypatch, tmp_path):
         import sqlite3
-        import src.engine.config as config_mod
         import src.services.mutation_coordinator as coord_mod
         from src.services.filing_service import FilingService
 
@@ -1088,8 +1087,10 @@ class TestFileMoveOnApprove:
             '{"routing_rules": [], "default_rule": "{year}/{artist} - {title}"}'
         )
 
-        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+        from src.services.config_service import settings as live_settings
+
+        monkeypatch.setattr(live_settings, "auto_move_on_approve", True)
+        monkeypatch.setattr(live_settings, "library_root", str(library))
         monkeypatch.setattr(coord_mod, "STAGING_DIR", str(staging))
 
         coordinator = MutationCoordinator(populated_db)
@@ -1259,7 +1260,6 @@ class TestFileMoveOnApprove:
     ):
         """A missing filing rule must not abort the mutation: DB commits, warning surfaced, no file copied."""
         import sqlite3
-        import src.engine.config as config_mod
         import src.services.mutation_coordinator as coord_mod
         from src.services.filing_service import FilingService
 
@@ -1282,8 +1282,10 @@ class TestFileMoveOnApprove:
         rules_file = tmp_path / "rules.json"
         rules_file.write_text('{"routing_rules": []}')
 
-        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+        from src.services.config_service import settings as live_settings
+
+        monkeypatch.setattr(live_settings, "auto_move_on_approve", True)
+        monkeypatch.setattr(live_settings, "library_root", str(library))
         monkeypatch.setattr(coord_mod, "STAGING_DIR", str(staging))
 
         coordinator = MutationCoordinator(populated_db)
@@ -1330,8 +1332,6 @@ class TestFileMoveOnApprove:
         The FilingService bypasses the physical copy but the coordinator cleanup must not treat it as a move.
         """
         import sqlite3
-        import src.engine.config as config_mod
-        import src.services.mutation_coordinator as coord_mod
         from src.services.filing_service import FilingService
 
         library = tmp_path / "library"
@@ -1357,8 +1357,10 @@ class TestFileMoveOnApprove:
             '{"routing_rules": [], "default_rule": "{year}/{artist} - {title}"}'
         )
 
-        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+        from src.services.config_service import settings as live_settings
+
+        monkeypatch.setattr(live_settings, "auto_move_on_approve", True)
+        monkeypatch.setattr(live_settings, "library_root", str(library))
 
         coordinator = MutationCoordinator(populated_db)
         coordinator._filing = FilingService(rules_path=rules_file)
@@ -1375,8 +1377,6 @@ class TestFileMoveOnApprove:
         ), "File contents were modified"
 
     def test_non_reviewed_song_not_moved(self, populated_db, monkeypatch, tmp_path):
-        import src.engine.config as config_mod
-        import src.services.mutation_coordinator as coord_mod
 
         staging = tmp_path / "staging"
         staging.mkdir(exist_ok=True)
@@ -1396,8 +1396,10 @@ class TestFileMoveOnApprove:
         conn.commit()
         conn.close()
 
-        monkeypatch.setattr(config_mod, "AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr(coord_mod, "LIBRARY_ROOT", library)
+        from src.services.config_service import settings as live_settings
+
+        monkeypatch.setattr(live_settings, "auto_move_on_approve", True)
+        monkeypatch.setattr(live_settings, "library_root", str(library))
 
         coordinator = MutationCoordinator(populated_db)
         coordinator.apply(

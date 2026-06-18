@@ -63,6 +63,26 @@ Displays the regex-based extractor.
 *Location: `src/static/js/dashboard/components/filename_parser_modal.js`*
 Hides the filename parser modal.
 
+### openSettingsModal(ctx)
+*Location: `src/static/js/dashboard/components/settings_modal.js`*
+Fetches `GET /api/v1/settings` (which includes `settings`, `schema`, and `warnings`), generates the form from the schema, wires Save. Save sends a changed-only patch via `POST /api/v1/settings`; 400 renders an in-modal warning, success closes + banner.
+
+### closeSettingsModal()
+*Location: `src/static/js/dashboard/components/settings_modal.js`*
+Hides the settings modal.
+
+### renderSettingsForm(container, settings, schema)
+*Location: `src/static/js/dashboard/components/settings_modal.js`*
+Generates the settings form from the schema array returned by `GET /api/v1/settings`. Renders `bool` as checkbox, `path` as text input, `select` as select with options — all tagged `[data-key]`. No hardcoded field list; adding a setting requires no changes here.
+
+### collectPatch(container, original)
+*Location: `src/static/js/dashboard/components/settings_modal.js`*
+Diffs current `[data-key]` control values against `original` and returns a changed-only patch dict (booleans for checkboxes, strings otherwise).
+
+### renderWarnings(container, warnings)
+*Location: `src/static/js/dashboard/components/settings_modal.js`*
+Renders a warning banner from a `[{kind, error}]` array, or clears the container if empty.
+
 ---
 
 ## Widgets

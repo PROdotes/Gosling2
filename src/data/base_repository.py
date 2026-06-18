@@ -1,7 +1,6 @@
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from src.services.logger import logger
 
 
 class BaseRepository:

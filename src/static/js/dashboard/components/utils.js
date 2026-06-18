@@ -143,6 +143,7 @@ export function isModalOpen() {
         "splitter-modal",
         "filename-parser-modal",
         "confirm-modal",
+        "settings-modal",
     ];
     return modals.some((id) => {
         const el = document.getElementById(id);

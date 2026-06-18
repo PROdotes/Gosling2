@@ -13,6 +13,12 @@ Fetches server-side validation rules for tags, BPM, and other metadata.
 ### fetchAppConfig()
 Fetches general application configuration.
 
+### fetchSettings()
+Fetches effective Tier-1 settings + corrupt-file warnings (`GET /api/v1/settings`).
+
+### saveSettings(patch)
+Persists a changed-only settings patch (`POST /api/v1/settings`); throws on a 400 (unknown key / bad value).
+
 ### mutate(command)
 The single entry point for all database mutations.
 - **Command structure**: `{ add: [], remove: [], update: [], delete: [] }`.
@@ -352,3 +358,6 @@ Deletes all identities with no associated songs, albums, or roles.
 ### getChangelog(limit)
 Fetches audit log entries. Returns `{ batches: [...] }` where each batch contains `batch_id`, `batch_label`, `timestamp`, and `rows` (field changes).
 Entries are ordered by most recent first. Supports pagination via `limit` query param.
+
+### getAuditIntegrity()
+Fetches `GET /api/v1/audit/integrity`. Returns `{ null_batch_count: N }`. Nonzero means a write bypassed `write_connection()` or the DB was edited manually.

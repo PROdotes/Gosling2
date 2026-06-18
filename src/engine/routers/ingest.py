@@ -27,10 +27,10 @@ from src.engine.routers.mutation_models import (
     DeleteSongItem,
     DeleteOriginalFileItem,
 )
+from src.services.config_service import settings
 from src.engine.config import (
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
-    WAV_AUTO_CONVERT,
     get_downloads_folder,
     get_db_path,
     ProcessingStatus,
@@ -65,7 +65,7 @@ async def _stream_ingestion(service, work_items):
             await asyncio.sleep(0)
 
             if is_wav:
-                if WAV_AUTO_CONVERT:
+                if settings.wav_auto_convert:
                     try:
                         logger.info(f"[IngestRouter] Converting WAV: '{staged_path}'")
                         mp3 = await run_in_threadpool(convert_to_mp3, Path(staged_path))

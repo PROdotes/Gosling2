@@ -264,6 +264,26 @@ header::after {
     color: #fff;
 }
 
+.header-settings-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-mut, var(--text-sec));
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.header-settings-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
 .search-input-wrapper {
     flex: 1;
     position: relative;

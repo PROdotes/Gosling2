@@ -3,6 +3,7 @@ import re
 import shutil
 from pathlib import Path
 from src.models.domain import Song
+from src.services.config_service import settings
 from src.services.logger import logger
 from src.utils.text import strip_diacritics
 
@@ -171,9 +172,7 @@ class FilingService:
         return target_absolute
 
     def write_id3_if_needed(self, song: Song, writer) -> list[dict]:
-        from src.engine.config import AUTO_SAVE_ID3
-
-        if not AUTO_SAVE_ID3:
+        if not settings.auto_save_id3:
             return []
         try:
             writer.write_metadata(song)
@@ -204,9 +203,9 @@ class FilingService:
         """Copy song to library if AUTO_MOVE_ON_APPROVE is enabled and song is reviewed.
         Returns (warnings, new_path). Does NOT delete the source — caller handles that after DB commit.
         """
-        from src.engine.config import AUTO_MOVE_ON_APPROVE, ProcessingStatus
+        from src.engine.config import ProcessingStatus
 
-        if not AUTO_MOVE_ON_APPROVE:
+        if not settings.auto_move_on_approve:
             return [], None
         if song.processing_status != ProcessingStatus.REVIEWED:
             return [], None

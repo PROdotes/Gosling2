@@ -72,7 +72,7 @@ async function withMergeConfirm(updateFn, mergeFn, confirmMsg, confirmTitle, onM
 
 export async function orchestrateScrubber(ctx, songId, title) {
     const state = ctx.getState();
-    const autoPlay = state.validationRules?.scrubber_auto_play ?? true;
+    const autoPlay = state.settings?.scrubber_auto_play ?? true;
 
     openScrubberModal(songId, title, {
         autoPlay,

@@ -533,3 +533,35 @@
     color: var(--accent);
     text-decoration: underline;
 }
+
+/* --- Settings modal form --- */
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.settings-row label {
+    font-size: 13px;
+    color: var(--text-sec);
+}
+
+.settings-row input[type="text"],
+.settings-row select {
+    flex: 0 0 58%;
+}
+
+.settings-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}

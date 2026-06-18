@@ -196,6 +196,22 @@ Fetches a single Song domain model by its unique ID with full hydration.
 ---
 
 
+## Settings Router
+*Location: `src/engine/routers/settings.py`*
+**Responsibility**: Read/apply Tier-1 user-overridable settings via `ConfigService` (config.py defaults overlaid with `json/settings.json`). Distinct from `GET /api/v1/config`, which serves read-only UI bootstrap constants (search engines, processing-status enum).
+
+### def get_settings() -> dict
+**HTTP**: `GET /api/v1/settings`
+- Returns `{"settings": <8 effective Tier-1 keys>, "warnings": [...]}`.
+- A corrupt `settings.json` falls back to defaults and adds a `settings_load` warning so the UI can show a banner.
+
+### def update_settings(patch: dict) -> dict
+**HTTP**: `POST /api/v1/settings`
+- Validates a partial settings dict, persists it to `json/settings.json`, and pushes values onto the live `config` module (no restart). Returns the same `{settings, warnings}` shape.
+- Unknown key or bad value -> `400`, writes nothing.
+---
+
+
 ## Ingest Router
 *Location: `src/engine/routers/ingest.py`*
 **Responsibility**: Dedicated endpoints for binary file handling and session state.
@@ -477,6 +493,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Entries are ordered by `id` DESC (most recent first).
 - Supports pagination via `limit` query param.
 - Wraps `AuditRepository.get_changelog`.
+
+### def get_audit_integrity() -> dict
+**HTTP**: `GET /api/v1/audit/integrity`
+- Returns the count of ChangeLog rows with NULL `batch_id`. Nonzero means a write path bypassed `write_connection()` or the DB was edited manually; the DB is locked until resolved.
+- Safe to call even when the DB is locked (uses a raw connection).
 
 ---
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from pathlib import Path
 from typing import List, Optional
 from src.models.view_models import (
     SongView,
@@ -27,15 +28,13 @@ from src.engine.config import (
     TAG_DEFAULT_CATEGORY,
     TAG_CATEGORY_DELIMITER,
     TAG_INPUT_FORMAT,
-    DEFAULT_SEARCH_ENGINE,
     DEFAULT_CREDIT_SEPARATORS,
-    SCRUBBER_AUTO_PLAY,
-    BLUR_SAVES_SCALARS,
     ID3_FRAMES_PATH,
     get_db_path,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
+from src.services.config_service import settings, SEARCH_ENGINE_LABELS
 
 
 def _get_coordinator() -> MutationCoordinator:
@@ -152,9 +151,7 @@ async def get_song(song_id: int) -> SongView:
 
         # 2. Organized destination preview (May fail due to metadata error)
         try:
-            from src.engine.config import LIBRARY_ROOT
-
-            root = LIBRARY_ROOT
+            root = Path(settings.library_root)
             preview = service._library_service._filing_service.evaluate_routing(song)
             view.projected_path = str(root / preview)
         except Exception as e:
@@ -500,7 +497,7 @@ async def get_song_web_search(
         logger.warning(f"[CatalogRouter] Song ID {song_id} not found for search")
         raise HTTPException(status_code=404, detail=f"Song ID {song_id} not found")
 
-    engine_id = engine or DEFAULT_SEARCH_ENGINE
+    engine_id = engine or settings.default_search_engine.value
 
     search_service = SearchService()
     url = search_service.get_search_url(song, engine=engine_id)
@@ -530,8 +527,8 @@ def get_config():
     from src.engine.config import ProcessingStatus, TAG_DEFAULT_CATEGORY
 
     return {
-        "search_engines": SearchService.ENGINES,
-        "default_search_engine": DEFAULT_SEARCH_ENGINE,
+        "search_engines": SEARCH_ENGINE_LABELS,
+        "default_search_engine": settings.default_search_engine.value,
         "processing_status": {s.name: s.value for s in ProcessingStatus},
         "tag_default_category": TAG_DEFAULT_CATEGORY,
     }
@@ -576,9 +573,9 @@ def get_validation_rules():
             "input_format": TAG_INPUT_FORMAT,
             "category_colors": _load_tag_category_colors(),
         },
-        "default_search_engine": DEFAULT_SEARCH_ENGINE,
-        "search_engines": SearchService.ENGINES,
+        "default_search_engine": settings.default_search_engine.value,
+        "search_engines": SEARCH_ENGINE_LABELS,
         "credit_separators": DEFAULT_CREDIT_SEPARATORS,
-        "scrubber_auto_play": SCRUBBER_AUTO_PLAY,
-        "blur_saves_scalars": BLUR_SAVES_SCALARS,
+        "scrubber_auto_play": settings.scrubber_auto_play,
+        "blur_saves_scalars": settings.blur_saves_scalars,
     }

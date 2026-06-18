@@ -20,6 +20,7 @@ import {
     getTagDetail,
     getTagSongs,
     isAbortError,
+    fetchSettings,
     resetIngestStatus,
     filterSongs,
     searchAlbums,
@@ -121,7 +122,7 @@ const state = {
     lastSearch: "",
     allowedExtensions: [],
     searchEngines: {},
-    defaultSearchEngine: null,
+    settings: {},
     chipHandles: null,
     scalarHandles: null,
 };
@@ -248,12 +249,12 @@ const ctx = {
                 fresh,
                 () => ctx.refreshActiveSongV2(fresh.id),
                 state.onSplit,
-                state.validationRules,
+                {...state.validationRules, ...state.settings},
                 state.onSplitPublisher,
             );
             state.scalarHandles = wireScalarInputs(
                 fresh,
-                state.validationRules,
+                {...state.validationRules, ...state.settings},
                 () => ctx.refreshActiveSongV2(fresh.id),
             );
             state.chipHandles.expandField(openFieldKey);
@@ -261,7 +262,7 @@ const ctx = {
 
         renderActionSidebar(fresh, {
             searchEngines: state.searchEngines,
-            defaultSearchEngine: state.defaultSearchEngine,
+            defaultSearchEngine: state.settings?.default_search_engine,
         });
 
         // The DB just changed — the cached diff is stale. Show "checking" and
@@ -371,6 +372,15 @@ const ctx = {
             setTimeout(() => banner.remove(), 4000);
         }
     },
+    applySettings(settings) {
+        Object.assign(state.settings, settings);
+        if (state.activeSong && !state.multiSelectIds) {
+            renderActionSidebar(state.activeSong, {
+                searchEngines: state.searchEngines,
+                defaultSearchEngine: state.settings.default_search_engine,
+            });
+        }
+    },
     switchMode,
     navigate,
     getActiveList,
@@ -388,7 +398,7 @@ const ctx = {
         const songIds = state.multiSelectIds;
         if (!songIds) return;
         const fresh = await getMultiView(songIds);
-        renderSongEditorMulti(fresh, songIds, state.validationRules);
+        renderSongEditorMulti(fresh, songIds, {...state.validationRules, ...state.settings});
     },
     updateSelection,
     updateIngestBadges,
@@ -791,12 +801,12 @@ async function openSelectedResult(index) {
         renderSongEditorV2(result, null, null);
         renderActionSidebar(result, {
             searchEngines: state.searchEngines,
-            defaultSearchEngine: state.defaultSearchEngine,
+            defaultSearchEngine: state.settings?.default_search_engine,
         });
         updateSyncLed(result.id, null);
         state.scalarHandles = wireScalarInputs(
             result,
-            state.validationRules,
+            {...state.validationRules, ...state.settings},
             () => {
                 ctx.refreshActiveSongV2(result.id);
             },
@@ -819,7 +829,7 @@ async function openSelectedResult(index) {
                     wireDriftIndicators(state.activeSongDiff);
                     renderActionSidebar(fresh, {
                         searchEngines: state.searchEngines,
-                        defaultSearchEngine: state.defaultSearchEngine,
+                        defaultSearchEngine: state.settings?.default_search_engine,
                     });
                 },
             });
@@ -842,7 +852,7 @@ async function openSelectedResult(index) {
                     wireDriftIndicators(state.activeSongDiff);
                     renderActionSidebar(fresh, {
                         searchEngines: state.searchEngines,
-                        defaultSearchEngine: state.defaultSearchEngine,
+                        defaultSearchEngine: state.settings?.default_search_engine,
                     });
                 },
             });
@@ -853,7 +863,7 @@ async function openSelectedResult(index) {
                 ctx.refreshActiveSongV2(result.id);
             },
             state.onSplit,
-            state.validationRules,
+            {...state.validationRules, ...state.settings},
             state.onSplitPublisher,
         );
 
@@ -870,7 +880,7 @@ async function openSelectedResult(index) {
                 );
                 state.scalarHandles = wireScalarInputs(
                     state.activeSong,
-                    state.validationRules,
+                    {...state.validationRules, ...state.settings},
                     () => {
                         ctx.refreshActiveSongV2(state.activeSong.id);
                     },
@@ -881,7 +891,7 @@ async function openSelectedResult(index) {
                         ctx.refreshActiveSongV2(state.activeSong.id);
                     },
                     state.onSplit,
-                    state.validationRules,
+                    {...state.validationRules, ...state.settings},
                     state.onSplitPublisher,
                 );
                 wireDriftIndicators(state.activeSongDiff);
@@ -1203,7 +1213,7 @@ function syncSongSelectionEditor() {
                     state.multiSelectIds &&
                     state.multiSelectIds.join() === songIds.join()
                 ) {
-                    renderSongEditorMulti(view, songIds, state.validationRules);
+                    renderSongEditorMulti(view, songIds, {...state.validationRules, ...state.settings});
                 }
             })
             .catch((err) => {
@@ -1239,7 +1249,8 @@ document.addEventListener("click", async (event) => {
         action === "close-link-modal" ||
         action === "close-spotify-modal" ||
         action === "close-splitter-modal" ||
-        action === "close-filename-parser-modal";
+        action === "close-filename-parser-modal" ||
+        action === "close-settings-modal";
 
     if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
@@ -1262,6 +1273,22 @@ document.addEventListener("click", async (event) => {
         document
             .getElementById("filter-toggle-btn")
             ?.classList.toggle("active", filterSidebar._sidebarVisible);
+        return;
+    }
+
+    if (action === "open-settings") {
+        const { openSettingsModal } = await import(
+            "./components/settings_modal.js"
+        );
+        await openSettingsModal(ctx);
+        return;
+    }
+
+    if (action === "close-settings-modal") {
+        const { closeSettingsModal } = await import(
+            "./components/settings_modal.js"
+        );
+        closeSettingsModal();
         return;
     }
 });
@@ -1315,14 +1342,17 @@ Promise.all([
     fetchRoles(),
     getAcceptedFormats().catch(() => []),
     fetchAppConfig().catch(() => null),
-]).then(([rules, frames, roles, exts, appConfig]) => {
+    fetchSettings().catch(() => null),
+]).then(([rules, frames, roles, exts, appConfig, settingsData]) => {
     state.validationRules = rules;
     state.id3Frames = frames;
     state.allRoles = roles;
     state.allowedExtensions = exts;
     if (appConfig) {
         state.searchEngines = appConfig.search_engines || {};
-        state.defaultSearchEngine = appConfig.default_search_engine || null;
+    }
+    if (settingsData) {
+        state.settings = settingsData.settings || {};
     }
 });
 setupHeaderDropZone();

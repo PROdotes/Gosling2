@@ -27,6 +27,7 @@ from src.services.catalog_service import CatalogService  # noqa: E402
 
 # from src.services.audit_service import AuditService  # REMOVED
 from src.engine import config  # noqa: E402
+from src.services.config_service import settings as live_settings  # noqa: E402
 from src.utils.text import normalize_for_search  # noqa: E402
 
 
@@ -51,10 +52,14 @@ def _backfill_search_shadows(cursor: sqlite3.Cursor) -> None:
 
 
 @pytest.fixture(autouse=True)
-def disable_side_effects(monkeypatch):
+def disable_side_effects(monkeypatch, tmp_path):
     """Disable destructive side-effects during general test runs."""
-    monkeypatch.setattr(config, "AUTO_MOVE_ON_APPROVE", False)
-    monkeypatch.setattr(config, "AUTO_SAVE_ID3", False)
+    # Read sites use the live settings instance; flip the file-touching ones off.
+    monkeypatch.setattr(live_settings, "auto_move_on_approve", False)
+    monkeypatch.setattr(live_settings, "auto_save_id3", False)
+    # Never read the real json/settings.json during tests (boot overlay /
+    # reload_settings default path). Point at a per-test path that doesn't exist.
+    monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
 
 
 @pytest.fixture(scope="session", autouse=True)

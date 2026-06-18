@@ -39,6 +39,18 @@ export async function fetchAppConfig() {
     return fetchJson("/api/v1/config");
 }
 
+export function fetchSettings() {
+    return fetchJson("/api/v1/settings");
+}
+
+export function saveSettings(patch) {
+    return fetchJson("/api/v1/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+    });
+}
+
 async function runSearch(key, url) {
     const previous = searchControllers.get(key);
     if (previous) {

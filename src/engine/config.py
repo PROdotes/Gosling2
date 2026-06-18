@@ -15,6 +15,9 @@ class ProcessingStatus(IntEnum):
     CONVERTING = 3
 
 
+# Editable runtime settings (the Settings model + live `settings` instance) live
+# in src/services/config_service.py. config.py holds only immutable code facts.
+
 # Database Path
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 
@@ -24,10 +27,6 @@ def get_db_path() -> Path:
 
 
 DB_PATH = get_db_path()
-
-# Library Management (Phase 3.2+)
-# GOSLING_LIBRARY_ROOT: The organized parent folder for all songs.
-LIBRARY_ROOT = Path("Z:\\Songs")
 
 
 def get_downloads_folder() -> Optional[str]:
@@ -83,23 +82,15 @@ SCALAR_VALIDATION = {
     "disc_number": {"min": 1, "max": 99},
 }
 
-# Blur-saves scalars: if True, blurring a scalar input saves the value; if False, it reverts.
-BLUR_SAVES_SCALARS = True
-
 # FFmpeg
 FFMPEG_PATH = _PROJECT_ROOT / "ffmpeg/ffmpeg.exe"
-WAV_AUTO_CONVERT = True
 
 # Song Approval Pipeline
-AUTO_MOVE_ON_APPROVE = True
-PROMPT_BEFORE_MOVE = True
-AUTO_SAVE_ID3 = True
-DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = _PROJECT_ROOT / "json/rules.json"
 PARSER_PRESETS_PATH = _PROJECT_ROOT / "json/parser_presets.json"
 ID3_FRAMES_PATH = _PROJECT_ROOT / "json/id3_frames.json"
 TRANSLITERATIONS_PATH = _PROJECT_ROOT / "json/transliterations.json"
-SCRUBBER_AUTO_PLAY = True
+SETTINGS_PATH = _PROJECT_ROOT / "json/settings.json"
 
 # Scalar fields allowed in PATCH /songs/{id}
 SCALAR_ALLOWED = {

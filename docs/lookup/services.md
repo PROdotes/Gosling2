@@ -37,6 +37,28 @@ The packer: expands ops (dicts, no `song_id`) into existing per-song mutation it
 
 ---
 
+## Settings (config_service)
+*Location: `src/services/config_service.py`*
+Defines the editable runtime settings. `json/settings.json` is the source of truth; the live `settings` instance is the in-memory mirror that read sites import (`from src.services.config_service import settings`). A setting is one typed field on the `Settings` pydantic model — type, default, and validation all live on the field, and the editor form is generated from `Settings.model_json_schema()`.
+
+### Settings(BaseModel)
+The eight editable settings as typed fields (library_root, wav_auto_convert, auto_move_on_approve, prompt_before_move, auto_save_id3, scrubber_auto_play, blur_saves_scalars, default_search_engine). `default_search_engine` is the `SearchEngine` enum (option set for the select); `SEARCH_ENGINE_LABELS` holds the display labels consumed by the search UI.
+
+### SearchEngine(str, Enum)
+The external search engines a song can be looked up on (spotify, google, youtube, musicbrainz). Declares the option set for the `default_search_engine` select; `model_json_schema()` exposes these values to the editor form.
+
+### settings
+The single live `Settings` instance. Read sites read `settings.x`, analogous to `config.X`. Starts at field defaults; populated from the file by `reload_settings()` at boot and mutated in place on save.
+
+### load_settings_from(path: Path) -> tuple[Settings, list[dict]]
+Pure read. Missing file -> defaults; a corrupt or model-invalid file -> defaults plus a `settings_load` warning. Used by GET /api/v1/settings (for display) and by `reload_settings`.
+
+### reload_settings() -> list[dict]
+Re-reads `json/settings.json` into the live `settings` instance (boot overlay). Returns load warnings.
+
+### save_settings(patch: dict) -> Settings
+Validates a partial settings dict, persists the full settings to `json/settings.json`, and updates the live instance in place. Raises `ValueError` / pydantic `ValidationError` (writing nothing) on unknown keys or values that fail field validation.
+
 ## IdentityService
 *Location: `src/services/identity_service.py`*
 

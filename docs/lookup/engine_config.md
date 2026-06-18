@@ -1,16 +1,13 @@
 # Engine Config
 *Location: `src/engine/config.py`*
 
-**Responsibility**: Centralized source of truth for all paths and environment variables.
+**Responsibility**: Immutable code facts — paths, enums, and validation rules. Editable runtime settings (library root, auto-move, search engine, etc.) live on the `Settings` model in `src/services/config_service.py`, not here.
 
 ### DB_PATH
 The path to the SQLite library database. Defaults to `sqldb/gosling2.db`.
 
 ### get_db_path() -> Path
 Returns the DB path, reading `GOSLING_DB_PATH` env var at call time. Use this (not `DB_PATH`) anywhere the path needs to be overridable at runtime (e.g. tests).
-
-### LIBRARY_ROOT
-The organized parent folder for all songs. Defaults to `Z:\Songs`.
 
 ### get_downloads_folder() -> str
 Returns the platform-specific default downloads folder (e.g., `~/Downloads` or `%USERPROFILE%\Downloads`). Used for safe source-file cleanup.
@@ -33,12 +30,6 @@ Validation rules for scalar fields exposed via `/api/v1/validation-rules`:
 - `year`: min 1860, max = current_year + 1
 - `bpm`: min 1, max 300
 - `isrc`: pattern `^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$`
-
-### AUTO_MOVE_ON_APPROVE
-Auto-move approved songs to library root. Set via `GOSLING_AUTO_MOVE_ON_APPROVE=true`.
-
-### PROMPT_BEFORE_MOVE
-Prompt before moving files. Set via `GOSLING_PROMPT_BEFORE_MOVE=true`.
 
 ### RENAME_RULES_PATH
 Path to rename rules JSON. Defaults to `config/rename_rules.json`.

@@ -4,7 +4,8 @@ from typing import Any
 
 from src.data.base_repository import BaseRepository
 from src.data.staging_repository import StagingRepository
-from src.engine.config import LIBRARY_ROOT, RENAME_RULES_PATH, STAGING_DIR
+from src.engine.config import RENAME_RULES_PATH, STAGING_DIR
+from src.services.config_service import settings
 from src.engine.routers.mutation_models import (
     AddAlbumItem,
     AddCreditItem,
@@ -147,7 +148,7 @@ class MutationCoordinator:
                     songs.append(post)
                     warnings += self._filing.write_id3_if_needed(post, self._id3_writer)
                     copy_warnings, new_path = self._filing.copy_if_needed(
-                        post, LIBRARY_ROOT
+                        post, Path(settings.library_root)
                     )
                     warnings += copy_warnings
                     if new_path:

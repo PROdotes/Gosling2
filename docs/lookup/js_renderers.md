@@ -66,6 +66,9 @@ Attaches link-modal triggers to all relationship chips (Artists, Albums, Tags).
 ### wireDriftIndicators(container, song)
 Initializes ID3 sync status indicators (LEDs).
 
+### notifyMutateWarnings(result)
+Inspects a mutate response for `warnings` and shows a toast if any filing or ID3 write warnings are present. Called after every chip add/remove and scalar save.
+
 ---
 
 ## Album Rendering
