@@ -113,6 +113,12 @@ function renderAlbumSubCards(albums, songId) {
                     `<option value="${t}" ${album.album_type === t ? "selected" : ""}>${t}</option>`,
             ).join("");
 
+            // A "Single" linked to more than one song is suspicious (likely a
+            // silent get-or-create merge); flag the count so it draws the eye.
+            const songCount = album.song_count ?? null;
+            const countSuspicious =
+                album.album_type === "Single" && songCount !== null && songCount > 1;
+
             return `
 <div class="album-sub-card" data-album-id="${albumId}">
   <div class="album-sub-title-row">
@@ -139,21 +145,25 @@ function renderAlbumSubCards(albums, songId) {
   </div>
 
   <div class="album-sub-meta-row">
-    <div class="editor-field">
+    <div class="editor-field album-meta-type">
       <label class="editor-label">Type</label>
       <select class="editor-input" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
     </div>
-    <div class="editor-field">
+    <div class="editor-field album-meta-year">
       <label class="editor-label">Year</label>
       <input class="editor-input" data-album-scalar="release_year" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.release_year ?? ""}" readonly>
     </div>
-    <div class="editor-field">
+    <div class="editor-field album-meta-disc">
       <label class="editor-label">Disc</label>
       <input class="editor-input" data-album-link="disc_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.disc_number ?? ""}" readonly>
     </div>
-    <div class="editor-field">
+    <div class="editor-field album-meta-track">
       <label class="editor-label">Track</label>
-      <input class="editor-input" data-album-link="track_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.track_number ?? ""}" readonly>
+      <div class="album-track-of">
+        <input class="editor-input" data-album-link="track_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.track_number ?? ""}" readonly>
+        <span class="album-track-sep">/</span>
+        <span class="album-track-total${countSuspicious ? " is-suspicious" : ""}" title="${countSuspicious ? "Single linked to multiple songs - possible duplicate album" : "Songs on this album"}">${songCount ?? "?"}</span>
+      </div>
     </div>
   </div>
 </div>`;

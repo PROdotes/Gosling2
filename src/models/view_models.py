@@ -89,6 +89,7 @@ class SongAlbumView(BaseModel):
     release_year: Optional[int] = None
     album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
+    song_count: Optional[int] = None  # Active songs on this album (duplicate cue)
     universal: bool = True  # Multi-edit: False = on some but not all selected songs
 
     @computed_field

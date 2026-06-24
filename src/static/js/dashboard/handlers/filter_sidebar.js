@@ -177,13 +177,13 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-mode-all")) {
             this._mode = "ALL";
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
         if (target.closest("#filter-mode-any")) {
             this._mode = "ANY";
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
 
@@ -211,7 +211,7 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-live-toggle")) {
             this._liveOnly = !this._liveOnly;
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
 
@@ -219,7 +219,7 @@ export class FilterSidebarHandler {
         if (target.closest("#filter-has-original-toggle")) {
             this._hasOriginal = !this._hasOriginal;
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
 
@@ -246,7 +246,7 @@ export class FilterSidebarHandler {
                 this._toggleValue(key, value, cat);
             }
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
 
@@ -258,7 +258,7 @@ export class FilterSidebarHandler {
             const cat = item.dataset.filterCat;
             this._toggleValue(key, value, cat);
             this._render();
-            this.ctx.onSearch?.();
+            this._applyFilters();
             return;
         }
     }

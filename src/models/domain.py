@@ -92,6 +92,9 @@ class SongAlbum(DomainModel):
     album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
 
+    # Count of active songs linked to this album (duplicate-detection cue)
+    song_count: Optional[int] = None
+
 
 class Album(DomainModel):
     """A first-class album directory record."""

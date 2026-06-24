@@ -12,7 +12,10 @@ class SongAlbumRepository(BaseRepository):
 
     _QUERY = """
         SELECT sa.SourceID, sa.AlbumID, sa.TrackNumber, sa.DiscNumber, sa.IsPrimary,
-               a.AlbumTitle, a.AlbumType, a.ReleaseYear
+               a.AlbumTitle, a.AlbumType, a.ReleaseYear,
+               (SELECT COUNT(*) FROM SongAlbums sac
+                JOIN MediaSources ms ON sac.SourceID = ms.SourceID
+                WHERE sac.AlbumID = sa.AlbumID AND ms.IsDeleted = 0) AS SongCount
         FROM SongAlbums sa
         JOIN Albums a ON sa.AlbumID = a.AlbumID
         WHERE sa.SourceID IN ({placeholders})
@@ -345,5 +348,6 @@ class SongAlbumRepository(BaseRepository):
             album_title=row["AlbumTitle"],
             album_type=row["AlbumType"],
             release_year=row["ReleaseYear"],
+            song_count=row["SongCount"] if "SongCount" in row.keys() else None,
             album_publishers=[],  # Hydrated later by CatalogService
         )

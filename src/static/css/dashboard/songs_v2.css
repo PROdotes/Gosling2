@@ -1416,14 +1416,56 @@
     padding-top: 6px;
 }
 
+/* Numeric fields size to their max content; Type absorbs the slack. */
 #songs-workspace .album-sub-meta-row > .editor-field {
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
 }
 
+#songs-workspace .album-sub-meta-row > .album-meta-type {
+    flex: 1 1 auto;
+    min-width: 6em;
+}
+
 #songs-workspace .album-sub-meta-row > .editor-field .editor-input {
-    width: 100%;
     box-sizing: border-box;
+}
+
+#songs-workspace .album-sub-meta-row > .album-meta-type .editor-input {
+    width: 100%;
+}
+
+/* Width = max digits, accounting for input padding (border-box). */
+#songs-workspace .album-sub-meta-row > .album-meta-year .editor-input {
+    width: 5.5em; /* 9999 */
+}
+
+#songs-workspace .album-sub-meta-row > .album-meta-disc .editor-input {
+    width: 4em; /* 99 */
+}
+
+#songs-workspace .album-meta-track .album-track-of {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#songs-workspace .album-meta-track .album-track-of .editor-input {
+    width: 4.5em; /* 999 */
+}
+
+#songs-workspace .album-track-sep {
+    color: var(--text-sec);
+}
+
+#songs-workspace .album-track-total {
+    color: var(--text-pri);
+    white-space: nowrap;
+}
+
+#songs-workspace .album-track-total.is-suspicious {
+    color: var(--warning);
+    font-weight: 700;
 }
 
 #songs-workspace select.editor-input option {
