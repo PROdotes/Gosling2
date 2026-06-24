@@ -914,7 +914,27 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
             const handle = handles[String(fieldKey).toLowerCase()];
             if (handle && handle.expand) handle.expand();
         },
+        // Re-unfold a field after a full re-render so editing a >5-item field
+        // (e.g. removing one of many tags) doesn't snap it back to its
+        // auto-folded default on every refresh.
+        unfoldField(fieldKey) {
+            if (!fieldKey) return;
+            const handle = handles[String(fieldKey).toLowerCase()];
+            if (handle && handle.unfold) handle.unfold();
+        },
     };
+}
+
+// Field keys of the chip fields the user currently has unfolded. Read before a
+// full editor rebuild so the rebuild can restore them (auto-fold otherwise
+// re-collapses every >5-item field). Only foldable+open fields qualify, which
+// are exactly the ones unfolded past their default.
+export function captureUnfoldedChipFields() {
+    return [
+        ...document.querySelectorAll(
+            "#editor-panel .editor-field.foldable.open[data-chip-field]",
+        ),
+    ].map((f) => f.dataset.chipField);
 }
 
 /**
@@ -1051,6 +1071,9 @@ function mixedPlaceholder(values) {
 }
 
 export function renderSongEditorMulti(view, songIds, validationRules = null) {
+    // Multi-edit re-renders the whole editor on every chip op, so preserve the
+    // user's unfolded fields across the rebuild instead of re-auto-folding.
+    const unfolded = captureUnfoldedChipFields();
     renderSongEditorV2(view, null, null);
     const panel = document.getElementById("editor-panel");
     const scroll = panel?.querySelector(".editor-scroll");
@@ -1080,7 +1103,8 @@ export function renderSongEditorMulti(view, songIds, validationRules = null) {
         refresh: () => getMultiView(songIds),
     };
 
-    wireChipInputs(view, rerender, null, validationRules, null, multiOps);
+    const chipHandles = wireChipInputs(view, rerender, null, validationRules, null, multiOps);
+    for (const key of unfolded) chipHandles.unfoldField(key);
     wireScalarInputs(view, validationRules, rerender, async (field, payload) => {
         const result = await multiMutate(songIds, { update: { [field]: payload } });
         notifyMutateWarnings(result);

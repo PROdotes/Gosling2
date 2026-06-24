@@ -57,6 +57,7 @@ import {
     renderPublishers as renderPublisherResults,
 } from "./renderers/publishers.js";
 import {
+    captureUnfoldedChipFields,
     renderActionSidebar,
     renderSongEditorEmpty,
     renderSongEditorMulti,
@@ -242,6 +243,8 @@ const ctx = {
                 document
                     .querySelector("#editor-panel .chip-input--expanded")
                     ?.closest("[data-chip-field]")?.dataset.chipField || null;
+            // Same idea for fold: don't re-collapse fields the user unfolded.
+            const unfoldedFields = captureUnfoldedChipFields();
 
             // Full re-render to handle new cards/structure
             renderSongEditorV2(fresh, state.activeSongDiff, state.activeSongRawTags);
@@ -258,6 +261,7 @@ const ctx = {
                 () => ctx.refreshActiveSongV2(fresh.id),
             );
             state.chipHandles.expandField(openFieldKey);
+            for (const key of unfoldedFields) state.chipHandles.unfoldField(key);
         }
 
         renderActionSidebar(fresh, {
