@@ -415,6 +415,10 @@ export function syncSongId3(id) {
     return fetchJson(`/api/v1/songs/${id}/sync-id3`);
 }
 
+export function revealSongFile(id) {
+    return fetchJson(`/api/v1/songs/${id}/reveal`, { method: "POST" });
+}
+
 export function setPublisherParent(publisherId, parentId) {
     return mutate({ update: [{ type: "publisher", id: publisherId, parent_id: parentId }] });
 }

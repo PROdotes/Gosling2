@@ -1265,6 +1265,9 @@ ${(() => {
     <label class="editor-label" for="ef-notes">Comments</label>
     <textarea class="editor-input editor-textarea" id="ef-notes" rows="3">${escapeHtml(song.notes ?? "")}</textarea>
   </div>
+  <div class="editor-field">
+    <button class="sidebar-btn" data-action="reveal-file" data-song-id="${song.id}" ${song.file_exists ? "" : "disabled"} title="${song.file_exists ? escapeHtml(song.source_path || "") : "File not found on disk"}">Go to File</button>
+  </div>
 </div>
 `;
 }

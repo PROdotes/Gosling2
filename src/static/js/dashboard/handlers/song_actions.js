@@ -23,6 +23,7 @@ import {
     removeSongPublisher,
     removeSongTag,
     resolveConflict,
+    revealSongFile,
     setPrimarySongAlbum,
     setPrimarySongTag,
     syncAlbumFromSong,
@@ -109,6 +110,7 @@ export class SongActionsHandler {
             "close-scrubber-modal",
             "sync-id3",
             "quick-create-album",
+            "reveal-file",
         ]);
     }
 
@@ -504,6 +506,19 @@ export class SongActionsHandler {
         } finally {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
+        }
+    }
+
+    async handleRevealFile(actionTarget) {
+        const id = actionTarget.dataset.songId;
+        actionTarget.disabled = true;
+        try {
+            await revealSongFile(id);
+        } catch (err) {
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(`Could not open file: ${err.message}`, "error");
+        } finally {
+            actionTarget.disabled = false;
         }
     }
 
