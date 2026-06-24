@@ -227,14 +227,17 @@ These were previously listed as missing but now exist in some form:
   from audio* remains — see below.)
 - **Batch Metadata Editor (Multi-Edit)** — In progress: collapsed read-view shipped,
   fan-out write path built. See `docs/specs/multiedit.md`.
+- **Settings screen** — Shipped. A settings modal edits runtime config, persisted to
+  `json/settings.json` and applied live without a restart. The form is generated from
+  a pydantic `Settings` model; immutable code facts (paths, enums, validation rules)
+  stay in `config.py`. Editable settings: library root, WAV auto-convert on ingest,
+  auto-move on approve, prompt before move, auto-save ID3 on edit, scrubber auto-play,
+  save scalar fields on blur, default search engine.
 
 ### Near-term gaps (library management)
 
 The remaining work to call library management "complete":
 
-- **Settings screen** — UI for the runtime config currently hardcoded in `config.py`
-  (library root, DB/log paths, auto-rename, write-to-tags, transcoding, WAV
-  auto-convert, etc.). Planned as JSON-file backed. (Parity with old exe.)
 - **Renaming Rules editor** — In-UI CRUD for `json/rules.json`: ordered,
   first-match-wins genre→path rules with a token palette and reorder. (Parity with old
   exe.)

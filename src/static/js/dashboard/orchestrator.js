@@ -76,6 +76,26 @@ export async function orchestrateScrubber(ctx, songId, title) {
 
     openScrubberModal(songId, title, {
         autoPlay,
+        onNavigate: (direction) => {
+            const s = ctx.getState();
+            const items = s.displayedItems || [];
+            if (!items.length) return null;
+
+            const newIndex =
+                direction > 0
+                    ? Math.min(s.selectedIndex + 1, items.length - 1)
+                    : Math.max(s.selectedIndex - 1, 0);
+            if (newIndex === s.selectedIndex) return null; // clamp at ends
+
+            if (s.currentMode === "songs") {
+                ctx.applySongSelection?.(newIndex, "set");
+            } else {
+                ctx.openEntityAtIndex?.(newIndex);
+            }
+
+            const sel = items[newIndex];
+            return { id: sel.id, title: sel.media_name || sel.title };
+        },
         onClose: () => {
             const s = state;
             if (

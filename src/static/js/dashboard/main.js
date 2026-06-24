@@ -385,6 +385,7 @@ const ctx = {
     navigate,
     getActiveList,
     openSelectedResult,
+    openEntityAtIndex,
     applySongSelection,
     selectAllSongs,
     clearSongEditor() {
@@ -1196,6 +1197,18 @@ function selectAllSongs() {
     state.selectedSongIds = new Set(items.map((s) => s.id));
     updateSelection();
     syncSongSelectionEditor();
+}
+
+// Move the cursor to an entity row (non-songs modes) and open its detail.
+// Shared by row-click, keyboard arrows, and scrubber navigation.
+function openEntityAtIndex(index) {
+    state.selectedIndex = index;
+    updateSelection();
+    const selected = state.displayedItems?.[index];
+    if (!selected) return;
+    const cachedList = getActiveList();
+    const actualIndex = cachedList?.findIndex((item) => item.id === selected.id);
+    if (actualIndex >= 0) openSelectedResult(actualIndex);
 }
 
 function syncSongSelectionEditor() {

@@ -15,6 +15,8 @@ let _currentId = null;
 let _currentTitle = null;
 let _onTagsClick = null;
 let _onClose = null;
+let _onNavigate = null;
+let _autoPlay = false;
 let modal;
 
 // Waveform canvas + playhead inside the waveform box
@@ -220,6 +222,13 @@ function handleScrubberKeydown(e) {
         e.stopImmediatePropagation();
         seek(10);
     }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (!_onNavigate) return;
+        const next = _onNavigate(e.key === "ArrowDown" ? 1 : -1);
+        if (next) loadSong(next.id, next.title, _autoPlay);
+    }
     if (e.key === "+" || e.key === "NumpadAdd") {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -236,12 +245,32 @@ tagsBtn?.addEventListener("click", () => {
     if (_onTagsClick && _currentId) _onTagsClick(_currentId, _currentTitle);
 });
 
+// Swap the audio/title/waveform for a song into the already-open modal.
+// Does NOT touch modal lifecycle (listeners stay registered once per open).
+function loadSong(songId, title, autoPlay) {
+    _currentId = songId;
+    _currentTitle = title;
+    audio.pause();
+    audio.src = `/api/v1/songs/${songId}/audio`;
+    timeCurrent.textContent = "0:00";
+    timeTotal.textContent = "0:00";
+    updatePlayhead();
+    updatePlayBtn();
+    titleEl.textContent = title || "Player";
+    loadWaveform(songId);
+    if (autoPlay) {
+        audio
+            .play()
+            .catch((err) => console.warn("Auto-play blocked by browser:", err));
+    }
+}
+
 export function openScrubberModal(
     songId,
     title,
-    { autoPlay = false, onTagsClick = null, onClose = null } = {},
+    { autoPlay = false, onTagsClick = null, onClose = null, onNavigate = null } = {},
 ) {
-    modal.open(songId, title, { autoPlay, onTagsClick, onClose });
+    modal.open(songId, title, { autoPlay, onTagsClick, onClose, onNavigate });
 }
 
 export function closeScrubberModal() {
@@ -251,29 +280,15 @@ export function closeScrubberModal() {
 // ─── Modal Lifecycle ──────────────────────────────────────────
 
 modal = createModalLifecycle(overlay, {
-    onOpen: (songId, title, { autoPlay, onTagsClick, onClose }) => {
-        _currentId = songId;
-        _currentTitle = title;
+    onOpen: (songId, title, { autoPlay, onTagsClick, onClose, onNavigate }) => {
         _onTagsClick = onTagsClick;
         _onClose = onClose;
+        _onNavigate = onNavigate;
+        _autoPlay = autoPlay;
 
-        audio.pause();
-        audio.src = `/api/v1/songs/${songId}/audio`;
-        timeCurrent.textContent = "0:00";
-        timeTotal.textContent = "0:00";
-        updatePlayhead();
-        updatePlayBtn();
-        titleEl.textContent = title || "Player";
-
-        loadWaveform(songId);
+        loadSong(songId, title, autoPlay);
 
         document.addEventListener("keydown", handleScrubberKeydown);
-
-        if (autoPlay) {
-            audio
-                .play()
-                .catch((err) => console.warn("Auto-play blocked by browser:", err));
-        }
     },
     onClose: () => {
         document.removeEventListener("keydown", handleScrubberKeydown);
@@ -286,6 +301,7 @@ modal = createModalLifecycle(overlay, {
         _currentId = null;
         _currentTitle = null;
         _onTagsClick = null;
+        _onNavigate = null;
         const cb = _onClose;
         _onClose = null;
         if (cb) cb();

@@ -1198,21 +1198,49 @@
 
 /* ── Bucket 2: Lost features ──────────────────────────────────────────────── */
 
+/* Segmented control: input + case buttons read as one unit, the border
+   lives on the row so S/T are clearly tools attached to the field. */
 #songs-workspace .editor-input-row {
     display: flex;
     align-items: stretch;
-    gap: 4px;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+#songs-workspace .editor-input-row:hover {
+    border-color: var(--border-strong);
+}
+
+#songs-workspace .editor-input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 #songs-workspace .editor-input-row .editor-input {
     flex: 1;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* Highlight moves to the group; neutralize the inner input's own states. */
+#songs-workspace .editor-input-row .editor-input:hover,
+#songs-workspace .editor-input-row .editor-input:focus {
+    border: none;
+    background: transparent;
+    box-shadow: none;
 }
 
 #songs-workspace .editor-case-btn {
-    background: var(--bg-element);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-sec);
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border);
+    color: var(--text-mut);
+    border-radius: 0;
     padding: 0 10px;
     font-size: 12px;
     cursor: pointer;
@@ -1221,7 +1249,7 @@
 
 #songs-workspace .editor-case-btn:hover {
     color: var(--text-pure);
-    border-color: var(--border-focus);
+    background: var(--bg-element);
 }
 
 #songs-workspace .chip-input__chip-label[data-action] {
@@ -1403,13 +1431,23 @@
     color: var(--text-pri);
 }
 
+/* Standalone action button (sync metadata from song) — boxed chrome and a
+   small gap set it apart from the title group and the bare unlink ✕. */
 #songs-workspace .album-sub-sync-btn {
-    background: none;
-    border: none;
-    color: var(--text-mut);
-    font-size: 15px;
+    flex-shrink: 0;
+    margin-left: 2px;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-sec);
+    font-size: 14px;
     font-weight: 700;
-    padding: 0 2px;
+    padding: 0;
     cursor: pointer;
     font-family: inherit;
     line-height: 1;
@@ -1417,6 +1455,7 @@
 
 #songs-workspace .album-sub-sync-btn:hover {
     color: var(--text-pure);
+    border-color: var(--border-focus);
 }
 
 #songs-workspace .album-sub-sync-btn.loading {

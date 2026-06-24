@@ -42,7 +42,7 @@
             "target_path": "Cro {genre}/{year}/{artist} - {title}"
         },
         {
-            "match_genres": ["cro", "instrumental", "Susjedi"],
+            "match_genres": ["cro", "instrumental", "Susjedi", "klape"],
             "target_path": "{genre}/{year}/{artist} - {title}"
         }
     ]

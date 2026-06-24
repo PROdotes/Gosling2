@@ -105,19 +105,7 @@ export class NavigationHandler {
             return;
         }
 
-        state.selectedIndex = rowIndex;
-        this.ctx.updateSelection?.();
-
-        const selected = state.displayedItems?.[state.selectedIndex];
-        if (selected) {
-            const cachedList = this.ctx.getActiveList?.();
-            const actualIndex = cachedList?.findIndex(
-                (item) => item.id === selected.id,
-            );
-            if (actualIndex >= 0) {
-                this.ctx.openSelectedResult?.(actualIndex);
-            }
-        }
+        this.ctx.openEntityAtIndex?.(rowIndex);
     }
 
     async handleNavigateSearch(actionTarget) {
@@ -318,18 +306,7 @@ export class NavigationHandler {
                     return;
                 }
 
-                state.selectedIndex = newIndex;
-                this.ctx.updateSelection?.();
-
-                const cachedList = this.ctx.getActiveList?.();
-                const selected = items[state.selectedIndex];
-                if (selected) {
-                    const actualIndex = cachedList?.findIndex(
-                        (item) => item.id === selected.id,
-                    );
-                    if (actualIndex >= 0)
-                        this.ctx.openSelectedResult?.(actualIndex);
-                }
+                this.ctx.openEntityAtIndex?.(newIndex);
                 return;
             }
 
