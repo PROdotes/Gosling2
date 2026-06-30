@@ -179,6 +179,14 @@ class SongCreditRepository(BaseRepository):
                     "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
                     (owner_identity_id,),
                 )
+            # Existing identity already has a primary name — add this as an alias
+            logger.debug(
+                f"[SongCreditRepository] inserting ArtistName '{display_name}' as alias under identity_id={owner_identity_id}"
+            )
+            cursor.execute(
+                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 0)",
+                (owner_identity_id, display_name, display_name_search),
+            )
         else:
             cursor.execute(
                 "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
@@ -188,14 +196,13 @@ class SongCreditRepository(BaseRepository):
             logger.debug(
                 f"[SongCreditRepository] created new identity_id={owner_identity_id} for '{display_name}'"
             )
-
-        logger.debug(
-            f"[SongCreditRepository] inserting ArtistName '{display_name}' under identity_id={owner_identity_id}"
-        )
-        cursor.execute(
-            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 1)",
-            (owner_identity_id, display_name, display_name_search),
-        )
+            logger.debug(
+                f"[SongCreditRepository] inserting ArtistName '{display_name}' as primary under identity_id={owner_identity_id}"
+            )
+            cursor.execute(
+                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 1)",
+                (owner_identity_id, display_name, display_name_search),
+            )
         return cursor.lastrowid
 
     def add_credit(

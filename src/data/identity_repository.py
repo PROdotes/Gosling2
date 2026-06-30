@@ -17,7 +17,12 @@ class IdentityRepository(BaseRepository):
         i.IdentityID, i.IdentityType, i.LegalName,
         COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
     """
-    _IDENTITY_JOIN = "LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0"
+    _IDENTITY_JOIN = """LEFT JOIN (
+        SELECT OwnerIdentityID, DisplayName
+        FROM ArtistNames
+        WHERE IsPrimaryName = 1 AND IsDeleted = 0
+        GROUP BY OwnerIdentityID
+    ) an ON i.IdentityID = an.OwnerIdentityID"""
 
     _SLIM_COUNT_COLUMNS = """
         (SELECT COUNT(DISTINCT sc.SourceID)
@@ -326,7 +331,7 @@ class IdentityRepository(BaseRepository):
                    COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
             FROM GroupMemberships gm
             JOIN Identities i ON gm.MemberIdentityID = i.IdentityID
-            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0
+            {self._IDENTITY_JOIN}
             WHERE gm.GroupIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
@@ -357,7 +362,7 @@ class IdentityRepository(BaseRepository):
                    COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
             FROM GroupMemberships gm
             JOIN Identities i ON gm.GroupIdentityID = i.IdentityID
-            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0
+            {self._IDENTITY_JOIN}
             WHERE gm.MemberIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}

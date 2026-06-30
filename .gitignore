@@ -79,3 +79,6 @@ temp/library/staging/
 # FFmpeg binaries
 ffmpeg/
 gosling-server.exe
+
+# Graphify knowledge graph output
+graphify-out/
