@@ -39,6 +39,7 @@ import {
     INGEST_RESULTS_LIST_ID,
     resolvePendingCard,
 } from "../renderers/ingestion.js";
+import { tombstoneRow } from "../renderers/songs.js";
 
 /**
  * Renders the sync LED + mismatch chip list from a diff dict.
@@ -206,21 +207,21 @@ export class SongActionsHandler {
 
         try {
             await deleteSong(id, deleteFile);
-            if (
-                this.ctx.getState().currentMode === "songs" &&
-                this.ctx.clearSongEditorV2
-            ) {
+            const inSongsList = this.ctx.getState().currentMode === "songs";
+            if (inSongsList && this.ctx.clearSongEditorV2) {
                 this.ctx.clearSongEditorV2();
             } else if (this.ctx.hideDetailPanel) {
                 this.ctx.hideDetailPanel();
             }
 
-            // Allow main.js or other systems to refresh the list
-            // In Gosling v3, we prefer performSearch()
-            if (typeof performSearch === "function") {
-                performSearch();
-            } else if (this.ctx.performSearch) {
-                this.ctx.performSearch();
+            // Red flash + dim + mouse-leave sweep, same path as mark-done.
+            // Falls back to a full refetch when the song isn't in the list view.
+            if (!(inSongsList && tombstoneRow(Number(id)))) {
+                if (typeof performSearch === "function") {
+                    performSearch();
+                } else if (this.ctx.performSearch) {
+                    this.ctx.performSearch();
+                }
             }
         } catch (err) {
             actionTarget.disabled = false;
@@ -295,19 +296,21 @@ export class SongActionsHandler {
 
         try {
             await rejectSong(id, reason);
-            if (
-                this.ctx.getState().currentMode === "songs" &&
-                this.ctx.clearSongEditorV2
-            ) {
+            const inSongsList = this.ctx.getState().currentMode === "songs";
+            if (inSongsList && this.ctx.clearSongEditorV2) {
                 this.ctx.clearSongEditorV2();
             } else if (this.ctx.hideDetailPanel) {
                 this.ctx.hideDetailPanel();
             }
 
-            if (typeof performSearch === "function") {
-                performSearch();
-            } else if (this.ctx.performSearch) {
-                this.ctx.performSearch();
+            // Red flash + dim + mouse-leave sweep, same path as mark-done.
+            // Falls back to a full refetch when the song isn't in the list view.
+            if (!(inSongsList && tombstoneRow(Number(id)))) {
+                if (typeof performSearch === "function") {
+                    performSearch();
+                } else if (this.ctx.performSearch) {
+                    this.ctx.performSearch();
+                }
             }
         } catch (err) {
             if (strip) this._collapseRejectStrip(strip, id);

@@ -393,10 +393,34 @@ export function patchSongRow(ctx, fresh) {
         // Re-query: outerHTML replaced the node. Flash class is added imperatively
         // (not baked into the markup) so it only animates on the transition, not
         // on every subsequent re-render of an already-tombstoned row.
-        panel
-            .querySelector(`.song-row[data-id="${fresh.id}"]`)
-            ?.classList.add("flash-done");
+        flashTombstone(
+            panel.querySelector(`.song-row[data-id="${fresh.id}"]`),
+            "done",
+        );
     }
+    return true;
+}
+
+// Apply the one-shot leave-flash to a row. Variant picks the color:
+// "done" = green (an edit pushed the song out of the active filter),
+// "removed" = red (an action removed it: reject/delete).
+function flashTombstone(node, variant) {
+    node?.classList.add(variant === "removed" ? "flash-removed" : "flash-done");
+}
+
+// Tombstone a row by id from an external action (reject/delete): flash it red,
+// dim it, and let the existing mouse-leave sweep flush it. Unlike patchSongRow,
+// this consults no status filter — the action itself is the intent to remove.
+// The selected/focused row stays (dimmed) until selection moves off it, same as
+// the done path. Returns true if a visible row was tombstoned (false when the
+// song isn't in the current list view, so the caller can fall back to a refetch).
+export function tombstoneRow(id) {
+    tombstonedIds.add(id);
+    const panel = document.getElementById("song-list-panel");
+    const node = panel?.querySelector(`.song-row[data-id="${id}"]`);
+    if (!node) return false;
+    node.classList.add("tombstoned");
+    flashTombstone(node, "removed");
     return true;
 }
 

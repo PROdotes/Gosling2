@@ -308,6 +308,27 @@
     }
 }
 
+/* One-shot flash when a row is removed by an action (reject/delete). Same
+   shape as flash-done, red instead of green, settling into the same dim. */
+#songs-workspace .song-row.flash-removed {
+    animation: songRowFlashRemoved 0.9s ease-out;
+}
+
+@keyframes songRowFlashRemoved {
+    0% {
+        background: rgba(239, 68, 68, 0.35);
+        opacity: 1;
+    }
+    55% {
+        background: rgba(239, 68, 68, 0.18);
+        opacity: 1;
+    }
+    100% {
+        background: transparent;
+        opacity: 0.4;
+    }
+}
+
 /* Sweep: the flashy exit when tombstoned rows are flushed (pointer left the
    list). Slide-fade left, then collapse the slot. Duration is tracked by the
    320ms timer in flushTombstones (songs.js). */
