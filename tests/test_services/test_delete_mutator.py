@@ -198,6 +198,25 @@ class TestDeleteIdentity:
                 "delete", DeleteIdentityItem(type="identity", id=1), conn
             )
 
+    def test_linked_via_album_only_rejected(self, mutator, conn):
+        # Fresh identity credited on Album 100 but with no song credits at all.
+        # The song-only guard used to miss this and allow the delete, leaving
+        # Album 100's credit pointing at a soft-deleted name.
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType) VALUES (999, 'person')"
+        )
+        conn.execute(
+            "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (9001, 999, 'Album Only Artist', 1)"
+        )
+        conn.execute(
+            "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (100, 9001, 1)"
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="still linked"):
+            mutator.apply_within(
+                "delete", DeleteIdentityItem(type="identity", id=999), conn
+            )
+
     def test_delete_soft_deletes_all_aliases(self, mutator, conn):
         # Build an orphan identity with two names attached, delete it, and
         # confirm both alias rows are soft-deleted.

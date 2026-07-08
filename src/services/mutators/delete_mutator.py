@@ -110,10 +110,15 @@ class DeleteMutator:
             for identity_id in self._identity_repo.get_unlinked_ids(conn):
                 self._identity_repo.soft_delete(identity_id, conn)
             return
-        linked = self._identity_repo.get_song_ids_by_identity(item.id, conn)
-        if linked:
+        linked_songs = self._identity_repo.get_song_ids_by_identity(item.id, conn)
+        if linked_songs:
             raise ValueError(
-                f"Identity {item.id} is still linked to {len(linked)} song(s)"
+                f"Identity {item.id} is still linked to {len(linked_songs)} song(s)"
+            )
+        linked_albums = self._identity_repo.get_album_ids_by_identity(item.id, conn)
+        if linked_albums:
+            raise ValueError(
+                f"Identity {item.id} is still linked to {len(linked_albums)} album(s)"
             )
         deleted = self._identity_repo.soft_delete(item.id, conn)
         if not deleted:
