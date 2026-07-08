@@ -608,8 +608,8 @@ async function switchMode(mode) {
     syncSearchClear();
     syncModeUi();
     ctx.hideDetailPanel();
-    filterSidebar.load("");
     if (mode === "songs") {
+        filterSidebar.load("");
         doSongSearch();
     } else {
         performSearch("");

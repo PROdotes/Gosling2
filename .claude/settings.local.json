@@ -48,7 +48,8 @@
       "Bash(Select-Object Name)",
       "Bash(black)",
       "Bash(ruff check *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(black --check .)"
     ]
   },
   "hooks": {
