@@ -35,8 +35,10 @@ import {
     mergeTag,
     getTagCategories,
     syncAlbumFromSong,
+    setPrimarySongTag,
 } from "./api.js";
 import { showConfirm } from "./components/confirm_modal.js";
+import { createChipInput } from "./components/chip_input.js";
 import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
@@ -74,8 +76,20 @@ export async function orchestrateScrubber(ctx, songId, title) {
     const state = ctx.getState();
     const autoPlay = state.settings?.scrubber_auto_play ?? true;
 
+    // Best-effort instant artist line; the tag-editor detail fetch corrects it.
+    const slim = (state.displayedItems || []).find(
+        (i) => String(i.id) === String(songId),
+    );
+    const artist =
+        slim?.display_artist ??
+        (String(state.activeSong?.id) === String(songId)
+            ? state.activeSong?.display_artist
+            : null) ??
+        null;
+
     openScrubberModal(songId, title, {
         autoPlay,
+        artist,
         onNavigate: (direction) => {
             const s = ctx.getState();
             const items = s.displayedItems || [];
@@ -94,7 +108,11 @@ export async function orchestrateScrubber(ctx, songId, title) {
             }
 
             const sel = items[newIndex];
-            return { id: sel.id, title: sel.media_name || sel.title };
+            return {
+                id: sel.id,
+                title: sel.media_name || sel.title,
+                artist: sel.display_artist ?? null,
+            };
         },
         onClose: () => {
             const s = state;
@@ -106,23 +124,97 @@ export async function orchestrateScrubber(ctx, songId, title) {
                 ctx.refreshActiveSongV2(s.activeSong.id);
             }
         },
-        onTagsClick: async (id, name) => {
-            // Re-fetch or use state.activeSong to get freshest tags
-            // If the song being scrubbed is the active one, use its tags
-            let tags = [];
-            if (
-                state.activeSong &&
-                String(state.activeSong.id) === String(id)
-            ) {
-                tags = state.activeSong.tags || [];
-            } else {
-                // Otherwise fetch them
-                const detail = await getCatalogSong(id);
-                tags = detail?.tags || [];
-            }
-            manageSongTags(ctx, id, name, tags);
+        onRenderTags: (container, id, isCurrent) =>
+            renderScrubberTagEditor(ctx, container, id, isCurrent),
+    });
+}
+
+// Inline tag editor embedded in the scrubber modal. Chips stay visible; the
+// add-input is collapsed behind a "+ add" stub so scrubber keybinds keep
+// working until the user deliberately opens it (one tag per open, by design).
+async function renderScrubberTagEditor(ctx, container, songId, isCurrent) {
+    const state = ctx.getState();
+    const rules = state.validationRules?.tags || {};
+    const categoryColors = rules.category_colors || {};
+
+    const toItems = (tags) =>
+        (tags || []).map((t) => ({
+            id: t.id,
+            label: t.name,
+            category: t.category,
+            _isPrimary: !!t.is_primary,
+        }));
+
+    const detail = await getCatalogSong(songId);
+    if (isCurrent && !isCurrent()) return null;
+
+    let handle;
+    const refreshChips = async () => {
+        const fresh = await getCatalogSong(songId);
+        handle.setItems(toItems(fresh?.tags));
+    };
+    const refreshMainView = getUpdateCallback(ctx, songId);
+
+    handle = createChipInput({
+        container,
+        items: toItems(detail?.tags),
+        onSearch: async (q) => {
+            const { name } = parseTagInput(q, rules);
+            const r = await searchTags(name);
+            if (r === ABORTED || !r) return [];
+            return r.map((t) => ({
+                id: t.id,
+                label: t.name,
+                category: t.category,
+            }));
+        },
+        onAdd: async (opt) => {
+            const { name, category } = opt.id
+                ? opt
+                : parseTagInput(opt.label, rules);
+            await addSongTag(songId, name, category ?? null, opt.id ?? null);
+            await refreshChips();
+            await refreshMainView();
+        },
+        onRemove: async (tagId) => {
+            await removeSongTag(songId, tagId);
+            // Re-fetch: removing the primary genre reassigns primary server-side
+            await refreshChips();
+            await refreshMainView();
+        },
+        allowCreate: true,
+        placeholder: "Add tag",
+        tagMode: true,
+        categoryColors,
+        collapseOnAdd: true,
+        getCreateLabel: (q) => {
+            const { name, category } = parseTagInput(q, rules);
+            return `+ Add "${name}" in "${category}"`;
+        },
+        extraChipButtons: (item) => {
+            if (item.category !== "Genre") return [];
+            return [
+                {
+                    className: `chip-input__chip-btn chip-input__chip-star${item._isPrimary ? " is-primary" : ""}`,
+                    html: "&#9733;",
+                    title: item._isPrimary
+                        ? "Primary genre"
+                        : "Set as primary genre",
+                    onClick: async (it) => {
+                        try {
+                            await setPrimarySongTag(songId, it.id);
+                            await refreshChips();
+                            await refreshMainView();
+                        } catch (err) {
+                            console.warn("Set primary tag failed:", err);
+                        }
+                    },
+                },
+            ];
         },
     });
+
+    return { handle, artist: detail?.display_artist ?? null };
 }
 
 // ─── UTILITIES ───────────────────────────────────────────────────────────────

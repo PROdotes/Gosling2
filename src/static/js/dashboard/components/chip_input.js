@@ -34,6 +34,7 @@ export function createChipInput({
     labelAttrs = null,
     extraChipButtons = null,
     placeholder = "Search...",
+    collapseOnAdd = false,
 }) {
     let items = [...initialItems];
 
@@ -305,11 +306,13 @@ export function createChipInput({
                 renderChips();
                 applyFold();
             }
+            if (collapseOnAdd) collapse();
         },
         renderItem,
         allowCreate,
         getCreateLabel,
         debounceMs: 180,
+        onEnterEmpty: collapseOnAdd ? collapse : null,
     });
 
     // ── Init ─────────────────────────────────────────────────────────────────

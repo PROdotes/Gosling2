@@ -813,7 +813,7 @@
 
 /* ── CHIP INPUT COMPONENT ───────────────────────────────────────────────── */
 
-#songs-workspace .chip-input {
+:is(#songs-workspace, #scrubber-modal) .chip-input {
     position: relative;
     display: flex;
     flex-wrap: wrap;
@@ -822,11 +822,11 @@
     min-height: 28px;
 }
 
-#songs-workspace .chip-input__chips {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chips {
     display: contents; /* chips flow inline with the text input */
 }
 
-#songs-workspace .chip-input__chip {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -839,7 +839,7 @@
     font-weight: 500;
 }
 
-#songs-workspace .chip-input__chip-btn {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-btn {
     background: none;
     border: none;
     color: var(--text-muted);
@@ -849,15 +849,15 @@
     line-height: 1;
 }
 
-#songs-workspace .chip-input__chip-btn:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-btn:hover {
     color: var(--text-pure);
 }
 
-#songs-workspace .chip-input__chip-split {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-split {
     font-size: 11px;
 }
 
-#songs-workspace .chip-input__text {
+:is(#songs-workspace, #scrubber-modal) .chip-input__text {
     /* Break onto its own line, full width, so it reads as a real "add" input. */
     flex: 1 1 100%;
     min-width: 0;
@@ -875,24 +875,24 @@
     padding: 5px 8px 5px 30px;
 }
 
-#songs-workspace .chip-input__text:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__text:hover {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: var(--border-strong);
 }
 
-#songs-workspace .chip-input__text:focus {
+:is(#songs-workspace, #scrubber-modal) .chip-input__text:focus {
     border-color: var(--accent);
     background-color: rgba(255, 255, 255, 0.05);
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-#songs-workspace .chip-input__text::placeholder {
+:is(#songs-workspace, #scrubber-modal) .chip-input__text::placeholder {
     color: var(--text-mut);
 }
 
 /* Add affordance — one reserved signal everywhere: dashed ghost pill.
    Low-chroma at rest, brightens to accent on hover (boss-test findable). */
-#songs-workspace .chip-input__stub {
+:is(#songs-workspace, #scrubber-modal) .chip-input__stub {
     display: inline-flex;
     align-items: center;
     gap: 0;
@@ -910,21 +910,21 @@
     transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
 
-#songs-workspace .chip-input__stub:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__stub:hover {
     border-color: var(--accent-border);
     color: var(--accent-hover);
     background: var(--accent-soft);
 }
 
-#songs-workspace .chip-input__text[hidden],
-#songs-workspace .chip-input__stub[hidden],
-#songs-workspace .chip-input__preview[hidden] {
+:is(#songs-workspace, #scrubber-modal) .chip-input__text[hidden],
+:is(#songs-workspace, #scrubber-modal) .chip-input__stub[hidden],
+:is(#songs-workspace, #scrubber-modal) .chip-input__preview[hidden] {
     display: none;
 }
 
 /* Folded one-liner: shows first two names + overflow count.
    Takes full width of the data column; click to unfold. */
-#songs-workspace .chip-input__preview {
+:is(#songs-workspace, #scrubber-modal) .chip-input__preview {
     flex: 1 1 100%;
     background: none;
     border: none;
@@ -938,18 +938,18 @@
     transition: color 0.1s ease;
 }
 
-#songs-workspace .chip-input__preview:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__preview:hover {
     color: var(--text-dim);
 }
 
-#songs-workspace .chip-input__preview-more {
+:is(#songs-workspace, #scrubber-modal) .chip-input__preview-more {
     color: var(--text-mute);
     font-size: 11px;
     white-space: nowrap;
     opacity: 0.75;
 }
 
-#songs-workspace .chip-input__dropdown {
+:is(#songs-workspace, #scrubber-modal) .chip-input__dropdown {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
@@ -962,24 +962,24 @@
     overflow: hidden;
 }
 
-#songs-workspace .chip-input__option {
+:is(#songs-workspace, #scrubber-modal) .chip-input__option {
     padding: 7px 12px;
     font-size: 13px;
     color: var(--text-pure);
     cursor: pointer;
 }
 
-#songs-workspace .chip-input__option:hover,
-#songs-workspace .chip-input__option--active {
+:is(#songs-workspace, #scrubber-modal) .chip-input__option:hover,
+:is(#songs-workspace, #scrubber-modal) .chip-input__option--active {
     background: var(--bg-element);
 }
 
-#songs-workspace .chip-input__option--create {
+:is(#songs-workspace, #scrubber-modal) .chip-input__option--create {
     color: var(--accent-blue, #4fa3e0);
     font-style: italic;
 }
 
-#songs-workspace .chip-input__tag-cat {
+:is(#songs-workspace, #scrubber-modal) .chip-input__tag-cat {
     font-size: 9px;
     font-weight: 800;
     opacity: 0.85;
@@ -1273,7 +1273,7 @@
     background: var(--bg-element);
 }
 
-#songs-workspace .chip-input__chip-label[data-action] {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-label[data-action] {
     background: none;
     border: none;
     color: inherit;
@@ -1282,21 +1282,21 @@
     cursor: pointer;
 }
 
-#songs-workspace .chip-input__chip-label[data-action]:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-label[data-action]:hover {
     text-decoration: underline;
 }
 
-#songs-workspace .chip-input__chip-star {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-star {
     color: var(--text-mut);
     opacity: 0.5;
 }
 
-#songs-workspace .chip-input__chip-star:hover {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-star:hover {
     opacity: 1;
     color: #facc15;
 }
 
-#songs-workspace .chip-input__chip-star.is-primary {
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip-star.is-primary {
     color: #facc15;
     opacity: 1;
 }

@@ -3,17 +3,20 @@ import { createModalLifecycle } from "./modal_lifecycle.js";
 
 const overlay = document.getElementById("scrubber-modal");
 const titleEl = document.getElementById("scrubber-modal-title");
+const artistEl = document.getElementById("scrubber-modal-artist");
 const audio = document.getElementById("scrubber-audio");
 const waveformBox = document.getElementById("scrubber-waveform-box");
 const playBtn = document.getElementById("scrubber-play-pause");
 const volumeBar = document.getElementById("scrubber-volume");
 const timeCurrent = document.getElementById("scrubber-time-current");
 const timeTotal = document.getElementById("scrubber-time-total");
-const tagsBtn = document.getElementById("scrubber-tags-btn");
+const tagsBox = document.getElementById("scrubber-tags");
 
 let _currentId = null;
 let _currentTitle = null;
-let _onTagsClick = null;
+let _onRenderTags = null;
+let _tagsHandle = null;
+let _tagsRequestId = 0;
 let _onClose = null;
 let _onNavigate = null;
 let _autoPlay = false;
@@ -227,12 +230,12 @@ function handleScrubberKeydown(e) {
         e.stopImmediatePropagation();
         if (!_onNavigate) return;
         const next = _onNavigate(e.key === "ArrowDown" ? 1 : -1);
-        if (next) loadSong(next.id, next.title, _autoPlay);
+        if (next) loadSong(next.id, next.title, _autoPlay, next.artist);
     }
     if (e.key === "+" || e.key === "NumpadAdd") {
         e.preventDefault();
         e.stopImmediatePropagation();
-        tagsBtn.click();
+        if (_tagsHandle) _tagsHandle.expand();
     }
     if (e.key === "Enter") {
         e.preventDefault();
@@ -241,13 +244,43 @@ function handleScrubberKeydown(e) {
     }
 }
 
-tagsBtn?.addEventListener("click", () => {
-    if (_onTagsClick && _currentId) _onTagsClick(_currentId, _currentTitle);
-});
+function setArtist(artist) {
+    artistEl.textContent = artist || "";
+    artistEl.hidden = !artist;
+}
+
+// Build the inline tag editor for the current song. The renderer is supplied
+// by the orchestrator; isCurrent() lets it bail before touching the DOM when
+// the user has already navigated to another song mid-fetch.
+async function loadTags(songId) {
+    _tagsHandle = null;
+    tagsBox.innerHTML = "";
+    if (!_onRenderTags) return;
+    const requestId = ++_tagsRequestId;
+    try {
+        const result = await _onRenderTags(
+            tagsBox,
+            songId,
+            () => requestId === _tagsRequestId,
+        );
+        if (requestId !== _tagsRequestId || !result) return;
+        _tagsHandle = result.handle;
+        // The detail fetch is authoritative for the artist line: it fills it
+        // in when the caller didn't know it, and clears a stale one.
+        setArtist(result.artist);
+        // Escape inside the add-input collapses it without closing the modal
+        const input = tagsBox.querySelector(".chip-input__text");
+        input?.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") e.stopPropagation();
+        });
+    } catch (err) {
+        console.warn("Tag editor load failed:", err);
+    }
+}
 
 // Swap the audio/title/waveform for a song into the already-open modal.
 // Does NOT touch modal lifecycle (listeners stay registered once per open).
-function loadSong(songId, title, autoPlay) {
+function loadSong(songId, title, autoPlay, artist = null) {
     _currentId = songId;
     _currentTitle = title;
     audio.pause();
@@ -257,7 +290,9 @@ function loadSong(songId, title, autoPlay) {
     updatePlayhead();
     updatePlayBtn();
     titleEl.textContent = title || "Player";
+    setArtist(artist);
     loadWaveform(songId);
+    loadTags(songId);
     if (autoPlay) {
         audio
             .play()
@@ -268,9 +303,21 @@ function loadSong(songId, title, autoPlay) {
 export function openScrubberModal(
     songId,
     title,
-    { autoPlay = false, onTagsClick = null, onClose = null, onNavigate = null } = {},
+    {
+        autoPlay = false,
+        artist = null,
+        onRenderTags = null,
+        onClose = null,
+        onNavigate = null,
+    } = {},
 ) {
-    modal.open(songId, title, { autoPlay, onTagsClick, onClose, onNavigate });
+    modal.open(songId, title, {
+        autoPlay,
+        artist,
+        onRenderTags,
+        onClose,
+        onNavigate,
+    });
 }
 
 export function closeScrubberModal() {
@@ -280,13 +327,13 @@ export function closeScrubberModal() {
 // ─── Modal Lifecycle ──────────────────────────────────────────
 
 modal = createModalLifecycle(overlay, {
-    onOpen: (songId, title, { autoPlay, onTagsClick, onClose, onNavigate }) => {
-        _onTagsClick = onTagsClick;
+    onOpen: (songId, title, { autoPlay, artist, onRenderTags, onClose, onNavigate }) => {
+        _onRenderTags = onRenderTags;
         _onClose = onClose;
         _onNavigate = onNavigate;
         _autoPlay = autoPlay;
 
-        loadSong(songId, title, autoPlay);
+        loadSong(songId, title, autoPlay, artist);
 
         document.addEventListener("keydown", handleScrubberKeydown);
     },
@@ -300,7 +347,10 @@ modal = createModalLifecycle(overlay, {
         ctx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
         _currentId = null;
         _currentTitle = null;
-        _onTagsClick = null;
+        _onRenderTags = null;
+        _tagsHandle = null;
+        _tagsRequestId++;
+        tagsBox.innerHTML = "";
         _onNavigate = null;
         const cb = _onClose;
         _onClose = null;
