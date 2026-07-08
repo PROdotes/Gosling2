@@ -140,6 +140,63 @@ class TestIdentityMutatorAddAlias:
         assert row["IsDeleted"] == 0
         assert row["IsPrimaryName"] == 0
 
+    def test_add_alias_reactivates_own_stale_primary_as_alias(self, mutator, conn):
+        # Identity 1 already has a live primary (NameID=10, 'Dave Grohl').
+        # A soft-deleted name that ALSO belongs to identity 1 and still carries a
+        # stale IsPrimaryName=1 (from before it was deleted) must be demoted to a
+        # non-primary alias on reactivation, not resurrected as a second primary.
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName, IsDeleted) VALUES (1, 'Davy G', 1, 1)"
+        )
+        stale_name_id = cur.lastrowid
+        conn.commit()
+
+        item = AddIdentityAliasItem.model_validate(
+            {"type": "identity_alias", "identity_id": 1, "display_name": "Davy G"}
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+
+        row = _get_name_row(conn, stale_name_id)
+        assert row["OwnerIdentityID"] == 1
+        assert row["IsDeleted"] == 0
+        assert row["IsPrimaryName"] == 0
+
+        # Identity 1 must still have exactly one live primary.
+        live_primaries = [a for a in _get_aliases_for(conn, 1) if a["IsPrimaryName"]]
+        assert len(live_primaries) == 1
+
+    def test_add_alias_by_id_reactivates_own_stale_primary_as_alias(
+        self, mutator, conn
+    ):
+        # Same scenario as above, but resolved via the NameID (not display_name) path.
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName, IsDeleted) VALUES (1, 'David G.', 1, 1)"
+        )
+        stale_name_id = cur.lastrowid
+        conn.commit()
+
+        item = AddIdentityAliasItem.model_validate(
+            {
+                "type": "identity_alias",
+                "identity_id": 1,
+                "display_name": "David G.",
+                "name_id": stale_name_id,
+            }
+        )
+        mutator.apply_within("add", item, conn)
+        conn.commit()
+
+        row = _get_name_row(conn, stale_name_id)
+        assert row["OwnerIdentityID"] == 1
+        assert row["IsDeleted"] == 0
+        assert row["IsPrimaryName"] == 0
+
+        live_primaries = [a for a in _get_aliases_for(conn, 1) if a["IsPrimaryName"]]
+        assert len(live_primaries) == 1
+
     def test_add_alias_invalid_identity_raises(self, mutator, conn):
         item = AddIdentityAliasItem.model_validate(
             {

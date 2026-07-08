@@ -413,6 +413,9 @@ class IdentityRepository(BaseRepository):
                         "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
                         (collision_name_id,),
                     )
+                    self._demote_if_duplicate_primary(
+                        collision_name_id, identity_id, cursor
+                    )
                     return collision_name_id
                 elif collision_deleted:
                     # Scenario B: Name exists but is soft-deleted under another identity.
@@ -465,6 +468,7 @@ class IdentityRepository(BaseRepository):
                     "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
                     (found_name_id,),
                 )
+                self._demote_if_duplicate_primary(found_name_id, identity_id, cursor)
                 return found_name_id
 
             # Scenario B: Move a non-primary alias (Safe)
@@ -508,6 +512,22 @@ class IdentityRepository(BaseRepository):
             (identity_id, display_name, display_name_search),
         )
         return cursor.lastrowid
+
+    def _demote_if_duplicate_primary(
+        self, name_id: int, identity_id: int, cursor: sqlite3.Cursor
+    ) -> None:
+        """An identity must have at most one live IsPrimaryName=1 row. If reactivating
+        name_id (which may carry a stale IsPrimaryName=1 from before it was soft-deleted)
+        would create a second live primary for identity_id, demote name_id instead."""
+        other_primary = cursor.execute(
+            "SELECT NameID FROM ArtistNames WHERE OwnerIdentityID = ? AND IsPrimaryName = 1 AND IsDeleted = 0 AND NameID != ?",
+            (identity_id, name_id),
+        ).fetchone()
+        if other_primary:
+            cursor.execute(
+                "UPDATE ArtistNames SET IsPrimaryName = 0 WHERE NameID = ?",
+                (name_id,),
+            )
 
     def _is_parent_identity(self, identity_id: int, cursor: sqlite3.Cursor) -> bool:
         """Return True if this identity has multiple aliases (is a parent of a tree)."""
