@@ -1,4 +1,5 @@
 import subprocess
+import time
 from pathlib import Path
 
 from src.engine.config import FFMPEG_PATH
@@ -38,6 +39,15 @@ def convert_to_mp3(src_path: Path) -> Path:
             f"ffmpeg exited 0 but output file was not created: {out_path}"
         )
 
-    src_path.unlink()
+    for attempt in range(5):
+        try:
+            src_path.unlink()
+            break
+        except PermissionError:
+            if attempt == 4:
+                raise RuntimeError(
+                    f"Could not delete source WAV after conversion: '{src_path}'"
+                )
+            time.sleep(0.2)
     logger.info(f"[Converter] <- convert_to_mp3() SUCCESS -> '{out_path}'")
     return out_path
