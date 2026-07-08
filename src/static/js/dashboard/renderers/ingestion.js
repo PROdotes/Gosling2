@@ -483,6 +483,8 @@ function setupDuplicateDeleteHandler(resultsId) {
         btn.textContent = "Deleting...";
         try {
             await deleteOriginalByPath(originalPath);
+            const stagedPath = btn.dataset.stagedPath;
+            if (stagedPath && stagedPath !== originalPath) await deleteStagingOrphan(stagedPath);
             const card = btn.closest(".result-card");
             const actionsRow = btn.closest(".ingest-actions-row");
             if (card) card.classList.add("source-deleted");
@@ -775,7 +777,7 @@ function createResultCard(result, path) {
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
                             Re-ingest & Activate
                         </button>
-                        <button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>
+                        <button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'} data-staged-path="${escapeHtml(result.staged_path || "")}">Delete Original</button>
                     </div>
                 </div>`;
                     })()
