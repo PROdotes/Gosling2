@@ -3,6 +3,19 @@
 
 ---
 
+## Models
+*Location: `src/models/`*
+**Responsibility**: Domain entities and API view models. Not covered by a dedicated lookup doc — read the files directly.
+
+- `domain.py` — core domain dataclasses (Song, SongCredit, MediaSource, etc., 11 classes).
+- `view_models.py` — pydantic API views: `SongView`/`SongSlimView`, `AlbumView`/`AlbumSlimView`, `IdentityView`/`IdentitySlimView`, `TagView`, `PublisherView`, `ArtistChipView`, `IngestionReportView`, plus request bodies. Slim views are the list/search shapes; full views hydrate detail endpoints.
+- `exceptions.py` — shared exception types (4 classes, e.g. MergeRequiredError).
+- `metadata_frames.py` — ID3 frame mapping structures.
+
+Also `src/engine/models/spotify.py` — Spotify parse/import request models.
+
+---
+
 ## FilenameParser
 *Location: `src/services/filename_parser.py`*
 **Responsibility**: Pattern-to-Regex compiler for extracting metadata from filename stems. Supports tokens like {Artist}, {Title}, and {Ignore}.

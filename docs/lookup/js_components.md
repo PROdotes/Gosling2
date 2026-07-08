@@ -73,7 +73,7 @@ Hides the settings modal.
 
 ### renderSettingsForm(container, settings, schema)
 *Location: `src/static/js/dashboard/components/settings_modal.js`*
-Generates the settings form from the schema array returned by `GET /api/v1/settings`. Renders `bool` as checkbox, `path` as text input, `select` as select with options — all tagged `[data-key]`. No hardcoded field list; adding a setting requires no changes here.
+Generates the settings form from the JSON-schema object returned by `GET /api/v1/settings` (iterates `schema.properties`). Renders `bool` as checkbox, `path` as text input, `select` as select with options — all tagged `[data-key]`. No hardcoded field list; adding a setting requires no changes here.
 
 ### collectPatch(container, original)
 *Location: `src/static/js/dashboard/components/settings_modal.js`*
@@ -131,9 +131,6 @@ Returns true if any major modal is currently visible.
 ### escapeHtml(str)
 Standard HTML escaping utility.
 
-### pluralize(count, singular, plural)
-Returns formatted string based on count.
-
 ### basename(path)
 Extracts the filename from a full path.
 
@@ -142,9 +139,6 @@ Ensures a value is treated as an array.
 
 ### buildNavigateAttrs(mode, query)
 Utility to build `data-action="navigate-search"` attributes.
-
-### formatCountLabel(count, label)
-Formats a label with an optional parenthesized count.
 
 ### renderStatus(status)
 Returns HTML for a processing status badge.

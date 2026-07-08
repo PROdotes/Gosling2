@@ -67,6 +67,9 @@ Unlinks a credit.
 ### handleRemoveAlbum(actionTarget)
 Unlinks an album.
 
+### handleRevealFile(actionTarget)
+Calls `revealSongFile` to open the song's containing folder in Explorer with the file selected.
+
 ### handleOpenScrubber(actionTarget)
 Opens the audio playback scrubber.
 

@@ -390,14 +390,14 @@ Calculates the target relative path based on rules. Internally calls `_sanitize_
 ### copy_to_library(song: Song, library_root: Path) -> Path
 Copies physical file to library. Handles same-file bypass logic.
 
-### write_id3_if_needed(song: Song, writer: MetadataWriter) -> List[str]
-Writes current DB state to the physical ID3 tags if they differ. Returns a list of warnings.
+### write_id3_if_needed(song: Song, writer) -> list[dict]
+Writes current DB state to the physical ID3 tags if they differ. Returns a list of warning dicts.
 
-### delete_staging_file(file_path: str) -> bool
-Physically deletes a file from the staging area.
+### delete_staging_file(song: Song, staging_dir: Path) -> None
+Physically deletes the song's file from the staging area.
 
-### delete_physical_file(file_path: str) -> bool
-Physically deletes a file from the library.
+### delete_physical_file(song: Song) -> None
+Physically deletes the song's file from the library.
 
 ### copy_if_needed(src: Path, dst: Path) -> None
 Copies file if destination doesn't exist or is different.

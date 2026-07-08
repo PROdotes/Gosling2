@@ -14,14 +14,14 @@ Fetches server-side validation rules for tags, BPM, and other metadata.
 Fetches general application configuration.
 
 ### fetchSettings()
-Fetches effective Tier-1 settings + corrupt-file warnings (`GET /api/v1/settings`).
+Fetches `{settings, schema, warnings}` (`GET /api/v1/settings`) — current values, the JSON schema the form renders from, and corrupt-file warnings.
 
 ### saveSettings(patch)
 Persists a changed-only settings patch (`POST /api/v1/settings`); throws on a 400 (unknown key / bad value).
 
 ### mutate(command)
 The single entry point for all database mutations.
-- **Command structure**: `{ add: [], remove: [], update: [], delete: [] }`.
+- **Command structure**: `{ add: [], update: [], merge: [], remove: [], delete: [] }` (merge is used by `mergeIdentity`/`mergePublisher`/`mergeTag`).
 - Processes the batch atomically on the server.
 - Used internally by almost all mutation-specific helper functions (e.g. `patchSongScalars`, `addSongCredit`).
 
@@ -350,6 +350,9 @@ Deletes an identity record.
 
 ### bulkDeleteUnlinkedIdentities()
 Deletes all identities with no associated songs, albums, or roles.
+
+### revealSongFile(id)
+Posts to `POST /api/v1/songs/{id}/reveal`. Opens the song's containing folder in Windows Explorer with the file selected. Returns `{ status, song_id }`.
 
 ---
 

@@ -31,6 +31,9 @@ Mirrors the sidebar's active status filters into the songs renderer so patchSong
 ### patchSongRow(ctx, fresh)
 Surgically updates a single song row in the rendered list and the cached song object, without a full re-render. Returns true if the row was found.
 
+### tombstoneRow(id)
+Marks a song row as deleted: dims it, overlays a tombstone label, and wires a hover-to-sweep interaction. Used after reject/delete mutations.
+
 ---
 
 ## Song Editor V2
@@ -68,6 +71,9 @@ Initializes ID3 sync status indicators (LEDs).
 
 ### notifyMutateWarnings(result)
 Inspects a mutate response for `warnings` and shows a toast if any filing or ID3 write warnings are present. Called after every chip add/remove and scalar save.
+
+### captureUnfoldedChipFields()
+Snapshots the set of chip field keys currently in expanded (unfolded) state so they can be restored after an editor rebuild.
 
 ---
 

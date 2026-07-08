@@ -13,9 +13,7 @@
 | `get_all_tags()` | `TagRepository.get_all()` | Pass-through (no hydration). |
 | `search_songs_slim(query)` | `SongRepository.search_slim(query)` | Pass-through. |
 | `search_albums_slim(query)` | `AlbumRepository.search_slim(query)` | Pass-through. |
-| `get_all_identities()` | `IdentityRepository.get_all_identities()` | Orchestrates `_hydrate_identities` (Wait, this is Smart). |
-
-*Correction: `get_all_identities()` calls `_hydrate_identities()`, so it is a **Smart Orchestrator** and should remain documented in `services.md`.*
+| `get_all_identities_slim()` | `IdentityService.get_all_slim()` | Pass-through; the live identity-list path is slim (no hydration). The old hydrating `get_all_identities()` note is obsolete. |
 
 ## 2. Structural Logic Duplication
 *Identical logic implemented in multiple locations in `src/`. These are candidates for refactoring into a Base class or shared utility.*

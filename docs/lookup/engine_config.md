@@ -9,30 +9,49 @@ The path to the SQLite library database. Defaults to `sqldb/gosling2.db`.
 ### get_db_path() -> Path
 Returns the DB path, reading `GOSLING_DB_PATH` env var at call time. Use this (not `DB_PATH`) anywhere the path needs to be overridable at runtime (e.g. tests).
 
-### get_downloads_folder() -> str
+### get_downloads_folder() -> Optional[str]
 Returns the platform-specific default downloads folder (e.g., `~/Downloads` or `%USERPROFILE%\Downloads`). Used for safe source-file cleanup.
 
-
 ### STAGING_DIR
-The Path to the temporary ingestion staging area. Defaults to `temp/library/staging`.
+The Path to the temporary ingestion staging area: `temp/library/staging`.
 
 ### MEDIA_DIR
-The Path to permanent storage for ingested files. Defaults to `temp/library/media`.
+The Path to permanent storage for ingested files: `temp/library/media`.
 
 ### ACCEPTED_EXTENSIONS
-List of supported file extensions for ingestion. Currently `[".mp3"]`.
+Supported ingestion extensions: `[".mp3", ".wav"]` (WAVs stage as status-3 and convert to MP3).
+
+### TAG_DEFAULT_CATEGORY
+`"Genre"`. Related: `TAG_CATEGORY_DELIMITER = "::"`, `TAG_INPUT_FORMAT = "tag:category"`.
+
+### DEFAULT_CREDIT_SEPARATORS
+Separators for the Artist Splitter: `["&", "feat.", "ft.", " x ", "vs.", ",", ";", "/"]`.
 
 ### COMMA_SPLIT_FIELDS
-Fields whose values should be split on ", " during metadata extraction (e.g., `["composers"]`).
+Fields whose values are additionally split on ", " during metadata extraction: `["composers"]`.
+
+### ALBUM_DEFAULT_TYPE
+`"Single"`. Related: `SONG_DEFAULT_YEAR = 2026`.
+
+### YEAR_VALIDATION
+Bundles `YEAR_MIN = 1860` and `YEAR_MAX = current_year + 1` for `SCALAR_VALIDATION`.
 
 ### SCALAR_VALIDATION
-Validation rules for scalar fields exposed via `/api/v1/validation-rules`:
-- `year`: min 1860, max = current_year + 1
+Single source of truth for scalar validation, exposed via `/api/v1/validation-rules`:
+- `year` and `release_year`: `YEAR_VALIDATION` (min 1860, max current_year + 1)
 - `bpm`: min 1, max 300
-- `isrc`: pattern `^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$`
+- `isrc`: pattern `^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$`, strip `-`, uppercase
+- `track_number`: min 1, max 999
+- `disc_number`: min 1, max 99
+
+### FFMPEG_PATH
+Bundled ffmpeg binary: `ffmpeg/ffmpeg.exe`.
 
 ### RENAME_RULES_PATH
-Path to rename rules JSON. Defaults to `config/rename_rules.json`.
+`json/rules.json`. Sibling JSON config paths: `PARSER_PRESETS_PATH` = `json/parser_presets.json`, `ID3_FRAMES_PATH` = `json/id3_frames.json`, `TRANSLITERATIONS_PATH` = `json/transliterations.json`, `SETTINGS_PATH` = `json/settings.json` (source of truth for the `Settings` model).
+
+### SCALAR_ALLOWED
+Field allowlist for song scalar updates: `{media_name, year, bpm, isrc, is_active, processing_status, mood, energy, notes}`. `METADATA_ALLOWED` adds `{credits, albums, tags, publishers}`.
 
 ### TRUSTED_ORIGINS
 CORS whitelist of trusted origins (localhost/127.0.0.1 on ports 3000, 5173, 8000).

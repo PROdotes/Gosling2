@@ -8,7 +8,7 @@
 ## Dashboard Entry Point
 *Location: `src/static/js/dashboard/main.js`*
 
-**Responsibility**: Bootstraps the application and manages global search state.
+**Responsibility**: Bootstraps the application, manages global search state, and owns the multi-select selection model (checkbox selection + multi-edit entry).
 
 ---
 
@@ -25,8 +25,4 @@ Enum for song review state.
 
 ### parseTagInput(rawInput, rules)
 *Location: `src/static/js/dashboard/utils/tag_input.js`*
-Splits a raw string into name and category parts.
-
-### validators
-*Location: `src/static/js/dashboard/utils/validators.js`*
-Object containing metadata validation functions.
+Splits a raw string into name and category parts. (Only file in `utils/` — the old `validators.js` was deleted; validation lives in the backend.)

@@ -30,18 +30,18 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Wraps `CatalogService.get_identity`.
 - Maps to `IdentityView` for recursive tree serialization.
 
-### async def get_all_identities() -> List[IdentityView]
+### async def get_all_identities() -> List[IdentitySlimView]
 **HTTP**: `GET /api/v1/identities`
-- Fetches the directory of active identities.
-- Wraps `CatalogService.get_all_identities`.
+- Fetches the directory of active identities (slim rows, no alias/member hydration).
+- Wraps `CatalogService.get_all_identities_slim`.
 
-### async def search_identities(q: str) -> List[IdentityView]
+### async def search_identities(q: str, exclude_groups: bool = False) -> List[IdentitySlimView]
 **HTTP**: `GET /api/v1/identities/search?q={query}`
-- Searches identities by name or alias.
-- Wraps `CatalogService.search_identities`.
+- Searches identities by name or alias (slim rows).
+- Wraps `CatalogService.search_identities_slim`.
 
 ### async def search_artist_names(q: str, exclude_groups: bool = False) -> List[ArtistChipView]
-**HTTP**: `GET /api/v1/identities/search-artist-names?q={query}`
+**HTTP**: `GET /api/v1/artist-names/search?q={query}`
 - Search ArtistNames for picker results. One row per name.
 - Wraps `CatalogService.search_artist_names`.
 
@@ -139,33 +139,33 @@ Fetches a single Song domain model by its unique ID with full hydration.
 ### async def delete_tag(tag_id: int) -> None
 **HTTP**: `DELETE /api/v1/tags/{tag_id}`
 - Soft-delete a single tag. 404 if not found, 403 if linked to active songs.
-- Wraps `CatalogService.get_tag` + `CatalogService.delete_unlinked_tags`.
+- Builds `DeleteTagItem(id=...)` and applies it via `MutationCoordinator.apply`.
 
 ### async def bulk_delete_unlinked_tags(unlinked: bool = False) -> dict
 **HTTP**: `DELETE /api/v1/tags?unlinked=true`
 - Soft-delete all unlinked tags in one transaction. Requires `?unlinked=true` as a safety flag (400 without it).
 - Returns `{"deleted": N}`.
-- Wraps `CatalogService.get_all_tags` + `CatalogService.delete_unlinked_tags`.
+- Applies `DeleteTagItem(unlinked=True)` via `MutationCoordinator.apply`.
 
 ### async def delete_publisher(publisher_id: int) -> None
 **HTTP**: `DELETE /api/v1/publishers/{publisher_id}`
 - Soft-delete a single publisher. 404 if not found, 403 if linked to active songs or albums.
-- Wraps `CatalogService.get_publisher` + `CatalogService.delete_unlinked_publishers`.
+- Builds `DeletePublisherItem(id=...)` and applies it via `MutationCoordinator.apply`.
 
 ### async def bulk_delete_unlinked_publishers(unlinked: bool = False) -> dict
 **HTTP**: `DELETE /api/v1/publishers?unlinked=true`
 - Soft-delete all unlinked publishers in one transaction. Requires `?unlinked=true` as a safety flag.
-- Wraps `CatalogService.get_all_publishers` + `CatalogService.delete_unlinked_publishers`.
+- Applies `DeletePublisherItem(unlinked=True)` via `MutationCoordinator.apply`.
 
 ### async def delete_album(album_id: int) -> None
 **HTTP**: `DELETE /api/v1/albums/{album_id}`
 - Soft-delete a single album. 404 if not found, 403 if linked to active songs.
-- Wraps `CatalogService.get_album` + `CatalogService.delete_unlinked_albums`.
+- Builds `DeleteAlbumItem(id=...)` and applies it via `MutationCoordinator.apply`.
 
 ### async def bulk_delete_unlinked_albums(unlinked: bool = False) -> dict
 **HTTP**: `DELETE /api/v1/albums?unlinked=true`
 - Soft-delete all unlinked albums in one transaction. Requires `?unlinked=true` as a safety flag.
-- Wraps `CatalogService.get_all_albums` + `CatalogService.delete_unlinked_albums`.
+- Applies `DeleteAlbumItem(unlinked=True)` via `MutationCoordinator.apply`.
 
 ### async def get_song_web_search(song_id: int, engine: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> dict
 **HTTP**: `GET /api/v1/songs/{song_id}/web-search`
@@ -186,28 +186,27 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ### def get_validation_rules() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/validation-rules`
-- Returns scalar field validation rules and global metadata defaults (e.g., tag categories/delimiters) for frontend use.
+- Returns scalar field validation rules plus global metadata defaults for frontend use: tag categories/delimiters, `search_engines`, `credit_separators`, `scrubber_auto_play`, `blur_saves_scalars`.
 
 ### def get_config() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/config`
-- Returns application configuration settings.
-- Returns `search_engines` dictionary and `default_search_engine`.
+- Returns read-only UI bootstrap constants: `search_engines`, `default_search_engine`, `processing_status`, `tag_default_category`.
 
 ---
 
 
 ## Settings Router
 *Location: `src/engine/routers/settings.py`*
-**Responsibility**: Read/apply Tier-1 user-overridable settings via `ConfigService` (config.py defaults overlaid with `json/settings.json`). Distinct from `GET /api/v1/config`, which serves read-only UI bootstrap constants (search engines, processing-status enum).
+**Responsibility**: Read/apply user-editable settings via the pydantic `Settings` model in `src/services/config_service.py`. `json/settings.json` is the source of truth; field defaults on the model are the defaults. Distinct from `GET /api/v1/config`, which serves read-only bootstrap constants.
 
 ### def get_settings() -> dict
 **HTTP**: `GET /api/v1/settings`
-- Returns `{"settings": <8 effective Tier-1 keys>, "warnings": [...]}`.
+- Returns `{"settings": <current values>, "schema": Settings.model_json_schema(), "warnings": [...]}` — the schema drives the editor form.
 - A corrupt `settings.json` falls back to defaults and adds a `settings_load` warning so the UI can show a banner.
 
 ### def update_settings(patch: dict) -> dict
 **HTTP**: `POST /api/v1/settings`
-- Validates a partial settings dict, persists it to `json/settings.json`, and pushes values onto the live `config` module (no restart). Returns the same `{settings, warnings}` shape.
+- Validates a partial settings dict against the model, persists to `json/settings.json`, and updates the live `settings` instance (no restart; the `config` module is untouched). Returns the same `{settings, schema, warnings}` shape.
 - Unknown key or bad value -> `400`, writes nothing.
 ---
 
@@ -266,13 +265,13 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - WAVs are ingested as `PENDING_CONVERT` via `CatalogService.ingest_wav_as_converting`. Conversion is confirmed separately via `/convert-wav`.
 - Non-WAVs are ingested via `IngestionService._ingest_single`.
 
-### async def scan_folder(request: FolderScanRequest) -> BatchIngestReport
+### async def scan_folder(request: FolderScanRequest) -> StreamingResponse
 **HTTP**: `POST /api/v1/ingest/scan-folder`
 - Server-side folder scanning and ingestion.
-- Scans local filesystem path for audio files (recursive or flat).
-- Copies files to staging and ingests via `CatalogService.ingest_batch()`.
-- Returns `BatchIngestReport` with aggregate stats and per-file results.
-- Example payload: `{"folder_path": "Z:\\Songs\\NewAlbum", "recursive": true}`
+- Scans a local filesystem path for audio files (recursive or flat).
+- `in_place: bool` option: ingest files where they sit (no staging copy); otherwise copies to staging first.
+- Streams NDJSON via the same `_stream_ingestion` generator as `/upload` (session status + `last_result` per file).
+- Example payload: `{"folder_path": "Z:\\Songs\\NewAlbum", "recursive": true, "in_place": false}`
 
 ### async def delete_song(song_id: int) -> Dict[str, Any]
 **HTTP**: `DELETE /api/v1/ingest/songs/{song_id}`
@@ -381,6 +380,13 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/songs/{song_id}/sync-id3`
 - Writes current DB state to the physical ID3 tags of the song file.
 
+### async def reveal_file(song_id: int) -> dict
+**HTTP**: `POST /api/v1/songs/{song_id}/reveal`
+- Opens the song's containing folder in Windows Explorer with the file selected.
+- Server-local only: opens a window on the machine running the server.
+- Returns `{"status": "ok", "song_id": song_id}`.
+- 404 if song not found; 400 if file missing on disk.
+
 ---
 
 ## Album Updates Router
@@ -460,7 +466,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ### filename_parser_apply(body: FilenameApplyRequest) -> dict
 **HTTP**: `POST /api/v1/tools/filename-parser/apply`
-- Parses each filename and applies extracted metadata to the DB.
+- Parses each filename and builds add/update mutation items from the extracted metadata. **Does not write** — the frontend sends the returned payload to `/api/v1/mutate`.
 - Handles: Title, Year, BPM, ISRC (scalars), Artist (Performer credit), Genre (tag), Publisher.
 
 ### tokenize(body: TokenizeRequest) -> List[dict]
@@ -477,8 +483,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ### confirm(body: ConfirmRequest) -> dict
 **HTTP**: `POST /api/v1/tools/splitter/confirm`
-- Resolves token list into names via `resolve_names`, then adds each as a credit or publisher and removes the original.
-- Wraps `CatalogService.add_song_credit` / `add_song_publisher` / `remove_song_credit` / `remove_song_publisher`.
+- Resolves the token list into names and returns the add/remove mutation payload for them. **Does not write** — the frontend applies the payload via `/api/v1/mutate`.
 
 ---
 
@@ -514,5 +519,4 @@ Fetches a single Song domain model by its unique ID with full hydration.
 ### async def import_credits(request: SpotifyImportRequest) -> None
 **HTTP**: `POST /api/v1/spotify/import`
 - Atomically imports a batch of credits and publishers for a song.
-- Performs a single transaction write; rolls back on any partial failure.
-- Wraps `CatalogService.import_credits_bulk`.
+- Builds `AddCreditItem`/`AddPublisherItem` lists and applies them as one `MutationRequest` via `MutationCoordinator.apply` (single transaction, rollback on partial failure).

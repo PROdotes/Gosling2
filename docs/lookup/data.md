@@ -180,15 +180,15 @@ Alternative accessor for find_by_display_name.
 
 ### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> int
 
-Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Optionally populates the DisplayName_Search shadow column (diacritic-stripped lowercase) when inserting new rows. Returns name_id.
+Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. When inserting a new name under an existing identity, it becomes the primary name if that identity has no active primary (otherwise an alias). Optionally populates the DisplayName_Search shadow column (diacritic-stripped lowercase) when inserting new rows. Returns name_id.
 
 ### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> SongCredit
 
 Add a single credit to a song. Get-or-creates ArtistName and Role. Supports explicit identity_id for Truth-First linking. Optionally accepts display_name_search (diacritic-stripped lowercase) to populate the search shadow when inserting new ArtistNames. Returns the SongCredit. Does NOT commit.
 
-### remove_credit(credit_id: int, conn: sqlite3.Connection) -> None
+### remove_credit(credit_id: int, conn: sqlite3.Connection) -> int
 
-Remove a single SongCredits link by CreditID. Keeps ArtistName record. Does NOT commit.
+Remove a single SongCredits link by CreditID. Keeps ArtistName record. Returns rowcount. Does NOT commit.
 
 ### update_credit_name(name_id: int, new_name: str, conn: sqlite3.Connection, new_name_search: Optional[str] = None) -> int
 
@@ -460,9 +460,9 @@ Batch-fetches tag objects for a list of Songs.
 Add a single tag to a song. Get-or-creates the Tag record.
 Returns the Tag. Does NOT commit.
 
-### remove_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
+### remove_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> int
 
-Remove a tag link from a song. Keeps Tag record. Does NOT commit.
+Remove a tag link from a song. Keeps Tag record. Returns rowcount. Does NOT commit.
 
 ### set_primary_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
 
