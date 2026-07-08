@@ -59,15 +59,25 @@ class MetadataWriter:
             except Exception:
                 tags = ID3()
 
+            # Tags this pass actually writes. Anything owned (in the config maps
+            # below) but not written here means the source value was removed —
+            # we clear those frames. Unmapped/dynamic TXXX frames (custom role
+            # or tag-category names) are never auto-cleared: we can't tell
+            # "removed" from "was never ours" for those, so touching them risks
+            # deleting data we don't understand.
+            written_tag_ids = set()
+
             # 1. Map Scalars via Config Field Map
             for field, tag_id in self.field_to_tag.items():
                 val = getattr(song, field, None)
                 if val is not None:
                     self._apply_frame(tags, tag_id, val)
+                    written_tag_ids.add(tag_id)
 
             # Map Notes to Common Comments (COMM)
             if song.notes:
                 self._apply_frame(tags, "COMM", song.notes)
+                written_tag_ids.add("COMM")
 
             # 2. Credits (Config-driven Role Mapping)
             credits_by_role = {}
@@ -82,6 +92,7 @@ class MetadataWriter:
 
                 if tag_id:
                     self._apply_frame(tags, tag_id, unique_names)
+                    written_tag_ids.add(tag_id)
                 else:
                     # Fallback to TXXX:RoleName for unmapped credits
                     tags.add(TXXX(encoding=3, desc=role, text=unique_names))
@@ -97,6 +108,7 @@ class MetadataWriter:
                 tag_id = self.category_to_tag.get(cat)
                 if tag_id:
                     self._apply_frame(tags, tag_id, unique_names)
+                    written_tag_ids.add(tag_id)
                 else:
                     tags.add(TXXX(encoding=3, desc=cat, text=unique_names))
 
@@ -106,10 +118,13 @@ class MetadataWriter:
             if song.albums:
                 album = next((a for a in song.albums if a.is_primary), song.albums[0])
                 self._apply_frame(tags, "TALB", album.album_title)
+                written_tag_ids.add("TALB")
                 if album.track_number:
                     self._apply_frame(tags, "TRCK", str(album.track_number))
+                    written_tag_ids.add("TRCK")
                 if album.disc_number:
                     self._apply_frame(tags, "TPOS", str(album.disc_number))
+                    written_tag_ids.add("TPOS")
 
                 # Album Artist (Config-driven if possible, else TPE2)
                 album_artists = list(
@@ -123,11 +138,23 @@ class MetadataWriter:
                 )
                 if album_artists:
                     self._apply_frame(tags, "TPE2", album_artists)
+                    written_tag_ids.add("TPE2")
 
             # 5. Publishers
             if song.publishers:
                 pub_names = list(dict.fromkeys([p.name for p in song.publishers]))
                 self._apply_frame(tags, "TPUB", pub_names)
+                written_tag_ids.add("TPUB")
+
+            # 6. Clear owned frames whose source value is now absent
+            owned_tag_ids = (
+                set(self.field_to_tag.values())
+                | set(self.role_to_tag.values())
+                | set(self.category_to_tag.values())
+                | {"COMM"}
+            )
+            for tag_id in owned_tag_ids - written_tag_ids:
+                self._delete_frame(tags, tag_id)
 
             # FORCE ID3v2.4 — update_to_v24 converts any v2.3 frame aliases (TP1→TPE1 etc)
             tags.update_to_v24()
@@ -139,6 +166,25 @@ class MetadataWriter:
         except Exception as e:
             logger.error(f"[MetadataWriter] Critical error writing to {path}: {e}")
             raise
+
+    def _delete_frame(self, tags: ID3, tag_id: str) -> None:
+        """Removes an owned frame whose source value is now absent, mirroring _apply_frame's key logic."""
+        if ":" in tag_id:
+            prefix, desc = tag_id.split(":", 1)
+            if prefix == "TXXX":
+                key = f"TXXX:{desc}"
+                if key in tags:
+                    del tags[key]
+            return
+
+        if tag_id == "COMM":
+            key = "COMM::eng"
+            if key in tags:
+                del tags[key]
+            return
+
+        if tag_id in tags:
+            del tags[tag_id]
 
     def _apply_frame(self, tags: ID3, tag_id: str, value: Any) -> None:
         """Applies a specific frame, handling list vs scalar and frame type dispatch."""

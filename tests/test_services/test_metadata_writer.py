@@ -413,6 +413,159 @@ class TestWriteMetadataPreservesFrames:
 
 
 # ---------------------------------------------------------------------------
+# Clearing stale owned frames (value removed from the song, not just absent)
+# ---------------------------------------------------------------------------
+
+
+class TestWriteMetadataClearsStaleFrames:
+    def test_composer_removed_clears_tcom(self, writer, mp3):
+        song = _bare_song(
+            mp3, credits=[SongCredit(role_name="Composer", display_name="Bach")]
+        )
+        writer.write_metadata(song)
+        assert "TCOM" in ID3(str(mp3)), "Sanity check: TCOM should be written first"
+
+        song_without_composer = _bare_song(mp3, credits=[])
+        writer.write_metadata(song_without_composer)
+
+        tags = ID3(str(mp3))
+        assert (
+            "TCOM" not in tags
+        ), "Expected stale TCOM to be cleared when composer credit is removed"
+
+    def test_genre_removed_clears_tcon(self, writer, mp3):
+        song = _bare_song(mp3, tags=[Tag(name="Techno", category="Genre")])
+        writer.write_metadata(song)
+        assert "TCON" in ID3(str(mp3)), "Sanity check: TCON should be written first"
+
+        song_without_genre = _bare_song(mp3, tags=[])
+        writer.write_metadata(song_without_genre)
+
+        tags = ID3(str(mp3))
+        assert (
+            "TCON" not in tags
+        ), "Expected stale TCON to be cleared when genre tag is removed"
+
+    def test_bpm_removed_clears_tbpm(self, writer, mp3):
+        song = _bare_song(mp3, bpm=140)
+        writer.write_metadata(song)
+        assert "TBPM" in ID3(str(mp3)), "Sanity check: TBPM should be written first"
+
+        song_without_bpm = _bare_song(mp3, bpm=None)
+        writer.write_metadata(song_without_bpm)
+
+        tags = ID3(str(mp3))
+        assert "TBPM" not in tags, "Expected stale TBPM to be cleared when bpm is unset"
+
+    def test_unmapped_txxx_role_not_cleared(self, writer, mp3):
+        # Unmapped/custom TXXX frames are never auto-cleared — we don't own
+        # them well enough to distinguish "removed" from "not ours".
+        song = _bare_song(
+            mp3, credits=[SongCredit(role_name="Remixer", display_name="DJ X")]
+        )
+        writer.write_metadata(song)
+
+        song_without_remixer = _bare_song(mp3, credits=[])
+        writer.write_metadata(song_without_remixer)
+
+        tags = ID3(str(mp3))
+        txxx_frames = {f.desc: f.text for f in tags.getall("TXXX")}
+        assert (
+            "Remixer" in txxx_frames
+        ), "Expected unmapped TXXX:Remixer to survive even after credits are cleared"
+
+
+# ---------------------------------------------------------------------------
+# Guard against over-deletion: only the exact absent owned frame goes, and
+# anything not owned by us (skip_write, unmapped TXXX, external tools) or
+# still present survives untouched.
+# ---------------------------------------------------------------------------
+
+
+class TestWriteMetadataDoesNotOverDelete:
+    def test_removing_composer_does_not_delete_performer(self, writer, mp3):
+        song = _bare_song(
+            mp3,
+            credits=[
+                SongCredit(role_name="Performer", display_name="Nika"),
+                SongCredit(role_name="Composer", display_name="Bach"),
+            ],
+        )
+        writer.write_metadata(song)
+        tags = ID3(str(mp3))
+        assert "TPE1" in tags and "TCOM" in tags, "Sanity check: both written first"
+
+        song_without_composer = _bare_song(
+            mp3, credits=[SongCredit(role_name="Performer", display_name="Nika")]
+        )
+        writer.write_metadata(song_without_composer)
+
+        tags = ID3(str(mp3))
+        assert "TCOM" not in tags, "Expected composer frame cleared"
+        assert "TPE1" in tags, "Expected performer frame to survive composer removal"
+        assert "Nika" in tags["TPE1"].text
+
+    def test_repeated_write_of_unchanged_song_keeps_all_frames(self, writer, mp3):
+        song = _bare_song(
+            mp3,
+            media_name="Title",
+            year=2020,
+            bpm=128,
+            isrc="GBABC1234567",
+            notes="A note",
+            credits=[SongCredit(role_name="Performer", display_name="Artist")],
+            tags=[Tag(name="Techno", category="Genre")],
+            albums=[SongAlbum(album_title="Album")],
+            publishers=[Publisher(name="ASCAP")],
+        )
+        writer.write_metadata(song)
+        writer.write_metadata(song)  # second identical pass must not self-delete
+
+        tags = ID3(str(mp3))
+        for frame_id in (
+            "TIT2",
+            "TDRC",
+            "TBPM",
+            "TSRC",
+            "TPE1",
+            "TCON",
+            "TALB",
+            "TPUB",
+        ):
+            assert (
+                frame_id in tags
+            ), f"Expected {frame_id} to survive an unchanged rewrite"
+        assert tags.getall("COMM"), "Expected COMM to survive an unchanged rewrite"
+
+    def test_skip_write_status_frame_never_touched(self, writer, mp3):
+        # TXXX:STATUS is skip_write in config — excluded from field_to_tag
+        # entirely, so it must never be read, written, or deleted by us.
+        existing = ID3()
+        existing.add(TXXX(encoding=3, desc="STATUS", text=["external status"]))
+        existing.save(str(mp3), v2_version=4)
+
+        writer.write_metadata(_bare_song(mp3, bpm=140))
+        writer.write_metadata(_bare_song(mp3, bpm=None))
+
+        tags = ID3(str(mp3))
+        txxx_frames = {f.desc: f.text for f in tags.getall("TXXX")}
+        assert txxx_frames.get("STATUS") == [
+            "external status"
+        ], "Expected TXXX:STATUS to be left untouched by MetadataWriter"
+
+    def test_album_survives_when_unrelated_field_cleared(self, writer, mp3):
+        album = SongAlbum(album_title="Greatest Hits")
+        writer.write_metadata(_bare_song(mp3, bpm=140, albums=[album]))
+        assert "TALB" in ID3(str(mp3)), "Sanity check: TALB written first"
+
+        writer.write_metadata(_bare_song(mp3, bpm=None, albums=[album]))
+
+        tags = ID3(str(mp3))
+        assert "TALB" in tags, "Expected album to survive an unrelated field clearing"
+        assert "TBPM" not in tags, "Expected bpm to still be cleared"
+
+
+# ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
 
