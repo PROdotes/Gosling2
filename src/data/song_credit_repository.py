@@ -179,13 +179,17 @@ class SongCreditRepository(BaseRepository):
                     "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
                     (owner_identity_id,),
                 )
-            # Existing identity already has a primary name — add this as an alias
+            has_primary = cursor.execute(
+                "SELECT 1 FROM ArtistNames WHERE OwnerIdentityID = ? AND IsPrimaryName = 1 AND IsDeleted = 0",
+                (owner_identity_id,),
+            ).fetchone()
+            is_primary = 0 if has_primary else 1
             logger.debug(
-                f"[SongCreditRepository] inserting ArtistName '{display_name}' as alias under identity_id={owner_identity_id}"
+                f"[SongCreditRepository] inserting ArtistName '{display_name}' as {'primary' if is_primary else 'alias'} under identity_id={owner_identity_id}"
             )
             cursor.execute(
-                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, 0)",
-                (owner_identity_id, display_name, display_name_search),
+                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, DisplayName_Search, IsPrimaryName) VALUES (?, ?, ?, ?)",
+                (owner_identity_id, display_name, display_name_search, is_primary),
             )
         else:
             cursor.execute(
