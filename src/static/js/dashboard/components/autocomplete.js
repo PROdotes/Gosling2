@@ -29,6 +29,7 @@ export function createAutocomplete({
     getCreateLabel = null,
     debounceMs = 200,
     onEnterEmpty = null,
+    activeClass = "link-dropdown-item--active",
 }) {
     let options = [];
     let activeIndex = -1;
@@ -70,7 +71,11 @@ export function createAutocomplete({
 
     function highlightIndex(index) {
         const opts = dropdownEl.querySelectorAll("[data-ac-index]");
-        opts.forEach((o, i) => o.classList.toggle("link-dropdown-item--active", i === index));
+        opts.forEach((o, i) => {
+            const isActive = i === index;
+            o.classList.toggle(activeClass, isActive);
+            if (isActive) o.scrollIntoView({ block: "nearest" });
+        });
         activeIndex = index;
     }
 

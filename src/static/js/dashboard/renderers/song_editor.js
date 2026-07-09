@@ -73,7 +73,7 @@ function renderScalarField(
 }
 
 function renderCaseButtons(songId, field) {
-    return `<button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="sentence" title="Sentence case" type="button">S</button><button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="title" title="Title Case" type="button">T</button>`;
+    return `<button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="title" title="Title Case" type="button">T</button><button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="sentence" title="Sentence case" type="button">S</button>`;
 }
 
 function renderChipField(
@@ -721,7 +721,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 id: t.id,
                 label: t.name,
                 category: t.category,
-                _isPrimary: !!t.is_primary,
+                _isPrimary: t.category === "Genre" && !!t.is_primary,
             }));
         const handle = createChipInput({
             container: tagsWrap,

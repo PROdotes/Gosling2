@@ -839,6 +839,11 @@
     font-weight: 500;
 }
 
+:is(#songs-workspace, #scrubber-modal) .chip-input__chip.is-primary {
+    background: rgba(249, 115, 22, 0.05);
+    border-color: rgba(249, 115, 22, 0.16);
+}
+
 :is(#songs-workspace, #scrubber-modal) .chip-input__chip-btn {
     background: none;
     border: none;
@@ -954,12 +959,13 @@
     top: calc(100% + 4px);
     left: 0;
     min-width: 220px;
+    max-height: 320px;
     background: var(--bg-window);
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     z-index: 200;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 :is(#songs-workspace, #scrubber-modal) .chip-input__option {

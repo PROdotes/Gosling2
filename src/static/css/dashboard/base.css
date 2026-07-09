@@ -593,7 +593,7 @@ input:checked + .slider:before {
 .row-title {
     font-weight: 600;
     color: var(--text);
-    font-size: 13px;
+    font-size: 15px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -601,12 +601,15 @@ input:checked + .slider:before {
 }
 
 .row-artist {
-    color: var(--text-dim);
-    font-size: 11px;
+    color: var(--text);
+    opacity: 0.58;
+    font-weight: 400;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     display: block;
+    margin-left: 20px;
 }
 
 .row-id {

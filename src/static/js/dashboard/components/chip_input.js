@@ -199,7 +199,9 @@ export function createChipInput({
         chipsEl.innerHTML = "";
         for (const item of items) {
             const chip = document.createElement("span");
-            chip.className = "chip-input__chip";
+            chip.className = item._isPrimary
+                ? "chip-input__chip is-primary"
+                : "chip-input__chip";
 
             const attrs = labelAttrs ? labelAttrs(item) : null;
             const attrStr = attrs
@@ -313,6 +315,7 @@ export function createChipInput({
         getCreateLabel,
         debounceMs: 180,
         onEnterEmpty: collapseOnAdd ? collapse : null,
+        activeClass: "chip-input__option--active",
     });
 
     // ── Init ─────────────────────────────────────────────────────────────────
