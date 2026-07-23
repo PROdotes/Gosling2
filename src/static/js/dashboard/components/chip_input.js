@@ -30,6 +30,7 @@ export function createChipInput({
     allowCreate = false,
     tagMode = false,
     getCreateLabel = null,
+    pinnedOption = null,
     categoryColors = {},
     labelAttrs = null,
     extraChipButtons = null,
@@ -273,12 +274,17 @@ export function createChipInput({
 
     // ── Dropdown rendering ─────────────────────────────────────────────────
 
-    function renderItem(opt, i, isCreate) {
+    function renderItem(opt, i, isCreate, isPinned) {
         const el = document.createElement("div");
-        el.className = `chip-input__option${isCreate ? " chip-input__option--create" : ""}`;
+        // Pinned shortcut reuses the "create" row style (blue italic) — the
+        // dropdown's own established language for "this row makes something
+        // new" — rather than a new accent color, which just reads as a chip.
+        el.className = `chip-input__option${isCreate || isPinned ? " chip-input__option--create" : ""}`;
         el.dataset.acIndex = i;
 
-        if (tagMode && opt.category && !isCreate) {
+        if (isPinned) {
+            el.textContent = opt.label;
+        } else if (tagMode && opt.category && !isCreate) {
             const color = categoryColors[opt.category] || "var(--text-mute)";
             el.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)};border:none">${escapeHtml(opt.category)}</span>${escapeHtml(opt.label)}`;
         } else if (isCreate) {
@@ -302,6 +308,13 @@ export function createChipInput({
             return results;
         },
         onSelect: async (opt) => {
+            // Pinned shortcut manages its own add + refresh (e.g. quick-create
+            // an album, not a chip), so it skips the normal onAdd/items flow.
+            if (opt.isPinned) {
+                await pinnedOption.onSelect();
+                if (collapseOnAdd) collapse();
+                return;
+            }
             const newItem = await onAdd(opt);
             if (newItem) {
                 items = [...items, newItem];
@@ -313,6 +326,9 @@ export function createChipInput({
         renderItem,
         allowCreate,
         getCreateLabel,
+        getPinnedOption: pinnedOption
+            ? () => ({ id: null, label: pinnedOption.label })
+            : null,
         debounceMs: 180,
         onEnterEmpty: collapseOnAdd ? collapse : null,
         activeClass: "chip-input__option--active",

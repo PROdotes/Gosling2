@@ -13,7 +13,6 @@ import {
     moveSongToLibrary,
     mutate,
     patchSongScalars,
-    quickCreateAlbum,
     rejectSong,
     removeAlbumCredit,
     removeAlbumPublisher,
@@ -110,7 +109,6 @@ export class SongActionsHandler {
             "close-filename-parser-modal",
             "close-scrubber-modal",
             "sync-id3",
-            "quick-create-album",
             "reveal-file",
         ]);
     }
@@ -1117,41 +1115,6 @@ export class SongActionsHandler {
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`Update failed: ${err.message}`, "error");
             this.ctx.refreshActiveDetail();
-        }
-    }
-
-    async handleQuickCreateAlbum(actionTarget) {
-        const { songId } = actionTarget.dataset;
-        const state = this.ctx.getState();
-        const song = state.activeSong;
-        if (!song || !song.media_name) return;
-
-        actionTarget.disabled = true;
-        actionTarget.classList.add("loading");
-        const originalHtml = actionTarget.innerHTML;
-        actionTarget.innerHTML = "Creating...";
-
-        try {
-            await quickCreateAlbum(songId, song.media_name);
-            await this.ctx.refreshActiveDetail();
-            showToast(
-                `Album "${song.media_name}" created & synced.`,
-                "success",
-            );
-
-            actionTarget.disabled = false;
-            actionTarget.classList.remove("loading");
-            actionTarget.innerHTML = originalHtml;
-        } catch (err) {
-            actionTarget.disabled = false;
-            actionTarget.classList.remove("loading");
-            actionTarget.innerHTML = originalHtml;
-            if (this.ctx.showBanner) {
-                this.ctx.showBanner(
-                    `Quick Create failed: ${err.message}`,
-                    "error",
-                );
-            }
         }
     }
 

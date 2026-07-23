@@ -27,6 +27,7 @@ export function createAutocomplete({
     renderItem,
     allowCreate = false,
     getCreateLabel = null,
+    getPinnedOption = null,
     debounceMs = 200,
     onEnterEmpty = null,
     activeClass = "link-dropdown-item--active",
@@ -36,6 +37,26 @@ export function createAutocomplete({
     let searchTimeout = null;
     let pendingSelect = false;
     let lastQuery = "";
+
+    // Shown in place of search results while the query is empty — a fast
+    // path pinned to the input itself instead of a separate always-visible
+    // button. Disappears the moment the user types, same as a normal search.
+    function showPinned() {
+        const pinned = getPinnedOption();
+        if (!pinned) {
+            hideDropdown();
+            return;
+        }
+        options = [{ ...pinned, isPinned: true }];
+        dropdownEl.innerHTML = renderItem(options[0], 0, false, true);
+        dropdownEl.style.display = "block";
+        highlightIndex(0);
+        attachOptionHandlers();
+    }
+
+    function handleFocus() {
+        if (!inputEl.value.trim() && getPinnedOption) showPinned();
+    }
 
     function showDropdown(opts) {
         options = opts;
@@ -134,7 +155,8 @@ export function createAutocomplete({
         lastQuery = q;
 
         if (!q) {
-            hideDropdown();
+            if (getPinnedOption) showPinned();
+            else hideDropdown();
             return;
         }
 
@@ -152,10 +174,12 @@ export function createAutocomplete({
     inputEl.addEventListener("input", handleInput);
     inputEl.addEventListener("keydown", handleKeydown);
     inputEl.addEventListener("blur", handleBlur);
+    inputEl.addEventListener("focus", handleFocus);
 
     return {
         destroy() {
             clearTimeout(searchTimeout);
+            inputEl.removeEventListener("focus", handleFocus);
             inputEl.removeEventListener("input", handleInput);
             inputEl.removeEventListener("keydown", handleKeydown);
             inputEl.removeEventListener("blur", handleBlur);

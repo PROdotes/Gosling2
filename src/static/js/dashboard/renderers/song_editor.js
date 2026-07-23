@@ -15,6 +15,7 @@ import {
     getMultiView,
     multiMutate,
     patchSongScalars,
+    quickCreateAlbum,
     removeAlbumCredit,
     removeAlbumPublisher,
     removeSongAlbum,
@@ -888,8 +889,35 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSpli
                 },
                 onRemove: async () => {}, // removal handled by card × buttons
                 allowCreate: true,
+                collapseOnAdd: true,
                 placeholder: "Add album / release",
                 getCreateLabel: (q) => `+ Create "${q}"`,
+                // Fast path pinned to the top of this same dropdown while the
+                // search is empty — quick-creates a Single album from the
+                // song's own title and syncs its metadata, rather than the
+                // bare album stub a typed "+ Create" would produce.
+                pinnedOption: song.media_name
+                    ? {
+                          label: `+ Create single "${song.media_name}"`,
+                          onSelect: async () => {
+                              try {
+                                  await quickCreateAlbum(song.id, song.media_name);
+                                  const fresh = await refresh();
+                                  if (!multiOps) updateAlbumSubSection(fresh, refresh);
+                                  showToast(
+                                      `Album "${song.media_name}" created & synced.`,
+                                      "success",
+                                  );
+                              } catch (err) {
+                                  showToast(
+                                      `Quick Create failed: ${err.message}`,
+                                      "error",
+                                      5000,
+                                  );
+                              }
+                          },
+                      }
+                    : null,
             });
         }
     }
@@ -1219,9 +1247,8 @@ export function renderSongEditorV2(song, diff = null, rawTags = null) {
   <div class="editor-field${song.albums.length === 0 ? " missing" : ""}" data-chip-field="album">
     <label class="editor-label">Album</label>
     <div class="album-field-body">
-      <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
       <div class="album-search-wrap"></div>
-      <button class="editor-quick-create-btn" data-action="quick-create-album" data-song-id="${song.id}" title="Quick-create a Single album from this song's title">+ Create single</button>
+      <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
     </div>
   </div>
 </div>
