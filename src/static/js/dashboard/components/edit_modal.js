@@ -369,12 +369,13 @@ function attachChipListHandler(key, field) {
         onSearch: async (q) => {
             const results = await field.onSearch(q);
             const linkedIds = new Set(field.items.map((i) => String(i.id)));
-            const filtered = results.filter((r) => !linkedIds.has(String(r.id)));
+            const filtered = results.filter((r) => !linkedIds.has(String(r.id)) && !r.exactSelfMatch);
             const options = filtered.map((r) => ({ ...r, id: r.id, label: r.label }));
             const exactMatch = results.some((r) => r.label.toLowerCase() === q.toLowerCase());
             if (!exactMatch && field.createLabel) {
                 options.unshift({ id: null, label: field.createLabel(q), isCreate: true, rawInput: q });
             }
+            if (exactMatch) options.suppressCreate = true;
             return options;
         },
         onSelect: async (opt) => {

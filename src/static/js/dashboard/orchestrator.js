@@ -38,6 +38,7 @@ import {
     setPrimarySongTag,
 } from "./api.js";
 import { showConfirm } from "./components/confirm_modal.js";
+import { showToast } from "./components/toast.js";
 import { createChipInput } from "./components/chip_input.js";
 import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
@@ -478,6 +479,7 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
 // ─── ENTITY EDITING (EDIT MODAL) ─────────────────────────────────────────────
 
 export async function manageArtist(ctx, artistId, artistName, songId = null) {
+    artistId = Number(artistId);
     const identity = await getArtistTree(artistId);
     if (!identity) return;
 
@@ -533,14 +535,25 @@ export async function manageArtist(ctx, artistId, artistName, songId = null) {
                     id: a.owner_identity_id,
                     name_id: a.name_id,
                     label: a.display_name,
+                    exactSelfMatch: a.owner_identity_id === artistId,
                 }));
             },
             onAdd: async (opt) => {
                 const displayName = opt.rawInput || opt.label;
                 await addIdentityAlias(artistId, displayName, opt.name_id);
                 const fresh = await getArtistTree(artistId);
-                const added = (fresh.aliases || []).find((a) => a.display_name === displayName);
-                return added ? { id: added.id, label: added.display_name } : { id: opt.name_id, label: displayName };
+                const added = (fresh.aliases || []).find(
+                    (a) => a.display_name === displayName && !a.is_primary,
+                );
+                if (!added) {
+                    showToast(
+                        `"${displayName}" is already this identity's own name — no alias added.`,
+                        "warning",
+                        4000,
+                    );
+                    return null;
+                }
+                return { id: added.id, label: added.display_name };
             },
             onRemove: async (item) => {
                 await removeIdentityAlias(artistId, item.id);

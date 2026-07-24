@@ -59,22 +59,25 @@ export function createAutocomplete({
     }
 
     function showDropdown(opts) {
-        options = opts;
-        activeIndex = opts.length > 0 ? 0 : -1;
+        // onSearch results may carry a suppressCreate flag (e.g. the typed
+        // text exactly matches something that can't be created/added again)
+        // to veto this dropdown's own free-text create row.
+        const showCreate = allowCreate && lastQuery.trim() && !opts.suppressCreate;
 
-        if (opts.length === 0 && !allowCreate) {
+        if (opts.length === 0 && !showCreate) {
             hideDropdown();
             return;
         }
 
         const html = opts.map((opt, i) => renderItem(opt, i, false)).join("");
 
-        if (allowCreate && lastQuery.trim()) {
+        if (showCreate) {
             const createOpt = { id: null, label: lastQuery.trim(), isCreate: true };
             options = [...opts, createOpt];
             const createHtml = renderItem(createOpt, opts.length, true);
             dropdownEl.innerHTML = html + createHtml;
         } else {
+            options = opts;
             dropdownEl.innerHTML = html;
         }
 
