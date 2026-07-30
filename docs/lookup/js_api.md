@@ -57,6 +57,9 @@ Fetches tags matching query.
 ### getCatalogSong(id, options)
 Fetches basic catalog song data.
 
+### getDeletedSong(id, options)
+Fetches the bare view of a soft-deleted song (`GET /api/v1/songs/{id}/deleted`) — no credits/albums/tags, those are hard-deleted at delete time.
+
 ### getMultiView(songIds)
 POSTs `{song_ids}` to `POST /api/v1/songs/multi-view`; returns the collapsed virtual SongView (`mixed_fields` + per-entry `universal` flags) for the multi-edit editor.
 
@@ -107,8 +110,11 @@ Updates scalar fields (BPM, Year, ISRC, etc).
 ### deleteSong(id)
 Soft-deletes a song.
 
-### rejectSong(id)
-Marks a song as rejected and removes it from staging.
+### rejectSong(id, reason)
+Sets `notes` to `REJECTED: {reason}` and soft-deletes the song in one mutate call.
+
+### changeRejectReason(id, reason)
+Updates `notes` to a new `REJECTED: {reason}` on an already-deleted song — update only, no delete (the song is already soft-deleted).
 
 ### moveSongToLibrary(id)
 Moves song from staging to organized library.

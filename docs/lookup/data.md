@@ -90,6 +90,10 @@ Only returns non-deleted records.
 
 Batch-fetches core song records for multiple IDs. Supports optional shared connection.
 
+### get_deleted_by_id(song_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[dict]
+
+Bare row for a soft-deleted song (rejected or plain-deleted) — SourceID, MediaName, SourcePath, SourceDuration, SourceNotes, TempoBPM, RecordingYear, ISRC. No joins: all credit/album/tag/publisher links are hard-deleted at delete time, so there's nothing else to fetch. Returns None if the ID isn't a deleted song.
+
 ### search_slim(query: str, conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
 Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated). Supports optional shared connection.
@@ -112,7 +116,7 @@ Returns all distinct values for each filter category (artists, years, decades, g
 
 ### filter_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode, conn) -> List[dict]
 
-Returns slim song rows matching the given filter criteria. `mode='ALL'` = AND logic, `mode='ANY'` = OR logic. `statuses` accepts: `not_done`, `ready_to_finalize`, `missing_data`, `done`. Same column set as `search_slim`.
+Returns slim song rows matching the given filter criteria. `mode='ALL'` = AND logic, `mode='ANY'` = OR logic. `statuses` accepts: `not_done`, `ready_to_finalize`, `missing_data`, `done`, `deleted` (`IsDeleted=1` — covers rejected and plain-deleted songs alike; the only status that targets soft-deleted rows). Same column set as `search_slim`, plus `IsDeleted`.
 
 ### get_by_processing_status(status: int) -> List[Song]
 

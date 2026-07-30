@@ -4,9 +4,11 @@
  */
 
 import {
+    changeRejectReason,
     cleanupOriginalFile,
     deleteSong,
     formatText,
+    getDeletedSong,
     getIngestStatus,
     getSongDetail,
     getSongWebSearch,
@@ -39,6 +41,7 @@ import {
     resolvePendingCard,
 } from "../renderers/ingestion.js";
 import { tombstoneRow } from "../renderers/songs.js";
+import { renderDeletedSongView } from "../renderers/song_editor.js";
 
 /**
  * Renders the sync LED + mismatch chip list from a diff dict.
@@ -104,6 +107,7 @@ export class SongActionsHandler {
             "reject-song",
             "reject-reason",
             "reject-cancel",
+            "change-reject-reason",
             "close-spotify-modal",
             "close-splitter-modal",
             "close-filename-parser-modal",
@@ -315,6 +319,27 @@ export class SongActionsHandler {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
                     `Rejection failed: ${err.message}`,
+                    "error",
+                );
+            }
+        }
+    }
+
+    async handleChangeRejectReason(actionTarget) {
+        const id = actionTarget.dataset.id;
+        const reason = actionTarget.dataset.reason;
+        if (!id || !reason) return;
+
+        actionTarget.disabled = true;
+        try {
+            await changeRejectReason(id, reason);
+            const fresh = await getDeletedSong(id);
+            renderDeletedSongView(fresh);
+        } catch (err) {
+            actionTarget.disabled = false;
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(
+                    `Reason change failed: ${err.message}`,
                     "error",
                 );
             }

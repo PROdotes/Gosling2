@@ -50,6 +50,10 @@ class LibraryService:
         actual_rules_path = rules_path or config.RENAME_RULES_PATH
         self._filing_service = FilingService(actual_rules_path)
 
+    def get_deleted_song(self, song_id: int) -> Optional[dict]:
+        """Bare row for a soft-deleted song. No hydration — see SongRepository.get_deleted_by_id."""
+        return self._song_repo.get_deleted_by_id(song_id)
+
     def get_song(
         self, song_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[Song]:

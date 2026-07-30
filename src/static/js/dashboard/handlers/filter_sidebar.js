@@ -31,6 +31,7 @@ const STATUS_FILTERS = [
     { key: "ready_to_finalize", label: "Ready to Finalize" },
     { key: "missing_data", label: "Missing Data" },
     { key: "done", label: "Done" },
+    { key: "deleted", label: "Deleted" },
 ];
 
 export class FilterSidebarHandler {

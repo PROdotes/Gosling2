@@ -31,6 +31,9 @@ Opens a reason picker for song rejection.
 ### handleRejectCancel(actionTarget)
 Cancels an in-progress song rejection.
 
+### handleChangeRejectReason(actionTarget)
+Updates the reject reason on an already-deleted song's detail panel (`changeRejectReason` + re-fetch via `getDeletedSong` + `renderDeletedSongView`). Distinct from `handleRejectSong` — no delete happens here, the song is already dead.
+
 ### handleToggleActive(actionTarget, event)
 Toggles song active status.
 

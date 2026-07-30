@@ -27,6 +27,7 @@ const STATUS_PREDICATES = {
     ready_to_finalize: (s) =>
         s.processing_status !== PROCESSING_STATUS.REVIEWED &&
         (s.review_blockers || []).length === 0,
+    deleted: (s) => !!s.is_deleted,
 };
 
 // True if the song still matches the active status filters. No status filter
@@ -227,12 +228,15 @@ function buildSongRowHtml(song, index, selectedIds, focusId) {
     const pills = (song.review_blockers || [])
         .map((b) => `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`)
         .join("");
+    const deletedBadge = song.is_deleted
+        ? `<span class="pill miss">DELETED</span>`
+        : "";
     const selectedClass = selectedIds?.has(song.id) ? " selected" : "";
     const focusedClass = song.id === focusId ? " focused" : "";
     const tombstonedClass = tombstonedIds.has(song.id) ? " tombstoned" : "";
     return `<div class="song-row${selectedClass}${focusedClass}${tombstonedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
   <div class="col-info">
-    <div class="row-title">${title}<span class="row-id"> #${song.id}</span></div>
+    <div class="row-title">${title}<span class="row-id"> #${song.id}</span>${deletedBadge}</div>
     <div class="row-artist">${artist}</div>
   </div>
   <div class="col-missing">${pills}</div>

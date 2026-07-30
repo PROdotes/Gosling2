@@ -4,6 +4,7 @@ from typing import List, Optional
 from src.models.view_models import (
     SongView,
     SongSlimView,
+    DeletedSongView,
     AlbumSlimView,
     AlbumView,
     TagView,
@@ -124,6 +125,19 @@ async def get_duplicate_songs(
     groups = service.find_duplicate_songs()
     logger.debug(f"[CatalogRouter] get_duplicate_songs groups={len(groups)}")
     return groups
+
+
+@router.get("/songs/{song_id:int}/deleted", response_model=DeletedSongView)
+async def get_deleted_song(
+    song_id: int, service: CatalogService = Depends(_get_service)
+) -> DeletedSongView:
+    """Bare view of a soft-deleted song — no credits/albums/tags (hard-deleted at delete time)."""
+    row = service.get_deleted_song(song_id)
+    if not row:
+        raise HTTPException(
+            status_code=404, detail=f"No deleted song with ID {song_id}"
+        )
+    return DeletedSongView.from_row(row)
 
 
 @router.get("/songs/{song_id:int}", response_model=SongView)

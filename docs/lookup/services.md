@@ -156,6 +156,9 @@ Scan a directory for supported audio formats. Pure discovery path.
 ### get_song(song_id: int) -> Optional[Song]
 Fetch a single song and all its credits by ID.
 
+### get_deleted_song(song_id: int) -> Optional[dict]
+Bare row for a soft-deleted song. No hydration — see `SongRepository.get_deleted_by_id`.
+
 ### get_all_publishers() -> List[Publisher]
 Fetch the full directory of publishers with resolved hierarchy chains.
 
@@ -226,6 +229,8 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration. Que
 **Responsibility**: The primary facade for all read operations and legacy/specialized write paths.
 
 ### get_song(song_id: int) -> Optional[Song]
+### get_deleted_song(song_id: int) -> Optional[dict]
+Bare row for a soft-deleted song, no hydration. Passthrough to `LibraryService.get_deleted_song`.
 ### get_album(album_id: int) -> Optional[Album]
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 ### get_tag(tag_id: int) -> Optional[Tag]

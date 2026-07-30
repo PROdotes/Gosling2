@@ -131,12 +131,13 @@ class SongSlimView(BaseModel):
     id: int
     media_name: str
     title: str
-    source_path: str
+    source_path: Optional[str] = None
     duration_s: float
     year: Optional[int] = None
     bpm: Optional[int] = None
     isrc: Optional[str] = None
     is_active: bool = False
+    is_deleted: bool = False
     processing_status: int
     display_artist: Optional[str] = None
     primary_genre: Optional[str] = None
@@ -224,6 +225,7 @@ class SongSlimView(BaseModel):
             bpm=row["TempoBPM"],
             isrc=row["ISRC"],
             is_active=bool(row["IsActive"]),
+            is_deleted=bool(row.get("IsDeleted", 0)),
             processing_status=row["ProcessingStatus"],
             display_artist=row["DisplayArtist"],
             primary_genre=row["PrimaryGenre"],
@@ -232,6 +234,42 @@ class SongSlimView(BaseModel):
             has_genre=bool(row["PrimaryGenre"]),
             has_publisher=bool(row.get("has_publisher", 0)),
             has_album=bool(row.get("has_album", 0)),
+        )
+
+
+class DeletedSongView(BaseModel):
+    """Bare view-model for a soft-deleted song (rejected or plain-deleted). All
+    credit/album/tag/publisher links are hard-deleted at delete time (see
+    delete_song_links), so there is nothing to hydrate — this is deliberately
+    just the raw row."""
+
+    id: int
+    media_name: str
+    source_path: Optional[str] = None
+    duration_s: float
+    year: Optional[int] = None
+    bpm: Optional[int] = None
+    isrc: Optional[str] = None
+    notes: Optional[str] = None
+
+    @computed_field
+    @property
+    def reject_reason(self) -> Optional[str]:
+        if not self.notes or not self.notes.startswith("REJECTED:"):
+            return None
+        return self.notes[len("REJECTED:") :].strip()
+
+    @classmethod
+    def from_row(cls, row: dict) -> "DeletedSongView":
+        return cls(
+            id=row["SourceID"],
+            media_name=row["MediaName"],
+            source_path=row["SourcePath"],
+            duration_s=float(row["SourceDuration"] or 0),
+            year=row["RecordingYear"],
+            bpm=row["TempoBPM"],
+            isrc=row["ISRC"],
+            notes=row["SourceNotes"],
         )
 
 

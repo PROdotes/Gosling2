@@ -27,6 +27,7 @@ from src.models.view_models import (
     SongAlbumView,
     SongSlimView,
     AlbumSlimView,
+    DeletedSongView,
     PublisherView,
     IngestionReportView,
     format_file_size,
@@ -1081,6 +1082,15 @@ class TestSongSlimViewFromRow:
             view.primary_genre is None
         ), f"Expected None for NULL genre, got {view.primary_genre}"
 
+    def test_null_source_path_does_not_raise(self):
+        """A hard-file-deleted song (delete_file=True) has SourcePath=NULL in
+        the DB; the 'deleted' status filter returns these rows, so from_row
+        must not choke building a SongSlimView from one."""
+        row = self._make_row(SourcePath=None, IsDeleted=1)
+        view = SongSlimView.from_row(row)
+
+        assert view.source_path is None
+
     def test_is_active_int_to_bool(self):
         """IsActive=1 maps to True, IsActive=0 maps to False."""
         active_view = SongSlimView.from_row(self._make_row(IsActive=1))
@@ -1134,6 +1144,67 @@ class TestSongSlimViewFromRow:
         assert (
             view.formatted_duration == "0:00"
         ), f"Expected '0:00' for 0s, got '{view.formatted_duration}'"
+
+    def test_is_deleted_true_when_row_marked_deleted(self):
+        """IsDeleted=1 maps to is_deleted True, regardless of notes content."""
+        row = self._make_row(IsDeleted=1, SourceNotes="REJECTED: BAD SONG")
+        view = SongSlimView.from_row(row)
+
+        assert view.is_deleted is True
+
+    def test_is_deleted_false_for_live_song_with_reject_looking_notes(self):
+        """A live (non-deleted) song must never read as deleted, even if its
+        notes happen to start with 'REJECTED:' - notes are a footnote, not the
+        source of truth for whether the song was actually removed."""
+        row = self._make_row(IsDeleted=0, SourceNotes="REJECTED: BAD SONG")
+        view = SongSlimView.from_row(row)
+
+        assert view.is_deleted is False
+
+    def test_is_deleted_true_for_plain_delete_without_reject_notes(self):
+        """A plain (non-reject) delete sets IsDeleted=1 with no REJECTED:
+        notes - the slim view only tracks deleted-ness, not the reason."""
+        row = self._make_row(IsDeleted=1, SourceNotes=None)
+        view = SongSlimView.from_row(row)
+
+        assert view.is_deleted is True
+
+    def test_is_deleted_defaults_false_when_column_absent(self):
+        """Rows from queries that don't select IsDeleted (e.g. get_by_id-style
+        hydration of live songs) must default is_deleted to False."""
+        row = self._make_row()
+        assert "IsDeleted" not in row
+        view = SongSlimView.from_row(row)
+
+        assert view.is_deleted is False
+
+
+# ===========================================================================
+# DeletedSongView.reject_reason
+# ===========================================================================
+class TestDeletedSongViewRejectReason:
+    """reject_reason only fires for notes written by the reject flow."""
+
+    def _make_view(self, notes) -> DeletedSongView:
+        return DeletedSongView(
+            id=1,
+            media_name="Bad Take",
+            source_path="/path/1",
+            duration_s=100,
+            notes=notes,
+        )
+
+    def test_extracts_reason_from_reject_notes(self):
+        view = self._make_view("REJECTED: wrong mix")
+        assert view.reject_reason == "wrong mix"
+
+    def test_none_for_plain_delete_with_no_notes(self):
+        view = self._make_view(None)
+        assert view.reject_reason is None
+
+    def test_none_for_notes_not_written_by_reject_flow(self):
+        view = self._make_view("duplicate of song 42")
+        assert view.reject_reason is None
 
 
 # ===========================================================================

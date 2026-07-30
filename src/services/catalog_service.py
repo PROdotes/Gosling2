@@ -105,6 +105,10 @@ class CatalogService:
         """Fetch a single song and all its credits by ID."""
         return self._library_service.get_song(song_id)
 
+    def get_deleted_song(self, song_id: int) -> Optional[dict]:
+        """Bare row for a soft-deleted song, no hydration."""
+        return self._library_service.get_deleted_song(song_id)
+
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
         return self._identity_service.get_identity(identity_id)

@@ -15,6 +15,12 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Raises `HTTPException(404)` if the song does not exist.
 - Wraps `CatalogService.get_song`.
 
+### async def get_deleted_song(song_id: int) -> DeletedSongView
+**HTTP**: `GET /api/v1/songs/{song_id}/deleted`
+Bare view of a soft-deleted song (rejected or plain-deleted) — no credits/albums/tags, since those are hard-deleted at delete time.
+- Raises `HTTPException(404)` if the song doesn't exist or isn't deleted.
+- Wraps `CatalogService.get_deleted_song`.
+
 ### async def search_songs(q: Optional[str] = None, query: Optional[str] = None, deep: bool = False) -> List[SongSlimView]
 **HTTP**: `GET /api/v1/songs/search?q={query}&query={alt_query}&deep={true|false}`
 - Surface slim search by default (`deep=false`). Full resolution when `deep=true`.

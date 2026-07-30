@@ -447,6 +447,50 @@
     padding: 4px 0;
 }
 
+/* Unlike .sidebar-path, this is meant to show the whole path (no truncation) —
+   used where there's no scrubber/tooltip fallback to recover the clipped part. */
+#songs-workspace .full-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-mut);
+    line-height: 1.4;
+    white-space: normal;
+    word-break: break-all;
+    padding: 4px 0;
+}
+
+#songs-workspace .reason-toggle-group {
+    display: flex;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+}
+
+#songs-workspace .reason-toggle-group button {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+
+#songs-workspace .reason-toggle-group button:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+#songs-workspace .reason-toggle-group button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    cursor: default;
+}
+
 /* ── EDITOR FORM ────────────────────────────────────────────────────────── */
 
 #songs-workspace .editor-song-id {

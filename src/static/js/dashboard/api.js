@@ -130,6 +130,10 @@ export function getCatalogSong(id, options = {}) {
     return fetchJson(`/api/v1/songs/${id}`, options);
 }
 
+export function getDeletedSong(id, options = {}) {
+    return fetchJson(`/api/v1/songs/${id}/deleted`, options);
+}
+
 export function getMultiView(songIds, options = {}) {
     return fetchJson("/api/v1/songs/multi-view", {
         method: "POST",
@@ -298,7 +302,7 @@ export function getIngestStatus() {
 }
 
 export function resetIngestStatus() {
-    return mutate({ update: [{ type: "ingest_status", reset: true }] });
+    return fetchJson("/api/v1/ingest/reset-status", { method: "POST" });
 }
 
 export function resolveConflict(ghostId, stagedPath) {
@@ -400,6 +404,12 @@ export function rejectSong(id, reason = "BAD SONG") {
     return mutate({
         update: [{ type: "song", id: Number(id), notes: `REJECTED: ${reason}` }],
         delete: [{ type: "song", id: Number(id) }],
+    });
+}
+
+export function changeRejectReason(id, reason) {
+    return mutate({
+        update: [{ type: "song", id: Number(id), notes: `REJECTED: ${reason}` }],
     });
 }
 

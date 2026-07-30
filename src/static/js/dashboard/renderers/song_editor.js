@@ -1208,6 +1208,42 @@ export function renderSongEditorMulti(view, songIds, validationRules = null) {
 }
 
 
+// Deleted songs have no credits/albums/tags/publishers left (hard-deleted at
+// delete time) and usually no backing file, so this is deliberately a bare,
+// read-only view — not the full editor. See DeletedSongView on the backend.
+export function renderDeletedSongView(song) {
+    const panel = document.getElementById("editor-panel");
+    if (!panel) return;
+    const scroll = panel.querySelector(".editor-scroll");
+    if (scroll) {
+        clearMultiPreview(scroll);
+        const reasonToggle = ["BAD SONG", "DUPLICATE", "AI GENERATED"]
+            .map((reason) => {
+                const active = song.reject_reason === reason;
+                return `<button class="${active ? "active" : ""}" data-action="change-reject-reason" data-id="${song.id}" data-reason="${escapeHtml(reason)}"${active ? " disabled" : ""}>${escapeHtml(reason)}</button>`;
+            })
+            .join("");
+        scroll.innerHTML = `
+<div class="editor-section">
+  <div class="editor-section-title">Deleted Song</div>
+  ${renderScalarField("Title", song.media_name, "ef-title", "text", "", false)}
+  ${renderScalarField("Year", song.year, "ef-year", "text", "", false)}
+  ${renderScalarField("BPM", song.bpm, "ef-bpm", "text", "", false)}
+  ${renderScalarField("ISRC", song.isrc, "ef-isrc", "text", "", false)}
+  <div class="editor-field">
+    <label class="editor-label">Path</label>
+    <div class="full-path">${escapeHtml(song.source_path || "")}</div>
+  </div>
+  <div class="editor-field">
+    <label class="editor-label">Reason</label>
+    <div class="reason-toggle-group">${reasonToggle}</div>
+  </div>
+</div>`;
+    }
+    const sidebar = panel.querySelector(".action-sidebar");
+    if (sidebar) sidebar.innerHTML = "";
+}
+
 export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;

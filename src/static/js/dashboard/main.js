@@ -14,6 +14,7 @@ import {
     getCatalogSong,
     getMultiView,
     getIngestStatus,
+    getDeletedSong,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
@@ -59,6 +60,7 @@ import {
 import {
     captureUnfoldedChipFields,
     renderActionSidebar,
+    renderDeletedSongView,
     renderSongEditorEmpty,
     renderSongEditorMulti,
     renderSongEditorV2,
@@ -793,6 +795,25 @@ async function openSelectedResult(index) {
             updateSelection();
         }
         const request = beginDetailRequest("songs", selected.id);
+
+        // Deleted songs have no credits/albums/tags left (hard-deleted at
+        // delete time) and usually no backing file, so they get a separate
+        // bare read-only view instead of the full song editor.
+        if (selected.is_deleted) {
+            const deleted = await getDeletedSong(selected.id, {
+                signal: request.signal,
+            }).catch((e) => {
+                if (!isAbortError(e)) throw e;
+                return null;
+            });
+            if (!deleted || !isActiveDetail("songs", selected.id)) return;
+            state.activeSong = null;
+            state.activeSongDiff = null;
+            state.activeSongRawTags = null;
+            renderDeletedSongView(deleted);
+            return;
+        }
+
         const result = await getCatalogSong(selected.id, {
             signal: request.signal,
         }).catch((e) => {

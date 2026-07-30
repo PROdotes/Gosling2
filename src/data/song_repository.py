@@ -230,6 +230,33 @@ class SongRepository(MediaSourceRepository):
         logger.debug(f"[SongRepository] <- update_scalars(id={song_id}) done")
         return media_rowcount if media_source_fields else cursor.rowcount
 
+    def get_deleted_by_id(
+        self, song_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[dict]:
+        """
+        Fetch the bare row for a soft-deleted song (rejected or plain-deleted).
+        No joins — all link tables were hard-deleted at delete time, so there's
+        nothing else to fetch. Returns None if the ID isn't a deleted song.
+        """
+        logger.debug(f"[SongRepository] -> get_deleted_by_id(id={song_id})")
+        query = """
+            SELECT m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
+                   m.SourceNotes, s.TempoBPM, s.RecordingYear, s.ISRC
+            FROM MediaSources m
+            JOIN Songs s ON m.SourceID = s.SourceID
+            WHERE m.SourceID = ? AND m.IsDeleted = 1
+        """
+
+        def _run(c):
+            c.row_factory = sqlite3.Row
+            row = c.execute(query, (song_id,)).fetchone()
+            return dict(row) if row else None
+
+        if conn:
+            return _run(conn)
+        with self._get_connection() as new_conn:
+            return _run(new_conn)
+
     def get_by_id(
         self, song_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[Song]:
@@ -942,17 +969,22 @@ class SongRepository(MediaSourceRepository):
                     )
 
         # 4. Statuses — each selected status is its own subquery so ALL mode ANDs them
+        # "deleted" is the only status targeting soft-deleted rows; every other
+        # status carries its own "m.IsDeleted = 0" so the outer join can stay tight
+        # unless "deleted" is explicitly requested (see include_deleted below).
+        include_deleted = bool(statuses and "deleted" in statuses)
         if statuses:
             status_map = {
-                "done": f"m.ProcessingStatus = {ProcessingStatus.REVIEWED}",
-                "not_done": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED}",
-                "missing_data": f"({BLOCKER_SQL})",
-                "ready_to_finalize": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND {NO_BLOCKER_SQL}",
+                "done": f"m.IsDeleted = 0 AND m.ProcessingStatus = {ProcessingStatus.REVIEWED}",
+                "not_done": f"m.IsDeleted = 0 AND m.ProcessingStatus != {ProcessingStatus.REVIEWED}",
+                "missing_data": f"m.IsDeleted = 0 AND ({BLOCKER_SQL})",
+                "ready_to_finalize": f"m.IsDeleted = 0 AND m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND {NO_BLOCKER_SQL}",
+                "deleted": "m.IsDeleted = 1",
             }
             for s in statuses:
                 if s in status_map:
                     subqueries.append(
-                        f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE m.IsDeleted = 0 AND {status_map[s]}"
+                        f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE {status_map[s]}"
                     )
 
         if not subqueries:
@@ -997,11 +1029,16 @@ class SongRepository(MediaSourceRepository):
             if has_original
             else ""
         )
+        # Normally the join hides soft-deleted rows outright. When "deleted" is
+        # one of the requested statuses, loosen it here — the id_filter subqueries
+        # above already scope each status (including "deleted") to the right
+        # IsDeleted value, so this outer clause only needs to stop blocking them.
+        deleted_clause = "" if include_deleted else "AND m.IsDeleted = 0"
 
         query_sql = f"""
             SELECT
                 m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
-                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
+                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive, m.IsDeleted,
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
                 EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
@@ -1011,7 +1048,7 @@ class SongRepository(MediaSourceRepository):
             FROM MediaSources m
             JOIN Songs s ON m.SourceID = s.SourceID
                 AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
-                AND m.IsDeleted = 0
+                {deleted_clause}
             LEFT JOIN SongCredits sc ON m.SourceID = sc.SourceID
             LEFT JOIN ArtistNames an ON sc.CreditedNameID = an.NameID AND an.IsDeleted = 0
             LEFT JOIN Roles r ON sc.RoleID = r.RoleID
