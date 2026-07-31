@@ -36,7 +36,9 @@ import {
     getTagCategories,
     syncAlbumFromSong,
     setPrimarySongTag,
+    resolveRuleForGenre,
 } from "./api.js";
+import { escapeHtml } from "./components/utils.js";
 import { showConfirm } from "./components/confirm_modal.js";
 import { showToast } from "./components/toast.js";
 import { createChipInput } from "./components/chip_input.js";
@@ -44,6 +46,7 @@ import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { parseTagInput } from "./utils/tag_input.js";
+import { renderRoutingPatternHtml } from "./utils/routing_pattern.js";
 
 /**
  * GOSLING ORCHESTRATOR
@@ -671,9 +674,28 @@ export async function manageTag(ctx, tagId) {
     const tagDetail = await getTagDetail(tagId).catch(() => null);
     if (!tagDetail) return;
 
+    const routingField = {};
+    if (tagDetail.category === "Genre") {
+        const resolved = await resolveRuleForGenre(tagDetail.name).catch(() => null);
+        if (resolved) {
+            let html;
+            if (resolved.source === "rule")
+                html = renderRoutingPatternHtml(resolved.target_path);
+            else if (resolved.source === "default")
+                html = `${renderRoutingPatternHtml(resolved.target_path)} <span class="routing-default-tag">(default)</span>`;
+            else html = escapeHtml("No rule matches -- add one in Filing Rules");
+            routingField.routing = {
+                type: "staticText",
+                label: "Routes to",
+                html,
+            };
+        }
+    }
+
     openEditModal({
         title: "Edit Tag",
         fields: {
+            ...routingField,
             name: {
                 type: "text",
                 label: "Name",

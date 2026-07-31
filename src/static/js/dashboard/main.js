@@ -1288,7 +1288,8 @@ document.addEventListener("click", async (event) => {
         action === "close-spotify-modal" ||
         action === "close-splitter-modal" ||
         action === "close-filename-parser-modal" ||
-        action === "close-settings-modal";
+        action === "close-settings-modal" ||
+        action === "close-rules-modal";
 
     if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
@@ -1327,6 +1328,18 @@ document.addEventListener("click", async (event) => {
             "./components/settings_modal.js"
         );
         closeSettingsModal();
+        return;
+    }
+
+    if (action === "open-rules") {
+        const { openRulesModal } = await import("./components/rules_modal.js");
+        await openRulesModal(ctx);
+        return;
+    }
+
+    if (action === "close-rules-modal") {
+        const { closeRulesModal } = await import("./components/rules_modal.js");
+        closeRulesModal();
         return;
     }
 });

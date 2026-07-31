@@ -19,6 +19,9 @@ import { formatText } from "../api.js";
  *       category: { type: "search", value: "major", onSearch: (q) => [], onSave },
  *       members: { type: "chipList", items: [{id, label}], onSearch, onAdd, onRemove, onRename: (item, newName) => {} },
  *       subItems: { type: "chipList", items: [], ... },
+ *       routing: { type: "staticText", label: "Routes to", value: "latin/{artist} - {title}" },
+ *       // staticText also accepts `html` (pre-built, trusted markup) instead of `value`
+ *       // (escaped plain text) -- e.g. to style replaceable tokens distinctly from literal text.
  *     },
  *     onClose: () => {},
  *   });
@@ -54,11 +57,23 @@ function renderFields() {
             sections.push(renderChipListField(key, field));
         } else if (field.type === "readOnlyList") {
             sections.push(renderReadOnlyListField(key, field));
+        } else if (field.type === "staticText") {
+            sections.push(renderStaticTextField(key, field));
         }
     }
 
     bodyEl.innerHTML = sections.join("");
     attachFieldHandlers();
+}
+
+function renderStaticTextField(key, field) {
+    const body = field.html != null ? field.html : escapeHtml(field.value || "");
+    return `
+        <div class="edit-modal-field" id="edit-field-${key}">
+            <label>${escapeHtml(field.label || key)}</label>
+            <div class="edit-modal-static-value">${body}</div>
+        </div>
+    `;
 }
 
 function renderTextField(key, field) {

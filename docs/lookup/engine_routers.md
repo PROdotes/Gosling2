@@ -216,6 +216,26 @@ Bare view of a soft-deleted song (rejected or plain-deleted) — no credits/albu
 - Unknown key or bad value -> `400`, writes nothing.
 ---
 
+## Rules Router
+*Location: `src/engine/routers/rules.py`*
+**Responsibility**: Read/replace the filing routing rules via `RulesFile` in `src/services/rules_service.py`. `json/rules.json` is the source of truth. Whole-list replace, not per-rule CRUD.
+
+### def get_filing_rules() -> dict
+**HTTP**: `GET /api/v1/rules`
+- Returns `{"rules": <current routing_rules + default_rule>, "warnings": [...]}`.
+- A corrupt `rules.json` falls back to an empty rule list and adds a `rules_load` warning.
+
+### def update_filing_rules(body: dict) -> dict
+**HTTP**: `POST /api/v1/rules`
+- Validates the full ordered rule list (accepts raw `dict` and validates manually, like `update_settings`, so a validation failure returns 400 instead of FastAPI's automatic 422), persists to `json/rules.json`. Returns `{rules, warnings}`.
+- Empty `match_genres` on a rule, or an unknown `{token}` in any `target_path`/`default_rule` -> `400`, writes nothing.
+
+### def resolve_filing_rule(genre: str) -> dict
+**HTTP**: `GET /api/v1/rules/resolve?genre={genre}`
+- Which rule (if any) the given genre would match under the current `rules.json`, for display next to a Genre tag (e.g. the Edit Tag modal). Returns `{"target_path": str|None, "rule_index": int|None, "source": "rule"|"default"|"none"}` with tokens left unresolved (no song context for a bare genre lookup).
+- Wraps `resolve_target_for_genre`.
+---
+
 
 ## Ingest Router
 *Location: `src/engine/routers/ingest.py`*

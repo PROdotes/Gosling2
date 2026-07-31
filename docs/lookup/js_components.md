@@ -83,6 +83,58 @@ Diffs current `[data-key]` control values against `original` and returns a chang
 *Location: `src/static/js/dashboard/components/settings_modal.js`*
 Renders a warning banner from a `[{kind, error}]` array, or clears the container if empty.
 
+### openRulesModal(ctx)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Filing rules editor (Gap #2 of settings/rules parity). Fetches `GET /api/v1/rules`, clones it into a local working-state object (`cloneWorkingState`), renders it, and holds all edits (genre chip add/remove, path text, reorder, add/remove rule, default rule) in that local state with zero network calls. Save posts the whole array once via `POST /api/v1/rules` (`toRulesPayload`); a 400 renders an in-modal warning without closing, success closes + banner. Explicit-save-only, same accidental-close risk as the settings modal (not fixed here, matches existing behavior).
+
+### closeRulesModal()
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Hides the rules modal.
+
+### cloneWorkingState(rulesFile)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Deep-clones a fetched `RulesFile` (`routing_rules` + `default_rule`) into an independent working copy the modal mutates locally; a `null` `default_rule` becomes `""` for the text input.
+
+### toRulesPayload(state)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Converts the working state back into the `RulesFile`-shaped POST body; a blank/whitespace-only `default_rule` becomes `null`.
+
+### renderRulesForm(container, state)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Pure DOM builder, unit-tested. Renders one `.rule-row` per routing rule (genre chip list + path input + up/down/remove buttons, Up/Down disabled at the array bounds) plus the default-rule input, fully from `state` — no hardcoded rule count.
+
+### renderWarnings(container, warnings)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Renders a warning banner from a `[{kind, error}]` array, or clears the container if empty.
+
+### addRule(state)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Appends an empty rule (`{match_genres: [], target_path: ""}`).
+
+### removeRule(state, ruleIndex)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Drops the rule at the given index.
+
+### moveRule(state, ruleIndex, direction)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Reorders a rule by `direction` (-1 up, +1 down); a no-op past the array bounds.
+
+### addGenre(state, ruleIndex, genre)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Trims and appends a genre to the rule's `match_genres`, case-insensitively deduped against existing entries; blank input is ignored.
+
+### removeGenre(state, ruleIndex, genre)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Removes the exact genre string from the rule's `match_genres`.
+
+### setPath(state, ruleIndex, path)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Replaces a single rule's `target_path`.
+
+### setDefaultRule(state, path)
+*Location: `src/static/js/dashboard/components/rules_modal.js`*
+Replaces the working state's `default_rule` text.
+
 ---
 
 ## Widgets

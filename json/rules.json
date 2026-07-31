@@ -48,6 +48,10 @@
         {
             "match_genres": ["cro", "instrumental", "Susjedi", "klape"],
             "target_path": "{genre}/{year}/{artist} - {title}"
-        }
+        },
+		{
+			"match_genres": ["samba"],
+            "target_path": "latin/{artist} - {title}"
+		}
     ]
 }

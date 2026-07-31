@@ -59,6 +59,31 @@ Re-reads `json/settings.json` into the live `settings` instance (boot overlay). 
 ### save_settings(patch: dict) -> Settings
 Validates a partial settings dict, persists the full settings to `json/settings.json`, and updates the live instance in place. Raises `ValueError` / pydantic `ValidationError` (writing nothing) on unknown keys or values that fail field validation.
 
+## Filing Rules (rules_service)
+*Location: `src/services/rules_service.py`*
+Ordered, first-match-wins genre-to-path routing rules consumed by `FilingService.evaluate_routing`. `json/rules.json` is the source of truth. Unlike settings, there is no live in-memory instance to keep in sync — `FilingService` reads its own copy fresh each time it's constructed (per `LibraryService.__init__`).
+
+### RoutingRule(BaseModel)
+`match_genres: list[str]` (non-empty), `target_path: str` (must only use known `{token}`s: `artist`, `title`, `year`, `genre` — the same four `evaluate_routing` actually substitutes; also rejected if unsafe, see below).
+
+### RulesFile(BaseModel)
+`routing_rules: list[RoutingRule]`, `default_rule: Optional[str]` (same token + path-safety validation as `target_path`, used when no rule's `match_genres` matches the song's primary genre).
+
+### _check_path_safety(v, field_name) / _check_tokens(v, field_name)
+Shared validators called by both `target_path` and `default_rule`. `_check_path_safety` rejects a leading `/` or `\`, a drive letter (`C:`), or any `..` path segment — `evaluate_routing` only sanitizes the *interpolated token values*, not the literal template text, so an absolute/traversal template would otherwise make `library_root / target_relative` silently escape the library root entirely (pathlib's `/` replaces the whole left side when the right side is absolute).
+
+### load_rules_from(path: Path) -> tuple[RulesFile, list[dict]]
+Pure read. Missing file -> empty rule list; a corrupt or model-invalid file -> empty rule list plus a `rules_load` warning.
+
+### get_rules() -> tuple[RulesFile, list[dict]]
+Reads `config.RENAME_RULES_PATH` fresh via `load_rules_from`.
+
+### save_rules(rules: RulesFile) -> RulesFile
+Validates and persists the full ordered rule list to `json/rules.json`. Raises `ValueError` / pydantic `ValidationError` (writing nothing) on an empty `match_genres` or an unknown token.
+
+### resolve_target_for_genre(genre: str) -> dict
+Finds which rule (if any) a genre would match, mirroring `FilingService.evaluate_routing`'s case-insensitive first-match-wins genre lookup — but with no song context, so `{artist}/{title}/{year}/{genre}` tokens in the returned `target_path` stay literal. Returns `{"target_path": str|None, "rule_index": int|None, "source": "rule"|"default"|"none"}`.
+
 ## IdentityService
 *Location: `src/services/identity_service.py`*
 

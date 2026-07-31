@@ -43,4 +43,4 @@ Opens EditModal for Identity management (Roles, Aliases, Members). Handles mergi
 Opens EditModal for Publisher management (Hierarchy/Sub-publishers).
 
 ### manageTag(ctx, tagId)
-Opens EditModal for Tag management (Name/Category).
+Opens EditModal for Tag management (Name/Category). For a Genre-category tag, also fetches `resolveRuleForGenre` and adds a read-only "Routes to" `staticText` field (via `field.html`, not `field.value`) rendering the matched rule's path pattern via `renderRoutingPatternHtml` (`utils/routing_pattern.js`) -- literal segments as plain escaped text, each `{token}` as a distinct styled chip with a hover title explaining it's replaced per-song.

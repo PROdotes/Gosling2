@@ -1,0 +1,10 @@
+{
+  "library_root": "Z:\\Songs",
+  "wav_auto_convert": true,
+  "auto_move_on_approve": true,
+  "prompt_before_move": true,
+  "auto_save_id3": true,
+  "scrubber_auto_play": true,
+  "blur_saves_scalars": true,
+  "default_search_engine": "spotify"
+}

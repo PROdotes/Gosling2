@@ -19,6 +19,7 @@ from src.engine.routers.mutations import router as mutations_router
 from src.engine.routers.audit import router as audit_router
 from src.engine.routers.multi_edit import router as multi_edit_router
 from src.engine.routers.settings import router as settings_router
+from src.engine.routers.rules import router as rules_router
 import uuid
 from src.services.logger import logger, request_id_var
 from src.services.config_service import reload_settings
@@ -163,6 +164,7 @@ app.include_router(mutations_router)
 app.include_router(audit_router)
 app.include_router(multi_edit_router)
 app.include_router(settings_router)
+app.include_router(rules_router)
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),

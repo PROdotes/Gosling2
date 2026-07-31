@@ -51,6 +51,22 @@ export function saveSettings(patch) {
     });
 }
 
+export function fetchRules() {
+    return fetchJson("/api/v1/rules");
+}
+
+export function saveRules(rulesFile) {
+    return fetchJson("/api/v1/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rulesFile),
+    });
+}
+
+export function resolveRuleForGenre(genre) {
+    return fetchJson(`/api/v1/rules/resolve?genre=${encodeURIComponent(genre)}`);
+}
+
 async function runSearch(key, url) {
     const previous = searchControllers.get(key);
     if (previous) {

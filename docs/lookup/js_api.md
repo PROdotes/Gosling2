@@ -19,6 +19,15 @@ Fetches `{settings, schema, warnings}` (`GET /api/v1/settings`) — current valu
 ### saveSettings(patch)
 Persists a changed-only settings patch (`POST /api/v1/settings`); throws on a 400 (unknown key / bad value).
 
+### fetchRules()
+Fetches `{rules, warnings}` (`GET /api/v1/rules`) — the current ordered routing rule list + default_rule, plus corrupt-file warnings.
+
+### saveRules(rulesFile)
+Persists the whole ordered rule list (`POST /api/v1/rules`); throws on a 400 (empty `match_genres` / unknown `{token}`).
+
+### resolveRuleForGenre(genre)
+Fetches which rule (if any) a genre would match (`GET /api/v1/rules/resolve?genre=...`) — `{target_path, rule_index, source}`.
+
 ### mutate(command)
 The single entry point for all database mutations.
 - **Command structure**: `{ add: [], update: [], merge: [], remove: [], delete: [] }` (merge is used by `mergeIdentity`/`mergePublisher`/`mergeTag`).

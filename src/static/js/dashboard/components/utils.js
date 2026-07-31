@@ -144,6 +144,7 @@ export function isModalOpen() {
         "filename-parser-modal",
         "confirm-modal",
         "settings-modal",
+        "rules-modal",
     ];
     return modals.some((id) => {
         const el = document.getElementById(id);
