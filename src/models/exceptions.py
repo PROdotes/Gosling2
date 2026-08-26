@@ -50,3 +50,18 @@ class DuplicateConflictError(IngestionError):
         self.title = title
         message = f"Song already exists in library: {title} (ID: {existing_id})"
         super().__init__(message, status_code=409)
+
+
+class AuditIntegrityError(RuntimeError):
+    """Raised when ChangeLog holds rows with NULL batch_id, meaning a write path
+    bypassed write_connection(). Writes stay locked until it is resolved.
+
+    Subclasses RuntimeError so existing handlers keep their current behaviour."""
+
+    def __init__(self, null_batch_rows: int):
+        self.null_batch_rows = null_batch_rows
+        super().__init__(
+            f"Audit integrity violation: {null_batch_rows} ChangeLog rows committed "
+            f"with NULL batch_id. A write path bypassed write_connection(). "
+            f"Fix before continuing."
+        )

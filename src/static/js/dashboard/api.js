@@ -388,19 +388,33 @@ export function patchSongScalars(songId, fields) {
     return mutate({ update: [{ type: "song", id: songId, ...fields }] });
 }
 
+// The write path is the only place the DB lock can be observed, so every
+// mutate reports it. Listener lives in main.js and paints the integrity banner.
+async function postMutation(url, payload) {
+    try {
+        return await fetchJson(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+    } catch (e) {
+        if (e.detail && e.detail.code === "DB_LOCKED") {
+            window.dispatchEvent(
+                new CustomEvent("db-locked", { detail: e.detail })
+            );
+        }
+        throw e;
+    }
+}
+
 export function mutate(command) {
-    return fetchJson("/api/v1/mutate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(command),
-    });
+    return postMutation("/api/v1/mutate", command);
 }
 
 export function multiMutate(songIds, ops) {
-    return fetchJson("/api/v1/songs/multi-mutate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ song_ids: songIds, ...ops }),
+    return postMutation("/api/v1/songs/multi-mutate", {
+        song_ids: songIds,
+        ...ops,
     });
 }
 

@@ -2,6 +2,8 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 
+from src.models.exceptions import AuditIntegrityError
+
 
 class BaseRepository:
     """
@@ -38,10 +40,7 @@ class BaseRepository:
         except sqlite3.OperationalError:
             count = 0  # ChangeLog table not yet created (pre-migration DB)
         if count > 0:
-            raise RuntimeError(
-                f"Audit integrity violation: {count} ChangeLog rows committed with "
-                f"NULL batch_id. A write path bypassed write_connection(). Fix before continuing."
-            )
+            raise AuditIntegrityError(count)
 
         return conn
 

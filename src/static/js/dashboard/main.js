@@ -1435,8 +1435,13 @@ async function checkAuditIntegrity() {
     }
 }
 
+// Checked once on load so an already-locked DB shows before anything is touched.
+// After that the write path reports it: every mutate that hits the lock fires
+// "db-locked", which is the only moment the lock actually costs the user anything.
 checkAuditIntegrity();
-setInterval(checkAuditIntegrity, 30000);
+window.addEventListener("db-locked", (e) => {
+    syncIntegrityBanner(e.detail?.null_batch_rows ?? 0);
+});
 
 // Restore in-progress badges on page reload
 (async () => {

@@ -3,7 +3,7 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.models.exceptions import MergeRequiredError
+from src.models.exceptions import AuditIntegrityError, MergeRequiredError
 from src.models.view_models import SongView
 from src.services.multi_edit_service import MultiEditService
 
@@ -88,6 +88,15 @@ async def multi_mutate(
             ),
             add=[op.model_dump() for op in body.add],
             remove=[op.model_dump() for op in body.remove],
+        )
+    except AuditIntegrityError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "DB_LOCKED",
+                "null_batch_rows": e.null_batch_rows,
+                "message": str(e),
+            },
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
