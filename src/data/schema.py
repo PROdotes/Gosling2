@@ -165,6 +165,13 @@ CREATE TABLE IF NOT EXISTS ChangeLog (
     old_value   TEXT,
     new_value   TEXT
 );
+
+-- Partial index over the unstamped rows only. Both hot audit paths filter on
+-- batch_id IS NULL: the write_connection() batch stamp and the get_connection()
+-- integrity tripwire. Without it each one scans the whole ChangeLog table, so
+-- every write got slower as the log grew.
+CREATE INDEX IF NOT EXISTS idx_changelog_unbatched
+    ON ChangeLog(batch_id) WHERE batch_id IS NULL;
 """
 
 # Tables excluded from audit triggers. Everything else is audited.
