@@ -21,6 +21,10 @@ single" action).
   a visual cue to spot accidental merges.
 - Root fix NOT done: add artist to the match key, or stop auto-resurrecting (decide which with the
   user — both were floated).
+- 2026-07-31: the auto-resurrect half is NOT album-specific. `song_credit_repository.py:150-165`
+  does the same for artist names (wakes the name, its identity, and that identity's primary name,
+  silently), and ChangeLog undo hits it from the other direction when restoring a link whose owner
+  is soft-deleted. Tracked as D9 in `docs/todo/changelog_undo_map.md` — decide once, apply to both.
 
 ## Audit blind spot (made this hard to trace)
 
