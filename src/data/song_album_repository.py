@@ -295,9 +295,15 @@ class SongAlbumRepository(BaseRepository):
     def set_primary(
         self, source_id: int, album_id: int, conn: sqlite3.Connection
     ) -> int:
-        """Demote all album links for the song, then promote the given album. Returns final rowcount. Does NOT commit."""
+        """Demote the song's OTHER album links, then promote the given album. Returns final rowcount. Does NOT commit.
+
+        The demote excludes the target on purpose: demoting then re-promoting the same row
+        writes a net no-op pair into ChangeLog (IsPrimary 1->0 then 0->1), which is junk
+        history and which a batch undo can misapply if it iterates rows forward.
+        """
         conn.execute(
-            "UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,)
+            "UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ? AND AlbumID != ?",
+            (source_id, album_id),
         )
         cursor = conn.execute(
             "UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?",

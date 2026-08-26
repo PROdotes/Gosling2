@@ -15,6 +15,7 @@ import pytest
 
 from src.data.base_repository import BaseRepository
 from src.data.schema import EXCLUDED_FROM_AUDIT, build_trigger_sql
+from src.data.tag_repository import TagRepository
 from src.engine.routers.mutation_models import MutationRequest
 from src.services.mutation_coordinator import MutationCoordinator
 
@@ -286,3 +287,143 @@ def test_value_to_null_update_is_logged(audit_db):
     assert len(rows) > 0, "value→NULL SourceNotes update should be logged"
     assert rows[0][0] is not None, "Old value should not be NULL"
     assert rows[0][1] is None, "New value should be NULL"
+
+
+# ---------------------------------------------------------------------------
+# 6. No-op primary flips write nothing
+#
+# set_primary/set_primary_tag used to demote EVERY link then re-promote the
+# target, so re-selecting the album/tag that was already primary wrote a net
+# no-op pair (IsPrimary 1->0 then 0->1) on one row. Undoing such a batch leaves
+# the song with NO primary if rows are replayed forward, and the staleness check
+# cannot see the problem. Both now exclude the target from the demote.
+# ---------------------------------------------------------------------------
+
+
+def _connect_audit(path):
+    conn = sqlite3.connect(path)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
+    return conn
+
+
+def test_setting_already_primary_album_logs_nothing(audit_db):
+    conn = _connect_audit(audit_db)
+    conn.execute("DELETE FROM SongAlbums WHERE SourceID = 6")
+    conn.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (6, 1, 1)"
+    )
+    conn.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (6, 2, 0)"
+    )
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    MutationCoordinator(audit_db).apply(
+        MutationRequest.model_validate(
+            {
+                "update": [
+                    {
+                        "type": "song_album",
+                        "song_id": 6,
+                        "album_id": 1,
+                        "is_primary": True,
+                    }
+                ]
+            }
+        )
+    )
+
+    conn = _connect_audit(audit_db)
+    rows = conn.execute(
+        "SELECT field_name, old_value, new_value FROM ChangeLog WHERE table_name = 'SongAlbums'"
+    ).fetchall()
+    primary = conn.execute(
+        "SELECT AlbumID FROM SongAlbums WHERE SourceID = 6 AND IsPrimary = 1"
+    ).fetchall()
+    conn.close()
+
+    assert (
+        rows == []
+    ), f"re-selecting the current primary album should log nothing, got {rows}"
+    assert [r[0] for r in primary] == [1], "album 1 must still be the only primary"
+
+
+def test_real_primary_album_flip_still_logs(audit_db):
+    """Guard against 'fixing' the no-op by suppressing genuine flips."""
+    conn = _connect_audit(audit_db)
+    conn.execute("DELETE FROM SongAlbums WHERE SourceID = 6")
+    conn.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (6, 1, 1)"
+    )
+    conn.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (6, 2, 0)"
+    )
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    MutationCoordinator(audit_db).apply(
+        MutationRequest.model_validate(
+            {
+                "update": [
+                    {
+                        "type": "song_album",
+                        "song_id": 6,
+                        "album_id": 2,
+                        "is_primary": True,
+                    }
+                ]
+            }
+        )
+    )
+
+    conn = _connect_audit(audit_db)
+    rows = conn.execute(
+        "SELECT old_value, new_value FROM ChangeLog "
+        "WHERE table_name = 'SongAlbums' AND field_name = 'IsPrimary' ORDER BY id"
+    ).fetchall()
+    primary = conn.execute(
+        "SELECT AlbumID FROM SongAlbums WHERE SourceID = 6 AND IsPrimary = 1"
+    ).fetchall()
+    conn.close()
+
+    assert [tuple(r) for r in rows] == [("1", "0"), ("0", "1")]
+    assert [r[0] for r in primary] == [2], "album 2 must be the only primary"
+
+
+def test_setting_already_primary_tag_logs_nothing(audit_db):
+    conn = _connect_audit(audit_db)
+    primary_before = conn.execute(
+        "SELECT TagID FROM MediaSourceTags WHERE SourceID = 9 AND IsPrimary = 1"
+    ).fetchone()
+    conn.close()
+    assert primary_before, "song 9 needs a primary genre for this test to mean anything"
+    tag_id = primary_before[0]
+
+    conn = _connect_audit(audit_db)
+    conn.execute("DELETE FROM ChangeLog")
+    conn.commit()
+    conn.close()
+
+    repo = TagRepository(audit_db)
+    with repo.write_connection("test") as conn:
+        repo.set_primary_tag(9, tag_id, conn)
+
+    conn = _connect_audit(audit_db)
+    rows = conn.execute(
+        "SELECT field_name, old_value, new_value FROM ChangeLog "
+        "WHERE table_name = 'MediaSourceTags'"
+    ).fetchall()
+    still_primary = conn.execute(
+        "SELECT TagID FROM MediaSourceTags WHERE SourceID = 9 AND IsPrimary = 1"
+    ).fetchall()
+    conn.close()
+
+    assert (
+        rows == []
+    ), f"re-setting the current primary tag should log nothing, got {rows}"
+    assert [r[0] for r in still_primary] == [tag_id]

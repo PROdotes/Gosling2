@@ -312,8 +312,12 @@ class TagRepository(BaseRepository):
     ) -> int:
         """
         Set a specific tag as primary for its category (Genre).
-        Resets all other genre tags for this song to non-primary.
+        Resets all OTHER genre tags for this song to non-primary.
         Returns rowcount of the primary set. Does NOT commit.
+
+        The demote excludes the target on purpose: demoting then re-promoting the same row
+        writes a net no-op pair into ChangeLog (IsPrimary 1->0 then 0->1), which is junk
+        history and which a batch undo can misapply if it iterates rows forward.
         """
         logger.debug(
             f"[TagRepository] -> set_primary_tag(source_id={source_id}, tag_id={tag_id})"
@@ -322,13 +326,13 @@ class TagRepository(BaseRepository):
 
         cursor.execute(
             """
-            UPDATE MediaSourceTags 
-            SET IsPrimary = 0 
-            WHERE SourceID = ? AND TagID IN (
+            UPDATE MediaSourceTags
+            SET IsPrimary = 0
+            WHERE SourceID = ? AND TagID != ? AND TagID IN (
                 SELECT TagID FROM Tags WHERE TagCategory COLLATE NOCASE = 'Genre'
             )
         """,
-            (source_id,),
+            (source_id, tag_id),
         )
 
         cursor.execute(
