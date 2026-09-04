@@ -849,13 +849,13 @@ export class SongActionsHandler {
     }
 
     async handleResolveConflict(actionTarget) {
-        const { ghostId, stagedPath } = actionTarget.dataset;
+        const { ghostId, stagedPath, originalPath } = actionTarget.dataset;
         actionTarget.disabled = true;
         const originalText = actionTarget.textContent;
         actionTarget.textContent = "Processing...";
 
         try {
-            const data = await resolveConflict(ghostId, stagedPath);
+            const data = await resolveConflict(ghostId, stagedPath, originalPath);
 
             showToast("Song reactivated successfully!", "success");
 

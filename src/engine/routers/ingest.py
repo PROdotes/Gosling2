@@ -241,7 +241,9 @@ async def convert_wav(staged_path: str) -> dict:
 
 
 @router.post("/resolve-conflict")
-async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView:
+async def resolve_conflict(
+    ghost_id: int, staged_path: str, original_path: Optional[str] = None
+) -> IngestionReportView:
     """
     Resolve a ghost conflict by reactivating the soft-deleted record with new metadata.
 
@@ -257,13 +259,16 @@ async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportVi
 
     try:
         service = _get_service()
-        # Heuristic for the original path of an uploaded staged file
-        original_src = os.path.join(
-            get_downloads_folder(), Path(staged_path).name.split("_", 1)[-1]
-        )
-        result = service.resolve_conflict(
-            ghost_id, staged_path, original_path=original_src
-        )
+        # Never derive the origin from staged_path: that file is the app's own
+        # artifact (uuid-prefixed, and transcoded to .mp3 for WAV imports), so
+        # reconstructing a user path from it invents one that never existed.
+        # Passing None leaves any origin already recorded for this song intact.
+        origin = original_path or None
+        if origin and is_same_file(Path(origin), Path(staged_path)):
+            # In-place imports hand back the file itself; that is not an "original"
+            # to offer for deletion.
+            origin = None
+        result = service.resolve_conflict(ghost_id, staged_path, original_path=origin)
 
         # Convert Domain Song to SongView if present
         if "song" in result and result["song"]:
