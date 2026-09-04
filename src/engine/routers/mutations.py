@@ -20,6 +20,7 @@ async def mutate(body: MutationRequest) -> dict:
     try:
         return coordinator.apply(body)
     except AuditIntegrityError as e:
+        logger.warning(f"[Mutate] rejected 409 DB_LOCKED: {e}")
         raise HTTPException(
             status_code=409,
             detail={
@@ -29,8 +30,10 @@ async def mutate(body: MutationRequest) -> dict:
             },
         )
     except LookupError as e:
+        logger.warning(f"[Mutate] rejected 404: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except MergeRequiredError as e:
+        logger.warning(f"[Mutate] rejected 409 MERGE_REQUIRED: {e}")
         raise HTTPException(
             status_code=409,
             detail={
@@ -40,4 +43,5 @@ async def mutate(body: MutationRequest) -> dict:
             },
         )
     except ValueError as e:
+        logger.warning(f"[Mutate] rejected 400: {e}")
         raise HTTPException(status_code=400, detail=str(e))
