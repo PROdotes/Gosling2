@@ -482,7 +482,7 @@ function setupDuplicateDeleteHandler(resultsId) {
         btn.disabled = true;
         btn.textContent = "Deleting...";
         try {
-            await deleteOriginalByPath(originalPath);
+            await deleteOriginalByPath(originalPath, btn.dataset.songId);
             const stagedPath = btn.dataset.stagedPath;
             if (stagedPath && stagedPath !== originalPath) await deleteStagingOrphan(stagedPath);
             const card = btn.closest(".result-card");
@@ -777,7 +777,7 @@ function createResultCard(result, path) {
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
                             Re-ingest & Activate
                         </button>
-                        <button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'} data-staged-path="${escapeHtml(result.staged_path || "")}">Delete Original</button>
+                        <button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${result.ghost_id}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'} data-staged-path="${escapeHtml(result.staged_path || "")}">Delete Original</button>
                     </div>
                 </div>`;
                     })()
@@ -808,7 +808,7 @@ function createResultCard(result, path) {
                     </button>
                     ${
                         status === "ALREADY_EXISTS"
-                            ? `<button class="ingest-btn-danger dup-delete-original-btn"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>`
+                            ? `<button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${song && song.id ? song.id : ""}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>`
                             : ""
                     }
                     <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>

@@ -34,7 +34,7 @@ from src.engine.routers.mutation_models import (
     UpdateSongTagItem,
     UpdateTagEntityItem,
 )
-from src.services.filing_service import FilingService
+from src.services.filing_service import FilingService, is_same_file
 from src.services.logger import logger
 from src.services.library_service import LibraryService
 from src.services.metadata_writer import MetadataWriter
@@ -102,6 +102,7 @@ class MutationCoordinator:
         copied_files: list[tuple[str, str]] = []
         deleted_songs = []
         delete_file_ids: set[int] = set()
+        deleted_originals: list[str] = []
         songs = []
         warnings = []
         try:
@@ -111,11 +112,15 @@ class MutationCoordinator:
                 for item in body.delete or []:
                     if isinstance(item, DeleteOriginalFileItem):
                         origin = self._staging_repo.get_origin(item.song_id, conn)
-                        if origin and Path(origin).exists():
-                            Path(origin).unlink()
-                            logger.info(
-                                f"[MutationCoordinator] Deleted original source: {origin}"
-                            )
+                        if origin:
+                            known = self._library.get_song_any_state(item.song_id, conn)
+                            own_path = known.get("source_path") if known else None
+                            if own_path and is_same_file(Path(origin), Path(own_path)):
+                                raise ValueError(
+                                    f"Refusing to delete the original for song {item.song_id}: "
+                                    f"the recorded original is the song's own file ({origin})"
+                                )
+                            deleted_originals.append(origin)
                         self._staging_repo.clear_origin(item.song_id, conn)
                         continue
                     if isinstance(item, DeleteSongItem):
@@ -160,6 +165,14 @@ class MutationCoordinator:
                             ),
                             conn,
                         )
+
+            for origin in deleted_originals:
+                path = Path(origin)
+                if path.exists():
+                    path.unlink()
+                    logger.info(
+                        f"[MutationCoordinator] Deleted original source: {origin}"
+                    )
 
             for song in deleted_songs:
                 if song.id in delete_file_ids:

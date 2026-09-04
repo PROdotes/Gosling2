@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -6,6 +7,21 @@ from src.models.domain import Song
 from src.services.config_service import settings
 from src.services.logger import logger
 from src.utils.text import strip_diacritics
+
+
+def is_same_file(a: Path, b: Path) -> bool:
+    """True when two paths point at the same physical file.
+
+    Prefers samefile(), which sees through case differences, symlinks, junctions and
+    8.3 short names. Falls back to a normcase'd resolved compare when either path is
+    missing, since samefile() requires both files to exist.
+    """
+    try:
+        if a.exists() and b.exists():
+            return a.samefile(b)
+    except OSError as e:
+        logger.warning(f"[FilingService] samefile() check failed for {a} vs {b}: {e}")
+    return os.path.normcase(str(a.resolve())) == os.path.normcase(str(b.resolve()))
 
 
 class FilingService:

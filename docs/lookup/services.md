@@ -181,8 +181,11 @@ Scan a directory for supported audio formats. Pure discovery path.
 ### get_song(song_id: int) -> Optional[Song]
 Fetch a single song and all its credits by ID.
 
-### get_deleted_song(song_id: int) -> Optional[dict]
+### get_deleted_song(song_id: int, conn: Optional[Connection] = None) -> Optional[dict]
 Bare row for a soft-deleted song. No hydration — see `SongRepository.get_deleted_by_id`.
+
+### get_song_any_state(song_id: int, conn: Optional[Connection] = None) -> Optional[dict]
+Identity (`{"id", "source_path"}`) of a song whether it is live or soft-deleted; `None` only when no such song exists. `get_song()` filters `IsDeleted` rows out, so callers reasoning about a rejected song's own file need this. `source_path` may be `None` on a deleted row whose file was removed at delete time.
 
 ### get_all_publishers() -> List[Publisher]
 Fetch the full directory of publishers with resolved hierarchy chains.
@@ -256,6 +259,8 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration. Que
 ### get_song(song_id: int) -> Optional[Song]
 ### get_deleted_song(song_id: int) -> Optional[dict]
 Bare row for a soft-deleted song, no hydration. Passthrough to `LibraryService.get_deleted_song`.
+### get_song_any_state(song_id: int) -> Optional[dict]
+Identity of a song whether live or soft-deleted. Passthrough to `LibraryService.get_song_any_state`.
 ### get_album(album_id: int) -> Optional[Album]
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 ### get_tag(tag_id: int) -> Optional[Tag]
@@ -413,6 +418,9 @@ Converts text to Sentence Case (First letter capitalized, the rest lowercase).
 
 ## FilingService
 *Location: `src/services/filing_service.py`*
+
+### is_same_file(a: Path, b: Path) -> bool
+Module-level. True when two paths point at the same physical file. Prefers `samefile()` (sees through case differences, symlinks, junctions, 8.3 short names); falls back to a `normcase`'d resolved compare when either path is missing. Used by the original-cleanup guards to refuse deleting a song's own file.
 
 ### evaluate_routing(song: Song) -> Path
 Calculates the target relative path based on rules. Internally calls `_sanitize_for_filesystem()` which uses shared `strip_diacritics()` from utils/text.py (Phase 3.1).

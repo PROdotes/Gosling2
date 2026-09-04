@@ -109,6 +109,10 @@ class CatalogService:
         """Bare row for a soft-deleted song, no hydration."""
         return self._library_service.get_deleted_song(song_id)
 
+    def get_song_any_state(self, song_id: int) -> Optional[dict]:
+        """Identity of a song whether it is live or soft-deleted."""
+        return self._library_service.get_song_any_state(song_id)
+
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
         return self._identity_service.get_identity(identity_id)

@@ -670,11 +670,11 @@ export function cleanupOriginalFile(songId) {
     return mutate({ delete: [{ type: "original_file", song_id: songId }] });
 }
 
-export function deleteOriginalByPath(filePath) {
+export function deleteOriginalByPath(filePath, songId) {
     return fetchJson("/api/v1/ingest/cleanup-original", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_path: filePath }),
+        body: JSON.stringify({ file_path: filePath, song_id: Number(songId) }),
     });
 }
 

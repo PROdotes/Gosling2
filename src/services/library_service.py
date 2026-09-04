@@ -50,9 +50,29 @@ class LibraryService:
         actual_rules_path = rules_path or config.RENAME_RULES_PATH
         self._filing_service = FilingService(actual_rules_path)
 
-    def get_deleted_song(self, song_id: int) -> Optional[dict]:
+    def get_deleted_song(
+        self, song_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[dict]:
         """Bare row for a soft-deleted song. No hydration — see SongRepository.get_deleted_by_id."""
-        return self._song_repo.get_deleted_by_id(song_id)
+        return self._song_repo.get_deleted_by_id(song_id, conn)
+
+    def get_song_any_state(
+        self, song_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[dict]:
+        """Identity of a song whether it is live or soft-deleted.
+
+        Returns {"id", "source_path"}, or None only when no such song exists at all.
+        get_song() filters IsDeleted rows out, so callers that must reason about a
+        rejected song's own file need this instead. source_path may be None on a
+        deleted row whose file was removed at delete time.
+        """
+        song = self.get_song(song_id, conn)
+        if song:
+            return {"id": song.id, "source_path": song.source_path}
+        ghost = self._song_repo.get_deleted_by_id(song_id, conn)
+        if ghost:
+            return {"id": ghost["SourceID"], "source_path": ghost["SourcePath"]}
+        return None
 
     def get_song(
         self, song_id: int, conn: Optional[sqlite3.Connection] = None

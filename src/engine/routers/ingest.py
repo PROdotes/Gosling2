@@ -36,6 +36,7 @@ from src.engine.config import (
     ProcessingStatus,
     PARSER_PRESETS_PATH,
 )
+from src.services.filing_service import is_same_file
 from src.utils.audio_hash import calculate_audio_hash
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
@@ -356,6 +357,45 @@ async def delete_song(
     return {"status": "DELETED", "id": song_id}
 
 
+def _delete_redundant_copy(service, request: CleanupOriginalRequest) -> dict:
+    """Delete a specific file the user is looking at, e.g. a duplicate ingest card.
+
+    song_id names the song that file duplicates; it is the safety reference, not the
+    target. If the path turns out to BE that song's own file there is nothing
+    redundant to remove, so the deletion is refused.
+    """
+    real_target = Path(request.file_path).resolve()
+
+    if request.song_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="song_id is required with file_path so the target can be checked against the song's own file.",
+        )
+
+    known = service.get_song_any_state(request.song_id)
+    if known is None:
+        raise HTTPException(
+            status_code=404, detail=f"Song ID {request.song_id} not found."
+        )
+
+    own_path = known.get("source_path")
+    if own_path and is_same_file(real_target, Path(own_path)):
+        logger.warning(
+            f"[IngestRouter] Blocked deletion of song {request.song_id}'s own file: {real_target}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot delete a file that is the active source of a library record.",
+        )
+
+    if not real_target.exists():
+        return {"status": "ALREADY_GONE", "path": str(real_target)}
+
+    real_target.unlink()
+    logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
+    return {"status": "DELETED", "path": str(real_target)}
+
+
 @router.post("/cleanup-original")
 async def cleanup_original_file(request: CleanupOriginalRequest):
     """
@@ -365,6 +405,9 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
 
     try:
         service = _get_service()
+
+        if request.file_path:
+            return _delete_redundant_copy(service, request)
 
         if request.song_id is not None:
             origin = service.get_staging_origin(request.song_id)
@@ -387,29 +430,9 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
             )
             return {"status": "DELETED", "id": request.song_id}
 
-        if not request.file_path:
-            raise HTTPException(
-                status_code=400, detail="Either file_path or song_id must be provided."
-            )
-
-        real_target = Path(request.file_path).resolve()
-
-        filed_song = service._song_repo.get_by_path(str(real_target))
-        if filed_song is not None:
-            logger.warning(
-                f"[IngestRouter] Security: Blocked deletion of filed library copy: {request.file_path}"
-            )
-            raise HTTPException(
-                status_code=403,
-                detail="Cannot delete a file that is the active source of a library record.",
-            )
-
-        if not os.path.exists(real_target):
-            return {"status": "ALREADY_GONE", "path": str(real_target)}
-
-        os.remove(real_target)
-        logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
-        return {"status": "DELETED", "path": str(real_target)}
+        raise HTTPException(
+            status_code=400, detail="Either file_path or song_id must be provided."
+        )
     except HTTPException:
         raise
     except Exception as e:
