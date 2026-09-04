@@ -31,9 +31,7 @@ def api(populated_db, monkeypatch):
 
 def _make_ghost(db_path, song_id=GHOST_ID):
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (song_id,)
-    )
+    conn.execute("UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (song_id,))
     conn.execute("DELETE FROM SongCredits WHERE SourceID = ?", (song_id,))
     conn.commit()
     conn.close()
