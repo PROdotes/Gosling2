@@ -251,6 +251,8 @@ class DeletedSongView(BaseModel):
     bpm: Optional[int] = None
     isrc: Optional[str] = None
     notes: Optional[str] = None
+    estimated_original_path: Optional[str] = None
+    original_exists: bool = False
 
     @computed_field
     @property
@@ -270,6 +272,7 @@ class DeletedSongView(BaseModel):
             bpm=row["TempoBPM"],
             isrc=row["ISRC"],
             notes=row["SourceNotes"],
+            estimated_original_path=row.get("OriginPath"),
         )
 
 

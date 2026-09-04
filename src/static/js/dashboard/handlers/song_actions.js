@@ -298,6 +298,7 @@ export class SongActionsHandler {
 
         try {
             await rejectSong(id, reason);
+            this._offerOriginalCleanup(id);
             const inSongsList = this.ctx.getState().currentMode === "songs";
             if (inSongsList && this.ctx.clearSongEditorV2) {
                 this.ctx.clearSongEditorV2();
@@ -323,6 +324,33 @@ export class SongActionsHandler {
                 );
             }
         }
+    }
+
+    async _offerOriginalCleanup(songId) {
+        // Reject clears the panel and sweeps the row, so the rejected song's own
+        // view is never shown. Offer its leftover source file here instead, as an
+        // explicit act: nothing is deleted unless this button is pressed.
+        let deleted;
+        try {
+            deleted = await getDeletedSong(songId);
+        } catch {
+            return;
+        }
+        if (!deleted || !deleted.original_exists) return;
+
+        const path = deleted.estimated_original_path || "";
+        const name = path.split(/[\\/]/).pop() || path;
+        showToast(`Original still on disk: ${name}`, "warning", 12000, {
+            label: "Delete Original",
+            onClick: async () => {
+                try {
+                    await cleanupOriginalFile(songId);
+                    showToast("Original deleted", "success");
+                } catch (err) {
+                    showToast(`Cleanup failed: ${err.message}`, "error");
+                }
+            },
+        });
     }
 
     async handleChangeRejectReason(actionTarget) {
@@ -911,7 +939,9 @@ export class SongActionsHandler {
         const songId = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
             await cleanupOriginalFile(songId);
-            if (this.ctx.refreshActiveSongV2) {
+            if (actionTarget.dataset.deleted) {
+                renderDeletedSongView(await getDeletedSong(songId));
+            } else if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();

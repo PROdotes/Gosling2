@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException, Query
 from pathlib import Path
 from typing import List, Optional
@@ -137,7 +138,10 @@ async def get_deleted_song(
         raise HTTPException(
             status_code=404, detail=f"No deleted song with ID {song_id}"
         )
-    return DeletedSongView.from_row(row)
+    view = DeletedSongView.from_row(row)
+    if view.estimated_original_path:
+        view.original_exists = os.path.exists(view.estimated_original_path)
+    return view
 
 
 @router.get("/songs/{song_id:int}", response_model=SongView)

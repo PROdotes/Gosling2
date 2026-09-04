@@ -241,9 +241,11 @@ class SongRepository(MediaSourceRepository):
         logger.debug(f"[SongRepository] -> get_deleted_by_id(id={song_id})")
         query = """
             SELECT m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
-                   m.SourceNotes, s.TempoBPM, s.RecordingYear, s.ISRC
+                   m.SourceNotes, s.TempoBPM, s.RecordingYear, s.ISRC,
+                   so.OriginPath
             FROM MediaSources m
             JOIN Songs s ON m.SourceID = s.SourceID
+            LEFT JOIN StagingOrigins so ON so.SourceID = m.SourceID
             WHERE m.SourceID = ? AND m.IsDeleted = 1
         """
 

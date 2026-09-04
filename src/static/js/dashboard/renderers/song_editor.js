@@ -1241,7 +1241,18 @@ export function renderDeletedSongView(song) {
 </div>`;
     }
     const sidebar = panel.querySelector(".action-sidebar");
-    if (sidebar) sidebar.innerHTML = "";
+    if (sidebar) sidebar.innerHTML = renderDeletedOriginalActions(song);
+}
+
+function renderDeletedOriginalActions(song) {
+    if (!song.estimated_original_path) return "";
+    const path = escapeHtml(song.estimated_original_path);
+    if (!song.original_exists) {
+        return `<button class="sidebar-btn" data-action="cleanup-original" data-song-id="${song.id}" data-deleted="1" data-path="${path}">Clear Stale Origin Record</button>
+           <div class="sidebar-path" style="opacity:0.6">${path}</div>`;
+    }
+    return `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-song-id="${song.id}" data-deleted="1" data-path="${path}">Delete Original</button>
+           <div class="sidebar-path" style="opacity:0.6">${path}</div>`;
 }
 
 export function renderSongEditorEmpty() {
