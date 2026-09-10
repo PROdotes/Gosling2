@@ -82,3 +82,8 @@ gosling-server.exe
 
 # Graphify knowledge graph output
 graphify-out/
+
+# API credentials (AcoustID, and any future service keys) - never commit.
+# NOTE: json/settings.json IS tracked, so keys must not go there.
+.env
+json/secrets.json
