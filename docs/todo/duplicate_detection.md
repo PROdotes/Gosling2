@@ -86,8 +86,11 @@ Direct repo write, NOT `MutationCoordinator` - same precedent as the rest of ing
 
 ### 6. PyInstaller
 
-No `.spec` file is currently checked in (the exe is built from a command line - see the
-saved recipe). Whatever bundles `ffmpeg.exe` must also bundle `fpcalc.exe`.
+Nothing to do. `ffmpeg/` is gitignored and provisioned as a runtime sibling folder (like
+`sqldb/`, `json/`, `temp/`) - the PyInstaller recipe does not bundle `ffmpeg.exe`, so there
+is no bundling step to extend. `fpcalc.exe` already sits in `ffmpeg/` next to `ffmpeg.exe`
+and `FPCALC_PATH` resolves exactly parallel to `FFMPEG_PATH`. A build machine setting up
+`ffmpeg/` just needs fpcalc in it (noted in the exe-build recipe).
 
 ### Not in Part 1
 
