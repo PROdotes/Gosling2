@@ -12,8 +12,10 @@ from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
 from src.models.exceptions import ReingestionConflictError
 from src.data.staging_repository import StagingRepository
+from src.data.audio_fingerprint_repository import AudioFingerprintRepository
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
+from src.utils.audio_fingerprint import calculate_fingerprint, FINGERPRINT_LENGTH_CAP
 from src.services.audio_repair import needs_xing_repair, repair_xing_header
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
@@ -59,6 +61,7 @@ class IngestionService:
         self._tag_repo = tag_repo or TagRepository(db_path)
         self._identity_repo = identity_repo or IdentityRepository(db_path)
         self._staging_repo = StagingRepository(db_path)
+        self._fingerprint_repo = AudioFingerprintRepository(db_path)
 
         # Cross-service dependencies
         self._library_service = library_service or LibraryService(db_path)
@@ -144,6 +147,46 @@ class IngestionService:
             logger.warning(
                 f"[IngestionService] Xing repair skipped for '{staged_path}': {e}"
             )
+
+    def _compute_fingerprint(self, audio_path: str) -> Optional[tuple[bytes, float]]:
+        """
+        Best-effort acoustic fingerprint for the final audio of a source.
+
+        Runs fpcalc, which is why callers invoke it before opening the write
+        transaction (mirroring _repair_staged_audio and calculate_audio_hash).
+        Returns (fingerprint_blob, duration_s), or None on any fpcalc failure -
+        ingestion never fails because a fingerprint could not be computed.
+        """
+        try:
+            result = calculate_fingerprint(audio_path)
+        except Exception as e:
+            logger.error(
+                f"[IngestionService] fingerprint compute raised for '{audio_path}': {e}"
+            )
+            return None
+        if result is None:
+            return None
+        fingerprint, duration_s = result
+        return fingerprint.tobytes(), duration_s
+
+    def _store_fingerprint(
+        self,
+        source_id: int,
+        computed: Optional[tuple[bytes, float]],
+        conn: sqlite3.Connection,
+    ) -> None:
+        """
+        Persist a fingerprint attempt for a source. computed=None records a
+        failed fpcalc run (Fingerprint NULL) so a later backfill skips the file
+        instead of re-reading it off the network drive forever.
+        """
+        if computed is None:
+            self._fingerprint_repo.set_fingerprint(source_id, None, None, None, conn)
+            return
+        blob, duration_s = computed
+        self._fingerprint_repo.set_fingerprint(
+            source_id, blob, duration_s, FINGERPRINT_LENGTH_CAP, conn
+        )
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """
@@ -312,6 +355,7 @@ class IngestionService:
             f"[IngestionService] -> finalize_wav_conversion(id={song_id}, mp3='{mp3_path}')"
         )
         mp3_hash = calculate_audio_hash(mp3_path)
+        fingerprint = self._compute_fingerprint(mp3_path)
 
         # Check if another record already has this MP3 hash (including soft-deleted)
         existing = self._song_repo.get_source_metadata_by_hash(mp3_hash)
@@ -337,6 +381,7 @@ class IngestionService:
                         self._song_repo.reactivate_ghost(
                             existing["id"], reactivated, conn
                         )
+                        self._store_fingerprint(existing["id"], fingerprint, conn)
                         self._song_repo.hard_delete(song_id, conn)
                     return existing["id"]
                 except Exception as ex:
@@ -371,6 +416,7 @@ class IngestionService:
                     },
                     conn,
                 )
+                self._store_fingerprint(song_id, fingerprint, conn)
                 self.enrich_metadata(song_id, conn)
             logger.info(
                 f"[IngestionService] <- finalize_wav_conversion(id={song_id}) Status now {ProcessingStatus.NEEDS_REVIEW}"
@@ -430,9 +476,11 @@ class IngestionService:
 
         # 2. Atomic Write
         song = check["song"]
+        fingerprint = self._compute_fingerprint(staged_path)
         try:
             with self._song_repo.write_connection("ingest") as conn:
                 new_id = self._song_repo.insert(song, conn)
+                self._store_fingerprint(new_id, fingerprint, conn)
                 hydrated_song = song.model_copy(update={"id": new_id})
                 self.enrich_metadata(new_id, conn)
                 hydrated_song = hydrated_song.model_copy(
@@ -489,6 +537,10 @@ class IngestionService:
         if not is_wav:
             self._repair_staged_audio(staged_path)
 
+        # WAV audio here is provisional; finalize_wav_conversion fingerprints the
+        # converted MP3 instead.
+        fingerprint = None if is_wav else self._compute_fingerprint(staged_path)
+
         try:
             with self._song_repo.write_connection("ingest") as conn:
                 audio_hash = calculate_audio_hash(staged_path)
@@ -505,6 +557,8 @@ class IngestionService:
                     }
                 )
                 self._song_repo.reactivate_ghost(ghost_id, reactivated, conn)
+                if not is_wav:
+                    self._store_fingerprint(ghost_id, fingerprint, conn)
                 if original_path:
                     self._staging_repo.set_origin(ghost_id, original_path, conn)
 
