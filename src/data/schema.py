@@ -154,6 +154,24 @@ CREATE TABLE IF NOT EXISTS StagingOrigins (
     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
 );
 
+-- Chromaprint acoustic fingerprints. Machine-derived, recomputable from the
+-- file, and EXCLUDED_FROM_AUDIT: a blob cast to text would dump ~6 KB per row
+-- into ChangeLog, and an unstamped audited write locks all writes (invariant 10).
+-- Separate table so song hydration never drags the blob into list/search reads.
+CREATE TABLE IF NOT EXISTS AudioFingerprints (
+    SourceID    INTEGER PRIMARY KEY,
+    Fingerprint BLOB,               -- packed uint32, little-endian; NULL = fpcalc failed
+    DurationS   REAL,
+    LengthCap   INTEGER,            -- fpcalc -length value in effect when fingerprinted
+    CreatedAt   TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
+);
+-- Tri-state without a status column: no row = never attempted; row with
+-- Fingerprint NULL = attempted, fpcalc failed; row with Fingerprint set =
+-- computed. A status column only earns its place if something ever queues rows
+-- ahead of the compute (a background worker - Part 3B, deferred); nothing in
+-- Part 1/2 does.
+
 CREATE TABLE IF NOT EXISTS ChangeLog (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id    TEXT,
@@ -175,7 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_changelog_unbatched
 """
 
 # Tables excluded from audit triggers. Everything else is audited.
-EXCLUDED_FROM_AUDIT = {"ChangeLog", "StagingOrigins"}
+EXCLUDED_FROM_AUDIT = {"ChangeLog", "StagingOrigins", "AudioFingerprints"}
 
 
 def build_trigger_sql(conn: sqlite3.Connection) -> str:

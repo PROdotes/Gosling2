@@ -673,3 +673,18 @@ Retrieves the original path for a song id, if it exists. Returns `None` if the m
 ### clear_origin(source_id: int, conn: Optional[sqlite3.Connection] = None) -> None
 
 Removes the origin mapping for a song. Usually called after the original file has been physically deleted or organized.
+
+---
+
+## AudioFingerprintRepository
+
+*Location: `src/data/audio_fingerprint_repository.py`*
+**Responsibility**: Chromaprint acoustic fingerprints in the `AudioFingerprints` table, one row per `MediaSource` once an attempt has been made. Machine-derived and recomputable, so writes go direct (not via `MutationCoordinator`) and the table is in `EXCLUDED_FROM_AUDIT`. Tri-state: no row = never attempted; row with `Fingerprint` NULL = attempted, fpcalc failed; row with `Fingerprint` set = computed.
+
+### set_fingerprint(source_id: int, fingerprint: Optional[bytes], duration_s: Optional[float], length_cap: Optional[int], conn: sqlite3.Connection) -> int
+
+Records a fingerprint attempt (`INSERT OR REPLACE`). Pass `fingerprint=None` with `duration_s`/`length_cap` `None` to mark a failed fpcalc run so backfill skips the file. Returns `cursor.rowcount`; never raises on zero rows.
+
+### get_fingerprint(source_id: int, conn: sqlite3.Connection) -> Optional[tuple[Optional[bytes], Optional[float], Optional[int]]]
+
+Returns `(fingerprint_bytes, duration_s, length_cap)` for a source, or `None` if no attempt has been recorded. A row from a failed run returns `(None, None, None)` - distinct from the method's own `None`.

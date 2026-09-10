@@ -84,6 +84,7 @@ SCALAR_VALIDATION = {
 
 # FFmpeg
 FFMPEG_PATH = _PROJECT_ROOT / "ffmpeg/ffmpeg.exe"
+FPCALC_PATH = _PROJECT_ROOT / "ffmpeg/fpcalc.exe"
 
 # Song Approval Pipeline
 RENAME_RULES_PATH = _PROJECT_ROOT / "json/rules.json"
