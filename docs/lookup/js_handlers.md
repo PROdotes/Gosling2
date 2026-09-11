@@ -121,6 +121,9 @@ Updates an album's release type (CD, Vinyl, Digital).
 ### handleOpenSpotifyModal(actionTarget)
 Opens the Spotify credit importer.
 
+### handleOpenDuplicateCheckModal(actionTarget)
+Opens the duplicate-check modal (Part 2A test harness) and runs the scan for the song.
+
 ### handleQuickCreateAlbum(actionTarget)
 Quickly creates an album from a song and links it.
 
@@ -135,6 +138,9 @@ Closes the ScrubberModal.
 
 ### handleCloseSpotifyModal(actionTarget)
 Closes the SpotifyModal.
+
+### handleCloseDuplicateCheckModal(actionTarget)
+Closes the duplicate-check modal.
 
 ### handleCloseSplitterModal(actionTarget)
 Closes the SplitterModal.

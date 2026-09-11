@@ -333,6 +333,9 @@ Previews metadata extraction from filenames.
 ### applyFilenameParsing(items, pattern)
 Applies metadata extraction from filenames.
 
+### findDuplicates(songId, threshold)
+Read-only acoustic duplicate scan (Part 2A test harness). Calls `POST /api/v1/songs/{songId}/find-duplicates`, writes nothing.
+
 ---
 
 ## Entity Details (Roles & Frames)

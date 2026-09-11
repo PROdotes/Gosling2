@@ -81,6 +81,8 @@ export class SongActionsHandler {
             "format-case",
             "remove-publisher",
             "open-spotify-modal",
+            "open-duplicate-check-modal",
+            "close-duplicate-check-modal",
             "open-splitter-modal",
             "open-filename-parser-single",
             "set-primary-tag",
@@ -1043,6 +1045,22 @@ export class SongActionsHandler {
                 }
             },
         });
+    }
+
+    async handleOpenDuplicateCheckModal(actionTarget) {
+        const id = actionTarget.dataset.id || actionTarget.dataset.songId;
+        const { title } = actionTarget.dataset;
+        const { openDuplicateCheckModal } = await import(
+            "../components/duplicate_check_modal.js"
+        );
+        openDuplicateCheckModal({ songId: id, title });
+    }
+
+    async handleCloseDuplicateCheckModal() {
+        const { closeDuplicateCheckModal } = await import(
+            "../components/duplicate_check_modal.js"
+        );
+        closeDuplicateCheckModal();
     }
 
     handleCloseEditModal() {

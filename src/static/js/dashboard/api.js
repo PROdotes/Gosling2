@@ -723,3 +723,10 @@ export function filterSongs(filters, mode = "ALL", liveOnly = false, hasOriginal
 export async function getAuditIntegrity() {
     return fetchJson("/api/v1/audit/integrity");
 }
+
+export function findDuplicates(songId, threshold) {
+    const params = threshold != null ? `?threshold=${threshold}` : "";
+    return fetchJson(`/api/v1/songs/${songId}/find-duplicates${params}`, {
+        method: "POST",
+    });
+}

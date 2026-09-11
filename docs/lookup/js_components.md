@@ -55,6 +55,14 @@ Displays the name/credit splitting tool.
 *Location: `src/static/js/dashboard/components/splitter_modal.js`*
 Hides the splitter modal.
 
+### openDuplicateCheckModal(config)
+*Location: `src/static/js/dashboard/components/duplicate_check_modal.js`*
+Runs the acoustic duplicate scan for a song (Part 2A test harness) and renders the result. Read-only.
+
+### closeDuplicateCheckModal()
+*Location: `src/static/js/dashboard/components/duplicate_check_modal.js`*
+Hides the duplicate-check modal.
+
 ### openFilenameParserModal(config)
 *Location: `src/static/js/dashboard/components/filename_parser_modal.js`*
 Displays the regex-based extractor.

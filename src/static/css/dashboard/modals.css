@@ -174,6 +174,61 @@
     font-size: 0.75rem;
 }
 
+/* --- Duplicate check modal --- */
+
+.dup-check-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dup-check-match {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.dup-check-match-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.dup-check-match-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.dup-check-match-score {
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.dup-check-match-score--same-recording {
+    color: var(--success, #4caf50);
+}
+
+.dup-check-match-score--related {
+    color: var(--text-sec);
+}
+
+.dup-check-match-artist {
+    font-size: 0.8rem;
+    color: var(--text-sec);
+}
+
+.dup-check-match-path {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    word-break: break-all;
+}
+
 /* --- Link modal --- */
 
 .link-modal-overlay {

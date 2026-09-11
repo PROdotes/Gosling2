@@ -1063,6 +1063,7 @@ ${playBtn}
 <div class="sidebar-group-label">Research</div>
 ${searchSplitBtn}
 <button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}"><img class="sidebar-btn__icon" src="/static/resources/Spotify_icon.svg" alt="">Spotify</button>
+<button class="sidebar-btn" data-action="open-duplicate-check-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Check Duplicates</button>
 
 <div class="sidebar-divider"></div>
 
