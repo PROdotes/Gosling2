@@ -546,3 +546,15 @@ Bare view of a soft-deleted song (rejected or plain-deleted) — no credits/albu
 **HTTP**: `POST /api/v1/spotify/import`
 - Atomically imports a batch of credits and publishers for a song.
 - Builds `AddCreditItem`/`AddPublisherItem` lists and applies them as one `MutationRequest` via `MutationCoordinator.apply` (single transaction, rollback on partial failure).
+
+---
+
+## Duplicate Detection Router
+*Location: `src/engine/routers/duplicate_detection.py`*
+**Responsibility**: Read-only acoustic duplicate scan - Part 2A test harness (see `docs/todo/duplicate_detection.md`). Temporary: expected to be removed or absorbed into Part 3.
+
+### find_duplicates(song_id: int, threshold: float = DUPLICATE_DETECTION_DEFAULT_THRESHOLD) -> dict
+**HTTP**: `POST /api/v1/songs/{song_id}/find-duplicates?threshold=0.75`
+- Runs the song's stored fingerprint against every other computed fingerprint in the library. Writes nothing.
+- `threshold` is a query param specifically so it can be tuned against live data without a redeploy.
+- 404 if the song does not exist. Otherwise wraps `DuplicateDetectionService.find_duplicates` - `{"comparable": bool, "matches": [...]}`.

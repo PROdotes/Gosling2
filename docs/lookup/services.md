@@ -566,3 +566,17 @@ Returns 1000 normalized RMS peaks. Cache hit reads from `sqldb/waveform_cache/{s
 
 ### delete_cache(song_id: int) -> None
 Best-effort removal of the cached waveform for a song. Silent if missing.
+
+---
+
+## DuplicateDetectionService
+*Location: `src/services/duplicate_detection_service.py`*
+
+**Responsibility**: Part 2A test harness for acoustic duplicate detection - read-only, no writes, no `MutationCoordinator` involvement. Temporary: the tuning harness for Part 2, expected to be removed or absorbed into Part 3 (see `docs/todo/duplicate_detection.md`).
+
+### find_duplicates(song_id: int, threshold: float = DUPLICATE_DETECTION_DEFAULT_THRESHOLD) -> Optional[dict]
+Runs the song's stored fingerprint against every other computed fingerprint (`AudioFingerprintRepository.get_all_computed`) via `src/utils/audio_fingerprint_match.find_matches`, then resolves matched IDs to slim song info (`SongRepository.search_slim_by_ids`).
+- Returns `None` if the song does not exist (router turns this into a 404).
+- Returns `{"comparable": False, "matches": []}` if the song has no computed fingerprint - distinct from "comparable but zero matches" (the "not comparable is a third state" pin).
+- Otherwise `{"comparable": True, "matches": [{"song_id", "score", "title", "artist", "path"}, ...]}`, best score first.
+- `DUPLICATE_DETECTION_DEFAULT_THRESHOLD = 0.75` (`src/engine/config.py`) - deliberately loose per "nothing is ever auto-decided" (score only orders/surfaces, never acts).

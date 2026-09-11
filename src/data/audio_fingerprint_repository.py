@@ -69,3 +69,19 @@ class AudioFingerprintRepository(BaseRepository):
         if row is None:
             return None
         return (row[0], row[1], row[2])
+
+    def get_all_computed(
+        self, conn: sqlite3.Connection
+    ) -> list[tuple[int, bytes, float]]:
+        """
+        Every row with a computed fingerprint, as (SourceID, Fingerprint,
+        DurationS). Excludes never-attempted (no row) and failed (Fingerprint
+        NULL) sources - neither has a blob to compare against. Read path, used
+        to build the candidate pool for duplicate-detection scans.
+        """
+        rows = conn.execute("""
+            SELECT SourceID, Fingerprint, DurationS
+            FROM AudioFingerprints
+            WHERE Fingerprint IS NOT NULL
+            """).fetchall()
+        return [(row[0], row[1], row[2]) for row in rows]

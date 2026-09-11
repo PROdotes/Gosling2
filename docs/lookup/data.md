@@ -688,3 +688,7 @@ Records a fingerprint attempt (`INSERT OR REPLACE`). Pass `fingerprint=None` wit
 ### get_fingerprint(source_id: int, conn: sqlite3.Connection) -> Optional[tuple[Optional[bytes], Optional[float], Optional[int]]]
 
 Returns `(fingerprint_bytes, duration_s, length_cap)` for a source, or `None` if no attempt has been recorded. A row from a failed run returns `(None, None, None)` - distinct from the method's own `None`.
+
+### get_all_computed(conn: sqlite3.Connection) -> list[tuple[int, bytes, float]]
+
+Every row with a computed fingerprint, as `(SourceID, Fingerprint, DurationS)`. Excludes never-attempted (no row) and failed (`Fingerprint` NULL) sources. Read path - builds the candidate pool for duplicate-detection scans (Part 2A).

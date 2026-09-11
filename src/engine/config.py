@@ -62,6 +62,15 @@ COMMA_SPLIT_FIELDS = ["composers"]
 # Album defaults
 ALBUM_DEFAULT_TYPE = "Single"
 
+# Duplicate detection (Part 2A test harness) - deliberately loose per
+# docs/todo/duplicate_detection.md ("nothing is ever auto-decided": the score
+# only orders/surfaces, never acts, so a loose cutoff costs nothing). The
+# other Part 2A tuning constants (offset window, overlap floor, duration
+# floor/prefilter) live beside the algorithm in audio_fingerprint_match.py,
+# not here - this one lives in config because it's shared across the
+# service and router layers rather than internal to the comparison itself.
+DUPLICATE_DETECTION_DEFAULT_THRESHOLD = 0.75
+
 # Song defaults
 SONG_DEFAULT_YEAR = 2026
 YEAR_MIN = 1860
