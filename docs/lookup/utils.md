@@ -30,6 +30,23 @@ Shells `fpcalc -raw -length 180` and parses its `FINGERPRINT`/`DURATION` lines.
 
 ---
 
+## Acoustic Fingerprint Matching
+*Location: `src/utils/audio_fingerprint_match.py`*
+**Responsibility**: Compare fingerprints from `audio_fingerprint.py` (Part 2A - pure, standalone; no DB access, no writes).
+
+### score(fp_a, fp_b) -> float | None
+Acoustic similarity of two fingerprints, 0.0-1.0.
+- Numpy XOR/popcount, `1 - popcount(a XOR b) / (32 * overlap)`, best of a bounded offset slide (`OFFSET_WINDOW_ITEMS = 120`, ~15s).
+- Returns `None` - "not comparable" - if no offset reaches `MIN_OVERLAP_ITEMS = 50`. Not a score of zero; collapsing the two would make "too short to compare" look like "confidently unrelated".
+
+### find_matches(fp, duration_s, candidates, threshold) -> list[tuple[int, float]]
+Scores `fp` against `candidates` (`(song_id, fingerprint, duration_s)` tuples), best first, at or above `threshold`.
+- Duration pre-filter `DURATION_PREFILTER_S = 16.0` (must be >= the offset window in seconds, or it silently discards true matches before `score()` ever sees them).
+- Skips anything under `MIN_COMPARABLE_DURATION_S = 30.0` (query or candidate) before scoring - closes the hub-song risk (idents/stings matching everything) by construction.
+- Pure function - caller owns fetching candidates and picking/tuning `threshold`.
+
+---
+
 ## Text Normalization & Diacritics
 *Location: `src/utils/text.py`*
 **Responsibility**: Unified diacritic-stripping for filesystem paths, search indices, and client-server communication (Phase 3.1).
