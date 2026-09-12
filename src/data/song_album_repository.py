@@ -200,7 +200,11 @@ class SongAlbumRepository(BaseRepository):
         credit_repo = SongCreditRepository(self.db_path)
         for credit in album.credits:
             role_id = credit_repo.get_or_create_role(credit.role_name, cursor)
-            name_id = credit_repo.get_or_create_credit_name(credit.display_name, cursor)
+            name_id = credit_repo.get_or_create_credit_name(
+                credit.display_name,
+                cursor,
+                display_name_search=normalize_for_search(credit.display_name),
+            )
             cursor.execute(
                 "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
                 (album_id, name_id, role_id),
