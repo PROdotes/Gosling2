@@ -7,6 +7,7 @@ from src.data.song_album_repository import SongAlbumRepository
 from src.data.publisher_repository import PublisherRepository
 from src.services.logger import logger
 from src.engine.config import ProcessingStatus
+from src.utils.text import normalize_for_search
 
 if TYPE_CHECKING:
     from src.services.credit_service import CreditService
@@ -524,7 +525,7 @@ class SongRepository(MediaSourceRepository):
             f"[SongRepository] -> find_by_metadata(title='{title}', artists={artists}, year={year})"
         )
 
-        params: List[Any] = [title]
+        params: List[Any] = [normalize_for_search(title)]
         year_filter = ""
         if year:
             year_filter = "AND s.RecordingYear = ?"
@@ -533,7 +534,7 @@ class SongRepository(MediaSourceRepository):
         query_sql = f"""
             SELECT DISTINCT {self._COLUMNS}
             {self._JOIN}
-            WHERE m.MediaName = ? COLLATE UTF8_NOCASE
+            WHERE m.MediaName_Search = ?
             {year_filter}
         """
 
@@ -577,11 +578,14 @@ class SongRepository(MediaSourceRepository):
 
         # Compare sets
         found_matches = []
-        target_set = set(a.lower() for a in artists)
+        target_set = {normalize_for_search(artist) for artist in artists}
         for song in candidates:
             if song.id is None:
                 continue
-            current_set = set(a.lower() for a in source_performers.get(song.id, []))
+            current_set = {
+                normalize_for_search(artist)
+                for artist in source_performers.get(song.id, [])
+            }
             if current_set == target_set:
                 found_matches.append(song)
 

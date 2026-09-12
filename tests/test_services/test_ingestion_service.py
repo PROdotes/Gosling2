@@ -26,7 +26,7 @@ import os
 import pytest
 from src.data.song_repository import SongRepository
 from src.services.catalog_service import CatalogService
-from tests.conftest import _connect
+from tests.conftest import _connect, _backfill_search_shadows
 
 
 def _connect_with_collation(db_path):
@@ -91,6 +91,7 @@ def disambiguation_db(tmp_path, _master_populated_db):
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (53, 20, 1)"
     )  # Nirvana Performer
 
+    _backfill_search_shadows(c)
     conn.commit()
     conn.close()
     return db_path
@@ -327,7 +328,7 @@ class TestYearBehavior:
 
 
 class TestCaseSensitivity:
-    """Title uses COLLATE UTF8_NOCASE, artist comparison uses .lower()."""
+    """Metadata matching uses the shared search normalizer."""
 
     def test_title_uppercase(self, populated_db):
         """EVERLONG matches Everlong."""
@@ -379,6 +380,36 @@ class TestCaseSensitivity:
         )
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 8, f"Expected id 8, got {results[0].id}"
+
+    def test_title_and_artist_without_diacritics_match_normalized_metadata(
+        self, populated_db
+    ):
+        """ASCII ingestion metadata matches stored diacritic display values."""
+        conn = _connect_with_collation(populated_db)
+        conn.execute(
+            """
+            UPDATE MediaSources
+            SET MediaName = ?, MediaName_Search = ?
+            WHERE SourceID = ?
+            """,
+            ("Moja Požega", "moja pozega", 1),
+        )
+        conn.execute(
+            """
+            UPDATE ArtistNames
+            SET DisplayName = ?, DisplayName_Search = ?
+            WHERE DisplayName = ?
+            """,
+            ("Željko", "zeljko", "Nirvana"),
+        )
+        conn.commit()
+        conn.close()
+
+        repo = SongRepository(populated_db)
+        results = repo.find_by_metadata("moja pozega", ["zeljko"], 1991)
+
+        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
+        assert results[0].id == 1, f"Expected id 1, got {results[0].id}"
 
 
 class TestPathCollision:
