@@ -290,6 +290,8 @@ class IngestionService:
                         "match_type": "METADATA",
                         "message": f"Metadata match found: {', '.join(performers)} - {title} ({year})",
                         "song": hydrated[0],
+                        "incoming_title": title,
+                        "incoming_artist": ", ".join(performers),
                     }
 
             # Final return for NEW songs

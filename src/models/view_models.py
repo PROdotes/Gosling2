@@ -814,6 +814,11 @@ class IngestionReportView(BaseModel):
     original_path: Optional[str] = None
     original_exists: Optional[bool] = None
 
+    # Incoming file's own parsed metadata (Populated on METADATA-match ALREADY_EXISTS,
+    # so the UI can show what was scanned next to what it matched)
+    incoming_title: Optional[str] = None
+    incoming_artist: Optional[str] = None
+
     @computed_field
     @property
     def status_label(self) -> str:

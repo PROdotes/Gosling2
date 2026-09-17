@@ -15,10 +15,10 @@ import { openFilenameParserModal } from "../components/filename_parser_modal.js"
 import { showToast } from "../components/toast.js";
 import { basename, escapeHtml, renderStatus } from "../components/utils.js";
 
-const DUPLICATE_MATCH_LABELS = {
-    PATH: "Duplicate: this exact file path is already in the library",
-    HASH: "Duplicate: byte-identical audio already in the library",
-    METADATA: "Duplicate: matching title, artist, and year already in the library",
+const DUPLICATE_MATCH_CHIPS = {
+    PATH: { label: "SAME PATH", confidence: "exact" },
+    HASH: { label: "SAME AUDIO", confidence: "exact" },
+    METADATA: { label: "SAME DATA", confidence: "fuzzy" },
 };
 
 const PATH_INPUT_ID = "ingest-path-input";
@@ -495,12 +495,12 @@ function setupDuplicateDeleteHandler(resultsId) {
             const actionsRow = btn.closest(".ingest-actions-row");
             if (card) card.classList.add("source-deleted");
             if (actionsRow) {
-                actionsRow.innerHTML = `<span class="muted-note">Original deleted</span>`;
+                actionsRow.innerHTML = `<span class="muted-note">Downloaded file deleted</span>`;
             }
         } catch (err) {
             btn.disabled = false;
             btn.classList.remove("confirming");
-            btn.textContent = "Delete Original";
+            btn.textContent = "Delete Downloaded File";
             showToast(`Failed: ${err.message}`, "error");
         }
     });
@@ -731,23 +731,50 @@ function createResultCard(result, path) {
     const statusClass = result.status_severity || "error";
 
     const song = result.song;
+    const isDuplicate = status === "ALREADY_EXISTS";
     const title =
         status === "CONFLICT" && result.title
             ? result.title
             : song?.media_name || song?.title || result.display_title || "Unknown Title";
     const artist = song?.display_artist || "-";
 
+    const incomingDisplay = result.incoming_title
+        ? `${result.incoming_artist || "-"} - ${result.incoming_title}`
+        : basename(path);
+    const existingDisplay = `${artist} - ${title}`;
+
     card.innerHTML = `
         <div class="card-icon ingest-icon">${icon}</div>
         <div class="card-body">
             <div class="card-title-row">
-                <div class="card-title">${escapeHtml(title)}</div>
+                <div class="card-title">${isDuplicate ? "Duplicate Found" : escapeHtml(title)}</div>
                 ${renderStatus(statusClass, statusLabel)}
             </div>
+            ${
+                (isDuplicate || status === "CONFLICT") && result.match_type && DUPLICATE_MATCH_CHIPS[result.match_type]
+                    ? `<span class="match-chip ${DUPLICATE_MATCH_CHIPS[result.match_type].confidence}">${escapeHtml(DUPLICATE_MATCH_CHIPS[result.match_type].label)}</span>`
+                    : ""
+            }
+            ${
+                isDuplicate
+                    ? `
+            <div class="dup-compare">
+                <div class="dup-compare-row"><span class="dup-compare-label">New</span><span class="dup-compare-value">${escapeHtml(incomingDisplay)}</span></div>
+                <div class="dup-compare-row"><span class="dup-compare-label">Existing</span><span class="dup-compare-value">${escapeHtml(existingDisplay)}</span></div>
+            </div>
+            `
+                    : status === "CONFLICT"
+                      ? `
+            <div class="dup-compare">
+                <div class="dup-compare-row"><span class="dup-compare-label">New</span><span class="dup-compare-value">${escapeHtml(basename(path))}</span></div>
+            </div>
+            `
+                      : `
             <div class="card-subtitle">${escapeHtml(artist)}</div>
             <div class="detail-path">${escapeHtml(path)}</div>
+            `
+            }
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
-            ${status === "ALREADY_EXISTS" && result.match_type ? `<div class="muted-note" style="margin-top: 0.5rem;">${escapeHtml(DUPLICATE_MATCH_LABELS[result.match_type] || "Duplicate detected")}</div>` : ""}
 
             ${
                 status === "CONFLICT"
@@ -784,7 +811,7 @@ function createResultCard(result, path) {
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}" data-original-path="${escapeHtml(result.original_path || "")}">
                             Re-ingest & Activate
                         </button>
-                        <button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${result.ghost_id}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'} data-staged-path="${escapeHtml(result.staged_path || "")}">Delete Original</button>
+                        <button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${result.ghost_id}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="File not found in downloads folder"'} data-staged-path="${escapeHtml(result.staged_path || "")}">Delete Downloaded File</button>
                     </div>
                 </div>`;
                     })()
@@ -815,7 +842,7 @@ function createResultCard(result, path) {
                     </button>
                     ${
                         status === "ALREADY_EXISTS"
-                            ? `<button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${song && song.id ? song.id : ""}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="Original not found in downloads folder"'}>Delete Original</button>`
+                            ? `<button class="ingest-btn-danger dup-delete-original-btn" data-song-id="${song && song.id ? song.id : ""}"${result.original_exists ? ` data-original-path="${escapeHtml(result.original_path || "")}"` : ' disabled title="File not found in downloads folder"'}>Delete Downloaded File</button>`
                             : ""
                     }
                     <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>

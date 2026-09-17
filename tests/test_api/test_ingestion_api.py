@@ -57,6 +57,8 @@ EXPECTED_INGESTION_FIELDS = {
     "staged_path",
     "original_path",
     "original_exists",
+    "incoming_title",
+    "incoming_artist",
     "status_label",
     "status_severity",
     "formatted_duration",
