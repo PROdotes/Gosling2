@@ -15,6 +15,12 @@ import { openFilenameParserModal } from "../components/filename_parser_modal.js"
 import { showToast } from "../components/toast.js";
 import { basename, escapeHtml, renderStatus } from "../components/utils.js";
 
+const DUPLICATE_MATCH_LABELS = {
+    PATH: "Duplicate: this exact file path is already in the library",
+    HASH: "Duplicate: byte-identical audio already in the library",
+    METADATA: "Duplicate: matching title, artist, and year already in the library",
+};
+
 const PATH_INPUT_ID = "ingest-path-input";
 const CHECK_BTN_ID = "ingest-check-btn";
 const RESULTS_LIST_ID = "ingest-results";
@@ -741,6 +747,7 @@ function createResultCard(result, path) {
             <div class="card-subtitle">${escapeHtml(artist)}</div>
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
+            ${status === "ALREADY_EXISTS" && result.match_type ? `<div class="muted-note" style="margin-top: 0.5rem;">${escapeHtml(DUPLICATE_MATCH_LABELS[result.match_type] || "Duplicate detected")}</div>` : ""}
 
             ${
                 status === "CONFLICT"

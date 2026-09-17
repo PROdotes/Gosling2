@@ -87,3 +87,4 @@ graphify-out/
 # NOTE: json/settings.json IS tracked, so keys must not go there.
 .env
 json/secrets.json
+/.codex/hooks.json
