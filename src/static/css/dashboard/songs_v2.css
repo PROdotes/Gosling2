@@ -97,6 +97,12 @@
     transform: translateY(-50%);
 }
 
+#songs-workspace .filter-section-count {
+    margin-left: 6px;
+    color: #d4a27d;
+    letter-spacing: 0;
+}
+
 #songs-workspace .filter-section-body {
     margin-top: 8px;
 }

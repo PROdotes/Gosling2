@@ -326,13 +326,17 @@ export class FilterSidebarHandler {
         const sidebar = document.getElementById("filter-sidebar");
         if (!sidebar) return;
 
+        // Selected-value count on the header, so a collapsed section still shows it is in use.
+        const countBadge = (n) =>
+            n > 0 ? ` <span class="filter-section-count">${n}</span>` : "";
+
         const renderSection = (key, label, values, renderValue) => {
             if (values.length === 0) return "";
             const isCollapsed = this._collapsed[key];
             return `
                 <div class="filter-section" data-filter-section="${key}">
                     <div class="filter-section-header">
-                        <span class="filter-section-label">${label}</span>
+                        <span class="filter-section-label">${label}${countBadge(this._active[key].length)}</span>
                         <span class="filter-section-toggle">${isCollapsed ? "&#9654;" : "&#9660;"}</span>
                     </div>
                     ${
@@ -360,10 +364,14 @@ export class FilterSidebarHandler {
 
         // Status section — always shown in full (static values, no server filtering)
         const isCollapsed = this._collapsed["statuses"];
+        const statusCount =
+            this._active.statuses.length +
+            (this._liveOnly ? 1 : 0) +
+            (this._hasOriginal ? 1 : 0);
         sectionsHtml += `
             <div class="filter-section" data-filter-section="statuses">
                 <div class="filter-section-header">
-                    <span class="filter-section-label">Status</span>
+                    <span class="filter-section-label">Status${countBadge(statusCount)}</span>
                     <span class="filter-section-toggle">${isCollapsed ? "&#9654;" : "&#9660;"}</span>
                 </div>
                 ${
@@ -435,7 +443,7 @@ export class FilterSidebarHandler {
             sectionsHtml += `
                 <div class="filter-section" data-filter-section="${sectionKey}">
                     <div class="filter-section-header">
-                        <span class="filter-section-label">${cat}</span>
+                        <span class="filter-section-label">${cat}${countBadge((this._active.tag_categories[cat] || []).length)}</span>
                         <span class="filter-section-toggle">${isCatCollapsed ? "&#9654;" : "&#9660;"}</span>
                     </div>
                     ${
