@@ -305,9 +305,9 @@ export class FilterSidebarHandler {
         if (!this._filterValues) return [];
         const keys = [
             "statuses",
+            "library",
             "artists",
             "contributors",
-            "live",
             "years",
             "decades",
             "genres",
@@ -364,14 +364,10 @@ export class FilterSidebarHandler {
 
         // Status section — always shown in full (static values, no server filtering)
         const isCollapsed = this._collapsed["statuses"];
-        const statusCount =
-            this._active.statuses.length +
-            (this._liveOnly ? 1 : 0) +
-            (this._hasOriginal ? 1 : 0);
         sectionsHtml += `
             <div class="filter-section" data-filter-section="statuses">
                 <div class="filter-section-header">
-                    <span class="filter-section-label">Status${countBadge(statusCount)}</span>
+                    <span class="filter-section-label">Status${countBadge(this._active.statuses.length)}</span>
                     <span class="filter-section-toggle">${isCollapsed ? "&#9654;" : "&#9660;"}</span>
                 </div>
                 ${
@@ -387,6 +383,24 @@ export class FilterSidebarHandler {
                             data-filter-value="${s.key}">${s.label}</button>`;
                         })
                         .join("")}
+                </div>`
+                }
+            </div>`;
+
+        // Library section - yes/no song flags, separate from the workflow stages above
+        const isLibraryCollapsed = this._collapsed["library"];
+        const libraryCount = (this._liveOnly ? 1 : 0) + (this._hasOriginal ? 1 : 0);
+        sectionsHtml += `
+            <div class="filter-section" data-filter-section="library">
+                <div class="filter-section-header">
+                    <span class="filter-section-label">Library${countBadge(libraryCount)}</span>
+                    <span class="filter-section-toggle">${isLibraryCollapsed ? "&#9654;" : "&#9660;"}</span>
+                </div>
+                ${
+                    isLibraryCollapsed
+                        ? ""
+                        : `
+                <div class="filter-section-body">
                     <button id="filter-live-toggle" class="filter-value${this._liveOnly ? " active" : ""}" data-filter-key="live">Live Only</button>
                     <button id="filter-has-original-toggle" class="filter-value${this._hasOriginal ? " active" : ""}" data-filter-key="has_original">Has Original</button>
                 </div>`
