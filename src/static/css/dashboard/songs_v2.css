@@ -74,24 +74,42 @@
 
 #songs-workspace .filter-section {
     border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 12px;
-    margin-top: 12px;
+    padding: 12px 0;
 }
 
-/* .filter-section-header typography lives in base.css (.section-title primitive) */
+/* .filter-section-header typography lives in base.css (.section-title primitive).
+   The section owns the divider, so the header drops its own rule and spacing;
+   otherwise a collapsed section renders as two lines around empty space. */
 #songs-workspace .filter-section-header {
     cursor: pointer;
     user-select: none;
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+/* Re-centre the base tick for the larger header text. */
+#songs-workspace .filter-section-header::before {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+#songs-workspace .filter-section-body {
+    margin-top: 8px;
 }
 
 #songs-workspace .filter-section-header:hover {
-    color: var(--text);
+    color: var(--text-pure);
 }
 
 #songs-workspace .filter-value {
+    position: relative;
     width: 100%;
     text-align: left;
-    padding: 5px 8px;
+    padding: 5px 8px 5px 24px;
     border-radius: var(--radius-sm);
     color: var(--text-dim);
     font-size: 12px;
@@ -107,10 +125,22 @@
     color: var(--text);
 }
 
+/* Selected = a marker in the indent plus light-orange text; full accent orange
+   reads as "special" rather than "on" and outweighs the section header. */
 #songs-workspace .filter-value.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-weight: 600;
+    color: #d4a27d;
+}
+
+#songs-workspace .filter-value.active::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #d4a27d;
+    transform: translateY(-50%);
 }
 
 #songs-workspace .filter-active-chips {
