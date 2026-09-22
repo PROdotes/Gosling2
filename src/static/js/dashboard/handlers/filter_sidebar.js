@@ -526,8 +526,14 @@ export class FilterSidebarHandler {
             <div class="filter-header">
                 <button id="filter-expand-all" class="filter-ctrl-btn" title="Expand all">ALL +</button>
                 <button id="filter-collapse-all" class="filter-ctrl-btn" title="Collapse all">ALL &#8722;</button>
-                <button id="filter-mode-all" class="filter-ctrl-btn${this._mode === "ALL" ? " active" : ""}" title="AND logic">ALL</button>
-                <button id="filter-mode-any" class="filter-ctrl-btn${this._mode === "ANY" ? " active" : ""}" title="OR logic">ANY</button>
+            </div>
+            <div class="filter-mode-line">
+                Songs matching
+                <span class="filter-mode-seg">
+                    <button id="filter-mode-all" class="filter-mode-word${this._mode === "ALL" ? " active" : ""}">every</button>
+                    <button id="filter-mode-any" class="filter-mode-word${this._mode === "ANY" ? " active" : ""}">any</button>
+                </span>
+                filter
             </div>
             <div class="filter-sections">
                 ${sectionsHtml}

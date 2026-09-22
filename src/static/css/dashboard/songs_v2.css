@@ -37,9 +37,53 @@
 
 #songs-workspace .filter-header {
     display: flex;
-    padding: 12px;
+    padding: 12px 12px 6px;
     gap: 4px;
+}
+
+/* ALL/ANY mode as a readable sentence: "Songs matching [every] [any] filter" */
+#songs-workspace .filter-mode-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 8px 12px;
     border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+/* every/any as one outlined segmented control so both halves read as clickable */
+#songs-workspace .filter-mode-seg {
+    display: inline-flex;
+    margin: 0 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#songs-workspace .filter-mode-word {
+    background: transparent;
+    color: var(--text-dim);
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#songs-workspace .filter-mode-word + .filter-mode-word {
+    border-left: 1px solid var(--border-strong);
+}
+
+#songs-workspace .filter-mode-word:hover {
+    color: var(--text-pure);
+}
+
+#songs-workspace .filter-mode-word.active {
+    background: var(--border-strong);
+    color: var(--text-pure);
 }
 
 #songs-workspace .filter-ctrl-btn {
