@@ -167,6 +167,20 @@ constraint is the offset bound" and "Pins settled" below. A naive pure-Python fu
 optimise. A 20-song batch drop = ~40s of added wait if done inline at ingest -> **do not
 scan at ingest**.
 
+MEASURED 2026-09-28 (supersedes the per-file budget above): the "check dupes" button took
+~3.3s on a ~950-song library (~350 candidates after the +-16s pre-filter, ~9ms each). The
+cost was all in `score()` (per-offset Python loop + `np.unpackbits`); DB load was ~20ms.
+`score()` is now one vectorized pass over all offsets with `np.bitwise_count` and
+prefix-sum correction for padded pairs -> ~0.69s (~2ms/candidate), scores verified
+bit-identical against the old loop. It is still linear in pre-filtered candidates:
+extrapolated to 50k songs, **~30-40s per check** worst case. Fine for a manual button,
+not for anything interactive or per-ingest. The duration pre-filter is weak for typical
+material: the 3-4 min cluster means +-16s keeps ~37% of the library for a 3:30 song, so
+the 30-40s figure is the common case, not an outlier. Tightening the pre-filter is not the
+lever (it drops true matches, see above). Getting below that needs a candidate index
+(inverted index on fingerprint sub-blocks, below) so only songs sharing content are
+scored - design this with Part 3, not as a tweak.
+
 Library-wide all-pairs sweep: 50k^2/2 ~= 1.25B pairs, ~17h naive. Needs duration bucketing
 (~tens of minutes, overnight job) or an inverted index on fingerprint sub-blocks (how
 AcoustID's server does it). Separate project.

@@ -38,28 +38,35 @@ def score(fp_a: np.ndarray, fp_b: np.ndarray) -> float | None:
     collapsing it into 0.0 would make "too short to compare" indistinguishable
     from "confidently unrelated".
     """
-    best: float | None = None
-    for offset in range(-OFFSET_WINDOW_ITEMS, OFFSET_WINDOW_ITEMS + 1):
-        if offset >= 0:
-            a = fp_a[offset:]
-            b = fp_b[: len(a)]
-        else:
-            b = fp_b[-offset:]
-            a = fp_a[: len(b)]
-        overlap = min(len(a), len(b))
-        if overlap < MIN_OVERLAP_ITEMS:
-            continue
-        a = a[:overlap]
-        b = b[:overlap]
+    # All offsets are scored in one vectorized pass. At offset o, fp_a[i] is
+    # paired with fp_b[i - o]. fp_b is zero-padded by the window on both sides
+    # so that row i of the sliding view holds fp_b[i - o] for every o (column
+    # t = W - o). A padded pair XORs against zero and contributes
+    # popcount(fp_a[i]); those rows form a prefix and suffix of each column,
+    # so they are subtracted with prefix sums instead of masked out.
+    w = OFFSET_WINDOW_ITEMS
+    len_a, len_b = len(fp_a), len(fp_b)
+    pad_right = max(len_a + w - len_b, 0) + w
+    b_padded = np.concatenate(
+        [np.zeros(w, dtype=fp_b.dtype), fp_b, np.zeros(pad_right, dtype=fp_b.dtype)]
+    )
+    b_windows = np.lib.stride_tricks.sliding_window_view(b_padded, 2 * w + 1)[:len_a]
+    all_bits = np.bitwise_count(fp_a[:, None] ^ b_windows).sum(axis=0, dtype=np.int64)
 
-        xor = np.bitwise_xor(a, b)
-        set_bits = int(np.unpackbits(xor.view(np.uint8)).sum())
-        candidate_score = 1.0 - set_bits / (32 * overlap)
+    offsets = np.arange(w, -w - 1, -1)
+    lo = np.clip(offsets, 0, len_a)
+    hi = np.clip(offsets + len_b, lo, len_a)
+    a_bits_cum = np.concatenate(
+        [[0], np.cumsum(np.bitwise_count(fp_a), dtype=np.int64)]
+    )
+    set_bits = all_bits - a_bits_cum[lo] - (a_bits_cum[len_a] - a_bits_cum[hi])
+    overlap = hi - lo
 
-        if best is None or candidate_score > best:
-            best = candidate_score
-
-    return best
+    usable = overlap >= MIN_OVERLAP_ITEMS
+    if not usable.any():
+        return None
+    scores = 1.0 - set_bits[usable] / (32 * overlap[usable])
+    return float(scores.max())
 
 
 def find_matches(
