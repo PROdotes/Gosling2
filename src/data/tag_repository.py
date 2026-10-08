@@ -94,7 +94,11 @@ class TagRepository(BaseRepository):
     def search(
         self, query: str, conn: Optional[sqlite3.Connection] = None
     ) -> List[Tag]:
-        """Search tags by name or category."""
+        """Search tags by name or category.
+
+        Ranked: exact name, name prefix, word-start inside name,
+        substring of name, category-only match; alphabetical within a tier.
+        """
         logger.debug(f"[TagRepository] -> search(q='{query}')")
         sql = """
             SELECT t.TagID, t.TagName, t.TagCategory,
@@ -102,23 +106,35 @@ class TagRepository(BaseRepository):
             FROM Tags t
             LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
             LEFT JOIN MediaSources ms ON mst.SourceID = ms.SourceID AND ms.IsDeleted = 0
-            WHERE (t.TagName LIKE ? COLLATE NOCASE OR t.TagCategory LIKE ? COLLATE NOCASE)
+            WHERE (t.TagName LIKE :contains COLLATE NOCASE
+                   OR t.TagCategory LIKE :contains COLLATE NOCASE)
               AND t.IsDeleted = 0
             GROUP BY t.TagID
-            ORDER BY CASE WHEN LOWER(t.TagName) = LOWER(?) THEN 0 ELSE 1 END,
+            ORDER BY CASE
+                         WHEN LOWER(t.TagName) = LOWER(:q) THEN 0
+                         WHEN t.TagName LIKE :prefix COLLATE NOCASE THEN 1
+                         WHEN t.TagName LIKE :word COLLATE NOCASE THEN 2
+                         WHEN t.TagName LIKE :contains COLLATE NOCASE THEN 3
+                         ELSE 4
+                     END,
                      t.TagName COLLATE NOCASE
         """
-        like = f"%{query}%"
+        params = {
+            "q": query,
+            "prefix": f"{query}%",
+            "word": f"% {query}%",
+            "contains": f"%{query}%",
+        }
 
         if conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(sql, (like, like, query)).fetchall()
+            rows = conn.execute(sql, params).fetchall()
             return [self._row_to_tag(row) for row in rows]
 
         try:
             with self._get_connection() as new_conn:
                 new_conn.row_factory = sqlite3.Row
-                rows = new_conn.execute(sql, (like, like, query)).fetchall()
+                rows = new_conn.execute(sql, params).fetchall()
                 results = [self._row_to_tag(row) for row in rows]
                 logger.debug(
                     f"[TagRepository] <- search(q='{query}') count={len(results)}"

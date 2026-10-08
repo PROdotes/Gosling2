@@ -247,16 +247,40 @@ class TestSearch:
             len(result) == 0
         ), f"Expected 0 results for nonexistent term, got {len(result)}"
 
-    def test_results_sorted_by_name(self, populated_db):
-        """Results should be sorted alphabetically."""
+    def test_results_ranked_by_match_tier_then_name(self, populated_db):
+        """Prefix > substring > category-only; alphabetical within a tier."""
         repo = TagRepository(populated_db)
         result = repo.search("e")
 
         names = [t.name for t in result]
-        sorted_names = sorted(names, key=str.lower)
-        assert (
-            names == sorted_names
-        ), f"Expected sorted names {sorted_names}, got {names}"
+        expected = [
+            # name starts with 'e'
+            "Electronic",
+            "Energetic",
+            "English",
+            # 'e' inside name
+            "Grunge",
+            # category-only (Era, Genre, Genre)
+            "90s",
+            "Alt Rock",
+            "Rock",
+        ]
+        assert names == expected, f"Expected {expected}, got {names}"
+
+    def test_prefix_beats_earlier_alphabetical_substring(self, populated_db):
+        """'ro' -> Rock (prefix) before Alt Rock (word-start), even though A < R."""
+        repo = TagRepository(populated_db)
+        result = repo.search("ro")
+
+        names = [t.name for t in result]
+        assert names[:2] == ["Rock", "Alt Rock"], f"Expected Rock first, got {names}"
+
+    def test_mid_word_substring_still_matches(self, populated_db):
+        """'unge' matches Grunge mid-word (the 'panj' -> Spanjolski case)."""
+        repo = TagRepository(populated_db)
+        result = repo.search("unge")
+
+        assert [t.name for t in result] == ["Grunge"]
 
 
 class TestGetById:
