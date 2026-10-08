@@ -1,57 +1,80 @@
 {
-    "routing_rules": [
-        {
-            "match_genres": ["patriotic", "domoljubne"],
-            "target_path": "Cro/Domoljubne/{artist} - {title}"
-        },
-        {
-            "match_genres": ["pop"],
-            "target_path": "{year}/{artist} - {title}"
-        },
-        {
-            "match_genres": [
-                "jazz",
-                "religiozne",
-                "oldies",
-                "x-mas",
-                "country",
-                "slow",
-                "metal",
-                "navijacke",
-                "rock",
-                "dance",
-                "trance",
-                "electronic",
-                "funk",
-                "blues",
-                "reggae",
-				"latin"
-            ],
-            "target_path": "{genre}/{artist} - {title}"
-        },
-        {
-            "match_genres": ["acoustic"],
-            "target_path": "akustika/{artist} - {title}"
-        },
-        {
-            "match_genres": ["club"],
-            "target_path": "clubbing/{artist} - {title}"
-        },
-        {
-            "match_genres": ["dječje", "djecje"],
-            "target_path": "djecje/{artist} - {title}"
-        },
-        {
-            "match_genres": ["Zabavne"],
-            "target_path": "Cro {genre}/{year}/{artist} - {title}"
-        },
-        {
-            "match_genres": ["cro", "instrumental", "Susjedi", "klape"],
-            "target_path": "{genre}/{year}/{artist} - {title}"
-        },
-		{
-			"match_genres": ["samba"],
-            "target_path": "latin/{artist} - {title}"
-		}
-    ]
+  "routing_rules": [
+    {
+      "match_genres": [
+        "patriotic",
+        "domoljubne"
+      ],
+      "target_path": "Cro/Domoljubne/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "pop"
+      ],
+      "target_path": "{year}/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "jazz",
+        "religiozne",
+        "oldies",
+        "x-mas",
+        "country",
+        "slow",
+        "metal",
+        "navijacke",
+        "rock",
+        "dance",
+        "trance",
+        "electronic",
+        "funk",
+        "blues",
+        "reggae",
+        "latin"
+      ],
+      "target_path": "{genre}/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "acoustic"
+      ],
+      "target_path": "akustika/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "club"
+      ],
+      "target_path": "clubbing/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "dječje",
+        "djecje"
+      ],
+      "target_path": "djecje/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "Zabavne"
+      ],
+      "target_path": "Cro {genre}/{year}/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "cro",
+        "instrumental",
+        "Susjedi",
+        "klape",
+        "world music"
+      ],
+      "target_path": "{genre}/{year}/{artist} - {title}"
+    },
+    {
+      "match_genres": [
+        "samba"
+      ],
+      "target_path": "latin/{artist} - {title}"
+    }
+  ],
+  "default_rule": null
 }
