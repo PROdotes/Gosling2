@@ -6,6 +6,7 @@
 import {
     changeRejectReason,
     cleanupOriginalFile,
+    clearRejectReason,
     deleteSong,
     formatText,
     getDeletedSong,
@@ -110,6 +111,7 @@ export class SongActionsHandler {
             "reject-reason",
             "reject-cancel",
             "change-reject-reason",
+            "clear-reject-reason",
             "close-spotify-modal",
             "close-splitter-modal",
             "close-filename-parser-modal",
@@ -359,21 +361,61 @@ export class SongActionsHandler {
         const id = actionTarget.dataset.id;
         const reason = actionTarget.dataset.reason;
         if (!id || !reason) return;
+        await this._applyDeletedSongReason(
+            actionTarget,
+            id,
+            () => changeRejectReason(id, reason),
+            "Reason change failed",
+        );
+    }
 
-        actionTarget.disabled = true;
+    async handleClearRejectReason(actionTarget) {
+        const id = actionTarget.dataset.id;
+        if (!id) return;
+        await this._applyDeletedSongReason(
+            actionTarget,
+            id,
+            () => clearRejectReason(id),
+            "Reason clear failed",
+        );
+    }
+
+    // Shared by the reason toggle and "Not rejected": lock the whole row so two
+    // quick clicks can't race, and only re-render if this song is still shown.
+    async _applyDeletedSongReason(actionTarget, id, apply, failLabel) {
+        const row = actionTarget.closest("[data-deleted-song-id]");
+        const buttons = row ? [...row.querySelectorAll("button")] : [actionTarget];
+        const wasDisabled = buttons.map((b) => b.disabled);
+        buttons.forEach((b) => (b.disabled = true));
+        const unlock = () =>
+            buttons.forEach((b, i) => (b.disabled = wasDisabled[i]));
+
         try {
-            await changeRejectReason(id, reason);
-            const fresh = await getDeletedSong(id);
-            renderDeletedSongView(fresh);
+            await apply();
         } catch (err) {
-            actionTarget.disabled = false;
+            unlock();
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(`${failLabel}: ${err.message}`, "error");
+            }
+            return;
+        }
+
+        let fresh;
+        try {
+            fresh = await getDeletedSong(id);
+        } catch (err) {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
-                    `Reason change failed: ${err.message}`,
+                    `Saved, but refreshing the view failed: ${err.message}`,
                     "error",
                 );
             }
+            return;
         }
+        const stillShown = document.querySelector(
+            `[data-deleted-song-id="${id}"]`,
+        );
+        if (stillShown) renderDeletedSongView(fresh);
     }
 
     async handleToggleActive(actionTarget, event) {

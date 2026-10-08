@@ -1224,6 +1224,8 @@ export function renderDeletedSongView(song) {
                 return `<button class="${active ? "active" : ""}" data-action="change-reject-reason" data-id="${song.id}" data-reason="${escapeHtml(reason)}"${active ? " disabled" : ""}>${escapeHtml(reason)}</button>`;
             })
             .join("");
+        const noReason = !song.is_rejected;
+        const clearReason = `<button class="reason-clear-btn${noReason ? " active" : ""}" data-action="clear-reject-reason" data-id="${song.id}"${noReason ? " disabled" : ""}>Not rejected</button>`;
         scroll.innerHTML = `
 <div class="editor-section">
   <div class="editor-section-title">Deleted Song</div>
@@ -1237,7 +1239,10 @@ export function renderDeletedSongView(song) {
   </div>
   <div class="editor-field">
     <label class="editor-label">Reason</label>
-    <div class="reason-toggle-group">${reasonToggle}</div>
+    <div class="reason-row" data-deleted-song-id="${song.id}">
+      <div class="reason-toggle-group">${reasonToggle}</div>
+      ${clearReason}
+    </div>
   </div>
 </div>`;
     }

@@ -1,6 +1,7 @@
 """
 End-to-end coverage for the reject/change-reason mutate payloads sent by
-src/static/js/dashboard/api.js (rejectSong, changeRejectReason).
+src/static/js/dashboard/api.js (rejectSong, changeRejectReason,
+clearRejectReason).
 
 These hit POST /api/v1/mutate against a real populated_db and assert real
 DB state, not just that fetch was called with a given body.
@@ -124,6 +125,31 @@ class TestChangeRejectReason:
         assert bool(row["IsDeleted"]) is True
         assert row["SourceNotes"] == "REJECTED: WRONG METADATA"
 
+    def test_clear_reason_turns_reject_into_plain_delete(self, api, populated_db):
+        # Mirrors clearRejectReason(): notes=null on an already-rejected song.
+        reject_resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "update": [{"type": "song", "id": 1, "notes": "REJECTED: BAD SONG"}],
+                "delete": [{"type": "song", "id": 1}],
+            },
+        )
+        assert reject_resp.status_code == 200, reject_resp.text
+
+        clear_resp = api.post(
+            "/api/v1/mutate",
+            json={"update": [{"type": "song", "id": 1, "notes": None}]},
+        )
+        assert clear_resp.status_code == 200, clear_resp.text
+
+        row = _media_row(populated_db, 1)
+        assert bool(row["IsDeleted"]) is True
+        assert row["SourceNotes"] is None
+
+        deleted = api.get("/api/v1/songs/1/deleted")
+        assert deleted.status_code == 200, deleted.text
+        assert deleted.json()["reject_reason"] is None
+
     def test_change_reason_on_nonexistent_song_returns_404_and_writes_nothing(
         self, api, populated_db
     ):
@@ -201,6 +227,29 @@ class TestGetDeletedSongEndpoint:
         assert body["source_path"] is None
         assert body["reject_reason"] is None
 
+    def test_legacy_bare_rejected_note_counts_as_rejected_without_reason(self, api):
+        # Older rows hold exactly "REJECTED" (no colon, no reason).
+        resp = api.post(
+            "/api/v1/mutate",
+            json={
+                "update": [{"type": "song", "id": 1, "notes": "REJECTED"}],
+                "delete": [{"type": "song", "id": 1}],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+
+        body = api.get("/api/v1/songs/1/deleted").json()
+        assert body["is_rejected"] is True
+        assert body["reject_reason"] is None
+
+    def test_plain_delete_is_not_rejected(self, api):
+        resp = api.post("/api/v1/mutate", json={"delete": [{"type": "song", "id": 2}]})
+        assert resp.status_code == 200, resp.text
+
+        body = api.get("/api/v1/songs/2/deleted").json()
+        assert body["is_rejected"] is False
+        assert body["reject_reason"] is None
+
     def test_404_for_a_live_song(self, api):
         resp = api.get("/api/v1/songs/1/deleted")
         assert resp.status_code == 404, resp.text
@@ -208,3 +257,25 @@ class TestGetDeletedSongEndpoint:
     def test_404_for_a_nonexistent_song(self, api):
         resp = api.get("/api/v1/songs/99999/deleted")
         assert resp.status_code == 404, resp.text
+
+
+class TestIngestionReportRejectFields:
+    # The ingest conflict card reads these instead of parsing notes itself.
+    @pytest.mark.parametrize(
+        "notes, is_rejected, reason",
+        [
+            (None, False, None),
+            ("some other note", False, None),
+            ("REJECTED", True, None),
+            ("REJECTED:", True, None),
+            ("REJECTED: DUPLICATE", True, "DUPLICATE"),
+            ("REJECTED: AI GENERATED", True, "AI GENERATED"),
+        ],
+    )
+    def test_reject_fields_from_notes(self, notes, is_rejected, reason):
+        from src.models.view_models import IngestionReportView
+
+        view = IngestionReportView(status="CONFLICT", notes=notes)
+        dumped = view.model_dump()
+        assert dumped["is_rejected"] is is_rejected
+        assert dumped["reject_reason"] == reason

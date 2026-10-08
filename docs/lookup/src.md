@@ -8,7 +8,7 @@
 **Responsibility**: Domain entities and API view models. Not covered by a dedicated lookup doc — read the files directly.
 
 - `domain.py` — core domain dataclasses (Song, SongCredit, MediaSource, etc., 11 classes).
-- `view_models.py` — pydantic API views: `SongView`/`SongSlimView`, `AlbumView`/`AlbumSlimView`, `IdentityView`/`IdentitySlimView`, `TagView`, `PublisherView`, `ArtistChipView`, `IngestionReportView`, plus request bodies. Slim views are the list/search shapes; full views hydrate detail endpoints.
+- `view_models.py` — pydantic API views: `SongView`/`SongSlimView`, `AlbumView`/`AlbumSlimView`, `IdentityView`/`IdentitySlimView`, `TagView`, `PublisherView`, `ArtistChipView`, `IngestionReportView`, `DeletedSongView`, plus request bodies. The "is this rejected" rule (notes start with `REJECTED`, bare legacy form included) lives once here as computed `is_rejected`/`reject_reason` on both `DeletedSongView` and `IngestionReportView`. Slim views are the list/search shapes; full views hydrate detail endpoints.
 - `exceptions.py` — shared exception types (4 classes, e.g. MergeRequiredError).
 - `metadata_frames.py` — ID3 frame mapping structures.
 

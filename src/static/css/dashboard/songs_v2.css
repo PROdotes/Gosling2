@@ -571,6 +571,47 @@
     cursor: default;
 }
 
+/* Wraps so a narrow editor drops "Not rejected" below the reasons instead of
+   pushing it past the panel edge. */
+#songs-workspace .reason-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: stretch;
+}
+
+#songs-workspace .reason-row .reason-toggle-group {
+    flex: 1 1 260px;
+}
+
+/* Not a reason: clears the reject so the song is a plain delete. Kept outside
+   the segmented group and neutral-styled so it doesn't read as a fourth reason. */
+#songs-workspace .reason-clear-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+    font-style: italic;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+
+#songs-workspace .reason-clear-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+#songs-workspace .reason-clear-btn.active {
+    border-style: solid;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    cursor: default;
+}
+
 /* ── EDITOR FORM ────────────────────────────────────────────────────────── */
 
 #songs-workspace .editor-song-id {

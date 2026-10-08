@@ -59,6 +59,8 @@ EXPECTED_INGESTION_FIELDS = {
     "original_exists",
     "incoming_title",
     "incoming_artist",
+    "is_rejected",
+    "reject_reason",
     "status_label",
     "status_severity",
     "formatted_duration",

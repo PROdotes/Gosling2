@@ -445,6 +445,13 @@ export function changeRejectReason(id, reason) {
     });
 }
 
+// Deleted-song view only: on a live song this would just wipe its notes.
+export function clearRejectReason(id) {
+    return mutate({
+        update: [{ type: "song", id: Number(id), notes: null }],
+    });
+}
+
 export function moveSongToLibrary(id) {
     return mutate({ update: [{ type: "song", id: Number(id), move_to_library: true }] });
 }

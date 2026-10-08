@@ -125,6 +125,9 @@ Sets `notes` to `REJECTED: {reason}` and soft-deletes the song in one mutate cal
 ### changeRejectReason(id, reason)
 Updates `notes` to a new `REJECTED: {reason}` on an already-deleted song — update only, no delete (the song is already soft-deleted).
 
+### clearRejectReason(id)
+Sets `notes` to null on an already-deleted song, turning a reject into a plain delete — update only, no delete.
+
 ### moveSongToLibrary(id)
 Moves song from staging to organized library.
 

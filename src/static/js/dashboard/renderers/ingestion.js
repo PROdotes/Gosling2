@@ -779,9 +779,9 @@ function createResultCard(result, path) {
             ${
                 status === "CONFLICT"
                     ? (() => {
-                        const isRejected = result.notes && result.notes.startsWith("REJECTED");
+                        const isRejected = result.is_rejected;
                         const rejectReason = isRejected
-                            ? (result.notes.split(":")[1] || "").trim() || "UNSPECIFIED"
+                            ? result.reject_reason || "UNSPECIFIED"
                             : null;
                         const rejectedLabel = isRejected
                             ? `Rejected Song (${rejectReason})`

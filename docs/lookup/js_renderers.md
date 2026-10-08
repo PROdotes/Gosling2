@@ -54,7 +54,7 @@ Renders the multi-edit editor: the collapsed virtual SongView through renderSong
 Renders the placeholder view when no song is selected.
 
 ### renderDeletedSongView(song)
-Bare, read-only view for a soft-deleted song (`DeletedSongView` — no credits/albums/tags, hard-deleted at delete time). Shows a reject-reason toggle (`change-reject-reason` action) instead of the full editor.
+Bare, read-only view for a soft-deleted song (`DeletedSongView` — no credits/albums/tags, hard-deleted at delete time). Shows a reject-reason toggle (`change-reject-reason` action, plus a separate neutral "Not rejected" button with `clear-reject-reason`, active when `is_rejected` is false). Selected state comes from the backend's `is_rejected`/`reject_reason`, never parsed from notes) instead of the full editor.
 
 ### renderActionSidebar(container, song)
 Renders the vertical action column (Organization, Cleanup, etc).

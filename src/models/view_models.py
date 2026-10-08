@@ -237,6 +237,21 @@ class SongSlimView(BaseModel):
         )
 
 
+_REJECTED_PREFIX = "REJECTED"
+
+
+def _is_rejected_note(notes: Optional[str]) -> bool:
+    # Bare "REJECTED" (no colon/reason) exists in legacy rows and still counts.
+    return bool(notes) and notes.startswith(_REJECTED_PREFIX)
+
+
+def _reject_reason_from_note(notes: Optional[str]) -> Optional[str]:
+    if not _is_rejected_note(notes):
+        return None
+    reason = notes[len(_REJECTED_PREFIX) :].lstrip(":").strip()
+    return reason or None
+
+
 class DeletedSongView(BaseModel):
     """Bare view-model for a soft-deleted song (rejected or plain-deleted). All
     credit/album/tag/publisher links are hard-deleted at delete time (see
@@ -256,10 +271,13 @@ class DeletedSongView(BaseModel):
 
     @computed_field
     @property
+    def is_rejected(self) -> bool:
+        return _is_rejected_note(self.notes)
+
+    @computed_field
+    @property
     def reject_reason(self) -> Optional[str]:
-        if not self.notes or not self.notes.startswith("REJECTED:"):
-            return None
-        return self.notes[len("REJECTED:") :].strip()
+        return _reject_reason_from_note(self.notes)
 
     @classmethod
     def from_row(cls, row: dict) -> "DeletedSongView":
@@ -818,6 +836,16 @@ class IngestionReportView(BaseModel):
     # so the UI can show what was scanned next to what it matched)
     incoming_title: Optional[str] = None
     incoming_artist: Optional[str] = None
+
+    @computed_field
+    @property
+    def is_rejected(self) -> bool:
+        return _is_rejected_note(self.notes)
+
+    @computed_field
+    @property
+    def reject_reason(self) -> Optional[str]:
+        return _reject_reason_from_note(self.notes)
 
     @computed_field
     @property
