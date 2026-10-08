@@ -247,6 +247,10 @@ The remaining work to call library management "complete":
 - **Lyrics** — Store and search song lyrics.
 - **External Data Sources** — MusicBrainz / AcousticBrainz / Last.fm enrichment.
 - **Mood/Energy Analysis** — Auto-detect mood/energy from audio (fields already exist).
+- **Language Detection** (idea, parked) — Suggest a Jezik tag from a ~30s clip via
+  offline Whisper language ID, hooked into the ingest ffmpeg pass. Suggest-only, never
+  auto-apply: mixed-language songs (Hebrew/Arabic Mizrahi, Balkan with Turkish loanwords)
+  get a confident single answer that may be wrong.
 
 ### Long-term: radio automation (playout)
 
