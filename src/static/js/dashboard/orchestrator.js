@@ -42,7 +42,7 @@ import { escapeHtml } from "./components/utils.js";
 import { showConfirm } from "./components/confirm_modal.js";
 import { showToast } from "./components/toast.js";
 import { createChipInput } from "./components/chip_input.js";
-import { openEditModal } from "./components/edit_modal.js";
+import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { parseTagInput } from "./utils/tag_input.js";
@@ -64,7 +64,7 @@ async function withMergeConfirm(updateFn, mergeFn, confirmMsg, confirmTitle, onM
             const confirmed = await showConfirm(confirmMsg, { title: confirmTitle, okLabel: "Merge" });
             if (confirmed) {
                 await mergeFn(err.detail.collision_id);
-                if (onMerged) onMerged();
+                if (onMerged) await onMerged(err.detail.collision_id);
             }
         } else if (err.detail?.code === "UNSAFE_MERGE") {
             throw new Error(err.detail.message);
@@ -512,7 +512,24 @@ export async function manageArtist(ctx, artistId, artistName, songId = null) {
                     (collisionId) => mergeIdentity(primary.id, collisionId),
                     `"${val}" already exists. Merge into existing identity?`,
                     "Merge Identity",
-                    () => { if (ctx.refreshLayout) ctx.refreshLayout(); },
+                    async (collisionId) => {
+                        if (ctx.refreshLayout) ctx.refreshLayout();
+                        // This identity is gone; keep the modal open on the merge target.
+                        // collisionId is a NameID; search by the typed name always returns it
+                        // (collision = exact case-insensitive match) and carries its owner.
+                        const results = await searchArtistNames(val);
+                        const target =
+                            results === ABORTED
+                                ? null
+                                : (results || []).find((a) => a.name_id === collisionId);
+                        if (!target) {
+                            // Never leave the modal bound to the merged-away identity.
+                            closeEditModal();
+                            showToast("Merged. Reopen the artist to keep editing.", "warning", 4000);
+                            return;
+                        }
+                        await manageArtist(ctx, target.owner_identity_id, target.display_name, songId);
+                    },
                 );
             },
         },
@@ -631,7 +648,11 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                         (collisionId) => mergePublisher(publisherId, collisionId),
                         `"${val}" already exists. Merge into existing publisher?`,
                         "Merge Publisher",
-                        () => { if (ctx.refreshActiveDetail) ctx.refreshActiveDetail(); },
+                        async (collisionId) => {
+                            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            // This publisher is gone; keep the modal open on the merge target.
+                            await managePublisher(ctx, collisionId, val);
+                        },
                     );
                 },
             },
@@ -709,7 +730,11 @@ export async function manageTag(ctx, tagId) {
                         (collisionId) => mergeTag(tagId, collisionId),
                         `"${val}" already exists in this category. Merge into existing tag?`,
                         "Merge Tag",
-                        () => { if (ctx.refreshActiveDetail) ctx.refreshActiveDetail(); },
+                        async (collisionId) => {
+                            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            // This tag is gone; keep the modal open on the merge target.
+                            await manageTag(ctx, collisionId);
+                        },
                     );
                 },
             },
@@ -727,7 +752,10 @@ export async function manageTag(ctx, tagId) {
                         (collisionId) => mergeTag(tagId, collisionId),
                         `"${tagDetail.name}" already exists in category "${val}". Merge into existing tag?`,
                         "Merge Tag",
-                        () => { if (ctx.refreshActiveDetail) ctx.refreshActiveDetail(); },
+                        async (collisionId) => {
+                            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+                            await manageTag(ctx, collisionId);
+                        },
                     );
                 },
                 onSearch: async (q) => {
