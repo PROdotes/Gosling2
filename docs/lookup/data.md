@@ -182,6 +182,9 @@ Get-or-create a Role by name. Returns role_id.
 ### get_name_id_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 Alternative accessor for find_by_display_name.
 
+### name_exists(name_id: int, conn: sqlite3.Connection) -> bool
+True if the ArtistName exists and is not soft-deleted. CreditMutator checks this before the rename collision check so a stale (merged-away) id 404s instead of re-offering a merge.
+
 ### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None, display_name_search: Optional[str] = None) -> int
 
 Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. When inserting a new name under an existing identity, it becomes the primary name if that identity has no active primary (otherwise an alias). Optionally populates the DisplayName_Search shadow column (diacritic-stripped lowercase) when inserting new rows. Returns name_id.

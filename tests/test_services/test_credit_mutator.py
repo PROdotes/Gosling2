@@ -230,6 +230,28 @@ class TestCreditMutatorUpdate:
         with pytest.raises(LookupError):
             mutator.apply_within("update", item, conn)
 
+    def test_update_soft_deleted_name_colliding_raises_lookup_not_merge(
+        self, mutator, conn
+    ):
+        # A name merged away is soft-deleted. A stale rename onto the merge target's
+        # name must 404, not raise MergeRequired (which re-offers a dead merge).
+        conn.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = 40")
+        item = UpdateCreditEntityItem.model_validate(
+            {"type": "credit", "id": 40, "display_name": "Dave Grohl"}
+        )
+        with pytest.raises(LookupError):
+            mutator.apply_within("update", item, conn)
+
+    def test_update_soft_deleted_name_does_not_rename_it(self, mutator, conn):
+        original = _get_display_name(conn, 40)
+        conn.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = 40")
+        item = UpdateCreditEntityItem.model_validate(
+            {"type": "credit", "id": 40, "display_name": "Brand New Name"}
+        )
+        with pytest.raises(LookupError):
+            mutator.apply_within("update", item, conn)
+        assert _get_display_name(conn, 40) == original
+
 
 # ---------------------------------------------------------------------------
 # search-shadow columns (phase 3.1 unit C.1)

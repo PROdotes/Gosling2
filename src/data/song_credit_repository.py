@@ -269,6 +269,14 @@ class SongCreditRepository(BaseRepository):
         ).fetchone()
         return row[0] if row else None
 
+    def name_exists(self, name_id: int, conn: sqlite3.Connection) -> bool:
+        """True if the ArtistName exists and is not soft-deleted."""
+        row = conn.execute(
+            "SELECT 1 FROM ArtistNames WHERE NameID = ? AND IsDeleted = 0",
+            (name_id,),
+        ).fetchone()
+        return row is not None
+
     def update_credit_name(
         self,
         name_id: int,
@@ -287,12 +295,12 @@ class SongCreditRepository(BaseRepository):
         cursor = conn.cursor()
         if new_name_search is not None:
             cursor.execute(
-                "UPDATE ArtistNames SET DisplayName = ?, DisplayName_Search = ? WHERE NameID = ?",
+                "UPDATE ArtistNames SET DisplayName = ?, DisplayName_Search = ? WHERE NameID = ? AND IsDeleted = 0",
                 (new_name, new_name_search, name_id),
             )
         else:
             cursor.execute(
-                "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?",
+                "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ? AND IsDeleted = 0",
                 (new_name, name_id),
             )
         logger.debug("[SongCreditRepository] <- update_credit_name() done")
