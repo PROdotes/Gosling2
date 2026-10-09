@@ -76,6 +76,9 @@ class PublisherMutator:
         if not fields:
             return
         if "name" in fields:
+            # Existence first: a stale id (e.g. merged away) must 404, not offer a merge.
+            if self._repo.get_by_id(item.id, conn) is None:
+                raise LookupError(f"Publisher {item.id} not found")
             existing_id = self._repo.find_by_name(item.name, conn)
             if existing_id is not None and existing_id != item.id:
                 raise MergeRequiredError("publisher", existing_id)

@@ -575,7 +575,7 @@ class PublisherRepository(BaseRepository):
         )
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE Publishers SET PublisherName = ? WHERE PublisherID = ?",
+            "UPDATE Publishers SET PublisherName = ? WHERE PublisherID = ? AND IsDeleted = 0",
             (name, publisher_id),
         )
         if cursor.rowcount == 0:
